@@ -1,107 +1,67 @@
--- Fast Stamina Regeneration Only
--- Focuses on instant regen without blocking game mechanics
+-- Infinity Stamina Script
+-- Path: game:GetService("Players").LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-print("⏳ Loading Fast Stamina Regen...")
-task.wait(2)
+-- Tunggu hingga player dan GUI siap
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Main = PlayerGui:WaitForChild("Main")
+local HomePage = Main:WaitForChild("HomePage")
+local Property = HomePage:WaitForChild("Property")
+local StaminaFrame = Property:WaitForChild("Stamina")
+local Bar = StaminaFrame:WaitForChild("Frame"):WaitForChild("Bar")
 
--- Load required modules
+-- Akses Value module
 local Value = require(ReplicatedStorage.Shared.Core.Value)
 local Config = require(ReplicatedStorage.Config)
-local Buff = require(ReplicatedStorage.Shared.Features.Buff)
 
--- Get original values
+-- Dapatkan nilai stamina maksimal
 local maxStamina = Config.Property.StaminaSystem.stamina.default
-local originalRegen = Config.Property.StaminaSystem.naturalRecovery
-local originalDelay = Config.Property.StaminaSystem.delayRecoveryTime
 
-print("📊 Original Settings:")
-print("  Max Stamina:", maxStamina)
-print("  Regen Rate:", originalRegen)
-print("  Regen Delay:", originalDelay)
-
--- ===== BOOST 1: INCREASE REGEN SPEED =====
--- Multiply regen speed by 500x (super fast recovery)
-Config.Property.StaminaSystem.naturalRecovery = originalRegen * 500
-
-print("✓ Regen speed boosted: " .. originalRegen .. " → " .. (originalRegen * 500))
-
--- ===== BOOST 2: REMOVE REGEN DELAY =====
--- Set delay to 0 so regen starts immediately
-Config.Property.StaminaSystem.delayRecoveryTime = 0
-
-print("✓ Regen delay removed: " .. originalDelay .. " → 0")
-
--- ===== BOOST 3: HOOK BUFF SYSTEM FOR REGEN =====
--- Override StaminaRegenRate buff to always boost regen
-Buff.OnChanged("StaminaRegenRate", function(arg1, arg2, arg3)
-    -- Apply massive multiplier to any regen buff
-    Config.Property.StaminaSystem.naturalRecovery = (originalRegen + arg2) * 500
-    print("🔥 Regen buff applied with 500x multiplier")
-end, {
-    replay = true
-})
-
-print("✓ Buff system hooked for max regen")
-
--- ===== BOOST 4: FORCE INSTANT RECOVERY =====
--- When stamina drops below max, boost regen even more
-local boostConnection = RunService.Heartbeat:Connect(function()
-    local currentStamina = Value.Stamina
+-- Fungsi untuk set infinity stamina
+local function setInfinityStamina()
+    -- Set stamina ke maksimal
+    Value.Stamina = maxStamina
     
-    -- If stamina is not full, temporarily boost regen to instant
-    if currentStamina < maxStamina then
-        -- Add instant regen boost
-        local regenAmount = (maxStamina - currentStamina) * 0.5 -- Recover 50% of missing stamina per frame
-        Value.Stamina = math.min(currentStamina + regenAmount, maxStamina)
-    end
-end)
-
-print("✓ Instant recovery active when stamina depletes")
-
--- ===== MONITOR REGEN IN ACTION =====
-local lastStamina = maxStamina
-task.spawn(function()
-    while task.wait(1) do
-        local currentStamina = Value.Stamina
-        if currentStamina ~= lastStamina then
-            local change = currentStamina - lastStamina
-            local changeSymbol = change > 0 and "▲" or "▼"
-            print(string.format("💪 Stamina %s: %.1f (%.1f/sec)", 
-                changeSymbol, currentStamina, change))
-        end
-        lastStamina = currentStamina
-    end
-end)
-
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("✅ FAST REGEN ACTIVATED!")
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("Benefits:")
-print("  • Regen speed: 500x faster")
-print("  • Regen delay: Removed")
-print("  • Instant recovery when depleted")
-print("  • Normal running mechanics")
-print("")
-print("Your stamina will regenerate INSTANTLY!")
-print("Press F9 to monitor regen rate")
-print("")
-print("To disable: _G.DisableFastRegen()")
-
--- Disable function
-_G.DisableFastRegen = function()
-    if boostConnection then
-        boostConnection:Disconnect()
-    end
+    -- Sembunyikan stamina bar (karena selalu penuh)
+    StaminaFrame.Visible = false
     
-    -- Restore original values
-    Config.Property.StaminaSystem.naturalRecovery = originalRegen
-    Config.Property.StaminaSystem.delayRecoveryTime = originalDelay
-    
-    print("❌ Fast Regen DISABLED")
-    print("Stamina system restored to normal")
+    -- Set ukuran bar ke penuh
+    Bar.Size = UDim2.fromScale(1, 1)
 end
 
-print("✅ Ready! Your stamina now regens INSTANTLY!")
+-- Hook RunService untuk terus mengisi stamina
+local connection = RunService.PreRender:Connect(function()
+    -- Selalu set stamina ke maksimal
+    Value.Stamina = maxStamina
+    
+    -- Pastikan running selalu enabled (tidak kehabisan stamina)
+    if Value.Run then
+        Value.Run = Value.Run
+    end
+    
+    -- Set bar size ke penuh
+    Bar.Size = UDim2.fromScale(1, 1)
+end)
+
+-- Set infinity stamina pertama kali
+setInfinityStamina()
+
+print("Infinity Stamina Activated!")
+print("Press F9 to see console messages")
+
+-- Fungsi untuk disable (opsional)
+local function disableInfinityStamina()
+    if connection then
+        connection:Disconnect()
+        print("Infinity Stamina Disabled!")
+    end
+end
+
+-- Return fungsi disable jika ingin dimatikan nanti
+return {
+    Disable = disableInfinityStamina
+}
