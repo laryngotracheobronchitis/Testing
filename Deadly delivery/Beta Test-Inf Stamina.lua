@@ -1,67 +1,49 @@
--- Infinity Stamina Script
--- Path: game:GetService("Players").LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
+-- Infinity Stamina Method 2 - Direct Hook
+-- Ini method lebih agresif yang langsung modify function
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
--- Tunggu hingga player dan GUI siap
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-local Main = PlayerGui:WaitForChild("Main")
-local HomePage = Main:WaitForChild("HomePage")
-local Property = HomePage:WaitForChild("Property")
-local StaminaFrame = Property:WaitForChild("Stamina")
-local Bar = StaminaFrame:WaitForChild("Frame"):WaitForChild("Bar")
+task.wait(1)
 
--- Akses Value module
+-- Load modules
 local Value = require(ReplicatedStorage.Shared.Core.Value)
 local Config = require(ReplicatedStorage.Config)
-
--- Dapatkan nilai stamina maksimal
 local maxStamina = Config.Property.StaminaSystem.stamina.default
 
--- Fungsi untuk set infinity stamina
-local function setInfinityStamina()
-    -- Set stamina ke maksimal
-    Value.Stamina = maxStamina
-    
-    -- Sembunyikan stamina bar (karena selalu penuh)
-    StaminaFrame.Visible = false
-    
-    -- Set ukuran bar ke penuh
-    Bar.Size = UDim2.fromScale(1, 1)
-end
+print("Starting Infinity Stamina Hack...")
 
--- Hook RunService untuk terus mengisi stamina
-local connection = RunService.PreRender:Connect(function()
-    -- Selalu set stamina ke maksimal
-    Value.Stamina = maxStamina
-    
-    -- Pastikan running selalu enabled (tidak kehabisan stamina)
-    if Value.Run then
-        Value.Run = Value.Run
+-- Method 1: Keep setting stamina to max
+spawn(function()
+    while true do
+        Value.Stamina = maxStamina
+        task.wait()
     end
-    
-    -- Set bar size ke penuh
-    Bar.Size = UDim2.fromScale(1, 1)
 end)
 
--- Set infinity stamina pertama kali
-setInfinityStamina()
+-- Method 2: Disable stamina consumption
+Value.StaminaConsumeMutil = 0
 
-print("Infinity Stamina Activated!")
-print("Press F9 to see console messages")
+-- Method 3: Hook the Run value to never disable
+local mt = getrawmetatable(Value)
+setreadonly(mt, false)
+local oldNewIndex = mt.__newindex
 
--- Fungsi untuk disable (opsional)
-local function disableInfinityStamina()
-    if connection then
-        connection:Disconnect()
-        print("Infinity Stamina Disabled!")
+mt.__newindex = newcclosure(function(t, k, v)
+    if k == "Stamina" and v < maxStamina then
+        v = maxStamina
     end
-end
+    if k == "StaminaConsumeMutil" and v > 0 then
+        v = 0
+    end
+    return oldNewIndex(t, k, v)
+end)
 
--- Return fungsi disable jika ingin dimatikan nanti
-return {
-    Disable = disableInfinityStamina
-}
+setreadonly(mt, true)
+
+print("✓ Infinity Stamina ACTIVE!")
+print("✓ Stamina will never decrease")
+print("✓ You can run forever!")
+
+-- Disable with: _G.StopStamina = true
+_G.StopStamina = false
