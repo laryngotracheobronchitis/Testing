@@ -1,11 +1,11 @@
--- Advanced Infinity Stamina - Metamethod Hook
--- This prevents stamina from EVER decreasing
+-- Infinity Stamina - Block Frame Only (Non-Intrusive)
+-- Blocks stamina reduction without affecting run mechanics
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-print("⏳ Loading Advanced Infinity Stamina...")
+print("⏳ Loading Non-Intrusive Infinity Stamina...")
 task.wait(2)
 
 -- Load modules
@@ -16,95 +16,102 @@ local Config = require(ReplicatedStorage.Config)
 local maxStamina = Config.Property.StaminaSystem.stamina.default
 print("📊 Max Stamina:", maxStamina)
 
--- Set initial stamina to max
+-- Set stamina to max initially
 Value.Stamina = maxStamina
 
--- ===== METHOD 1: METATABLE HOOK (MOST POWERFUL) =====
-print("🔧 Hooking metatable...")
-
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-local oldIndex = mt.__index
-local oldNewIndex = mt.__newindex
-
-setreadonly(mt, false)
-
--- Hook __newindex to prevent stamina from being set below max
-mt.__newindex = newcclosure(function(self, key, value)
-    if self == Value and key == "Stamina" then
-        -- Force stamina to always be max
-        if value < maxStamina then
-            value = maxStamina
-        end
-        print("🛡️ Blocked stamina decrease. Kept at:", maxStamina)
-    end
-    
-    if self == Value and key == "StaminaConsumeMutil" then
-        -- Force consume multiplier to 0
-        value = 0
-    end
-    
-    return oldNewIndex(self, key, value)
-end)
-
-setreadonly(mt, true)
-print("✓ Metatable hook installed")
-
--- ===== METHOD 2: DIRECT CONFIG MANIPULATION =====
--- Make stamina consume absolutely zero
-Config.Property.StaminaSystem.runStaminaConsume = 0
-Config.Property.StaminaSystem.naturalRecovery = 999999 -- Insane regen speed
-Config.Property.StaminaSystem.delayRecoveryTime = 0
-
-print("✓ Config modified:")
-print("  - Consume: 0")
-print("  - Regen: 999999")
-print("  - Delay: 0")
-
--- ===== METHOD 3: CONTINUOUS FORCED REFILL =====
--- Aggressively refill stamina every frame
-local refillConnection = RunService.RenderStepped:Connect(function()
-    -- Force stamina to max using rawset to bypass hooks
-    rawset(Value, "Stamina", maxStamina)
-end)
-
-print("✓ Continuous refill active")
-
--- ===== METHOD 4: OVERRIDE THE STAMINA SCRIPT =====
--- Find and modify the stamina consumption calculation
+-- ===== HIDE STAMINA BAR TO PREVENT VISUAL UPDATES =====
 task.spawn(function()
-    local success = pcall(function()
-        -- Set all consumption variables to 0
-        local stamVars = {
-            "runStaminaConsume_upvw",
-            "var17_upvw",
-            "var16_upvw"
-        }
+    pcall(function()
+        local StaminaFrame = Players.LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
+        local OriginalVisible = StaminaFrame.Visible
         
-        -- Try to access and zero out these variables
-        for i, varName in ipairs(stamVars) do
-            pcall(function()
-                getgenv()[varName] = 0
-            end)
-        end
+        -- Keep bar invisible so it doesn't update
+        StaminaFrame.Visible = false
+        print("✓ Stamina bar hidden (blocked frame updates)")
+        
+        -- Also set bar to full visually
+        StaminaFrame.Frame.Bar.Size = UDim2.fromScale(1, 1)
     end)
 end)
 
--- ===== METHOD 5: BLOCK STAMINA DECREASE IN BUFF SYSTEM =====
+-- ===== METHOD 1: SUPER FAST REGEN (999x FASTER) =====
+-- Instead of blocking consumption, make regen instant
+Config.Property.StaminaSystem.naturalRecovery = Config.Property.StaminaSystem.naturalRecovery * 999
+Config.Property.StaminaSystem.delayRecoveryTime = 0
+
+print("✓ Regen speed: 999x FASTER (instant recovery)")
+print("✓ Regen delay: REMOVED")
+
+-- ===== METHOD 2: REDUCE CONSUMPTION TO NEAR ZERO =====
+-- Make stamina drain 0.001% of original (basically nothing)
+Config.Property.StaminaSystem.runStaminaConsume = Config.Property.StaminaSystem.runStaminaConsume * 0.00001
+Value.StaminaConsumeMutil = 0.00001
+
+print("✓ Stamina consumption: 99.999% REDUCED")
+
+-- ===== METHOD 3: SMART REFILL (Only when needed) =====
+-- Only refill if stamina drops below 95%, don't touch if full
+local lastStamina = maxStamina
+local refillConnection = RunService.Heartbeat:Connect(function()
+    local currentStamina = Value.Stamina
+    
+    -- If stamina is dropping, instantly refill
+    if currentStamina < maxStamina * 0.95 then
+        Value.Stamina = maxStamina
+        print("🔋 Refilled stamina: " .. math.floor(currentStamina) .. " → " .. maxStamina)
+    end
+    
+    lastStamina = currentStamina
+end)
+
+print("✓ Smart auto-refill: ACTIVE")
+
+-- ===== METHOD 4: HOOK VALUE CHANGES (Gentle approach) =====
+-- Only intercept stamina DECREASES, allow normal function otherwise
+local oldStamina = Value.Stamina
+task.spawn(function()
+    while task.wait(0.05) do
+        local newStamina = Value.Stamina
+        
+        -- If stamina decreased, restore it
+        if newStamina < oldStamina - 1 then
+            Value.Stamina = maxStamina
+        end
+        
+        oldStamina = Value.Stamina
+    end
+end)
+
+print("✓ Decrease blocker: ACTIVE")
+
+-- ===== METHOD 5: OVERRIDE BUFF EFFECTS =====
 task.spawn(function()
     pcall(function()
         local Buff = require(ReplicatedStorage.Shared.Features.Buff)
         
-        -- Override Stamina buff to only allow increases
+        -- Make stamina consume buffs ineffective
+        Buff.OnChanged("StaminaConsumeRate", function(arg1, arg2, arg3)
+            -- Keep consumption minimal
+            local clamped = 0.00001
+            Config.Property.StaminaSystem.runStaminaConsume = Config.Property.StaminaSystem.runStaminaConsume * clamped
+            Value.StaminaConsumeMutil = clamped
+        end, { replay = true })
+        
+        -- Boost regen buffs massively
+        Buff.OnChanged("StaminaRegenRate", function(arg1, arg2, arg3)
+            Config.Property.StaminaSystem.naturalRecovery = Config.Property.StaminaSystem.naturalRecovery * 999
+        end, { replay = true })
+        
+        -- Block negative stamina buffs
         Buff.OnApply("Stamina", function(arg1, arg2)
             local change = arg2:Get()
-            if change > 0 then
-                -- Allow stamina increase
-                Value.Stamina = math.min(Value.Stamina + change, maxStamina)
-            else
-                -- Block stamina decrease
+            if change < 0 then
+                -- Block negative changes
                 Value.Stamina = maxStamina
-                print("🛡️ Blocked stamina decrease from buff")
+                print("🛡️ Blocked negative stamina buff")
+            else
+                -- Allow positive changes
+                Value.Stamina = math.min(Value.Stamina + change, maxStamina)
             end
         end)
         
@@ -112,44 +119,34 @@ task.spawn(function()
     end)
 end)
 
--- ===== METHOD 6: ALTERNATIVE HEARTBEAT REFILL =====
-local heartbeatConnection = RunService.Heartbeat:Connect(function()
-    if Value.Stamina ~= maxStamina then
-        Value.Stamina = maxStamina
-    end
-end)
-
--- ===== STATUS DISPLAY =====
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("✅ ADVANCED INFINITY STAMINA!")
-print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("Active protections:")
-print("  ✓ Metatable hook")
-print("  ✓ Config override") 
-print("  ✓ Continuous refill")
-print("  ✓ Buff system block")
-print("  ✓ Multi-layer protection")
-print("")
-print("Your stamina CANNOT decrease!")
-print("Press F9 to monitor status")
-
--- Monitor stamina changes
+-- ===== STATUS MONITOR =====
 task.spawn(function()
-    local lastStamina = Value.Stamina
-    while task.wait(0.5) do
+    while task.wait(3) do
         local currentStamina = Value.Stamina
-        if currentStamina ~= lastStamina then
-            print(string.format("💪 Stamina: %.1f → %.1f", lastStamina, currentStamina))
-            lastStamina = currentStamina
-        end
+        local percentage = math.floor((currentStamina / maxStamina) * 100)
+        print(string.format("💪 Stamina: %d/%d (%d%%)", 
+            math.floor(currentStamina), maxStamina, percentage))
     end
 end)
+
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("✅ INFINITY STAMINA ACTIVE!")
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("Features:")
+print("  • Stamina bar hidden (no frame updates)")
+print("  • Consumption reduced to 0.001%")
+print("  • Regen speed increased 999x")
+print("  • Instant refill when stamina drops")
+print("  • You CAN run normally!")
+print("")
+print("To disable: _G.DisableStamina()")
 
 -- Disable function
 _G.DisableStamina = function()
-    if refillConnection then refillConnection:Disconnect() end
-    if heartbeatConnection then heartbeatConnection:Disconnect() end
+    if refillConnection then 
+        refillConnection:Disconnect() 
+    end
     print("❌ Infinity Stamina DISABLED")
 end
 
-print("Ready! Run and your stamina stays full!")
+print("✅ Ready! Try running now!")
