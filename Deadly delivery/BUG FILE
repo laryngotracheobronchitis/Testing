@@ -1,11 +1,11 @@
--- Infinity Stamina - Direct Active (No consumption at all)
--- Stamina will never decrease and always stay full
+-- Infinity Stamina - Aggressive Loop Version
+-- Multiple loops to ensure stamina NEVER decreases
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-print("⏳ Loading Infinity Stamina...")
+print("⏳ Loading Infinity Stamina (Loop Version)...")
 task.wait(1)
 
 -- Load required modules
@@ -16,90 +16,154 @@ local Config = require(ReplicatedStorage.Config)
 local maxStamina = Config.Property.StaminaSystem.stamina.default
 
 print("📊 Max Stamina:", maxStamina)
-print("🔧 Activating Infinity Stamina...")
+print("🔧 Starting aggressive loops...")
 
--- Set initial stamina to max
+-- Set initial values
 Value.Stamina = maxStamina
-
--- ===== STEP 1: SET CONSUMPTION TO ZERO =====
 Config.Property.StaminaSystem.runStaminaConsume = 0
-Value.StaminaConsumeMutil = 0
-
-print("✓ Stamina consumption set to 0")
-
--- ===== STEP 2: SET SUPER FAST REGEN =====
 Config.Property.StaminaSystem.naturalRecovery = 99999
 Config.Property.StaminaSystem.delayRecoveryTime = 0
+Value.StaminaConsumeMutil = 0
 
-print("✓ Regen speed: 99999")
-print("✓ Regen delay: 0")
+print("✓ Initial config set")
 
--- ===== STEP 3: KEEP STAMINA ALWAYS FULL =====
--- This ensures stamina never goes below max
-local keepFullConnection = RunService.Heartbeat:Connect(function()
-    if Value.Stamina < maxStamina then
+-- ===== LOOP 1: RENDERSTEPPED (Highest priority, runs before rendering) =====
+local loop1 = RunService.RenderStepped:Connect(function()
+    Value.Stamina = maxStamina
+    Value.StaminaConsumeMutil = 0
+    Config.Property.StaminaSystem.runStaminaConsume = 0
+end)
+
+print("✓ Loop 1 (RenderStepped) active")
+
+-- ===== LOOP 2: HEARTBEAT (Runs every frame) =====
+local loop2 = RunService.Heartbeat:Connect(function()
+    Value.Stamina = maxStamina
+    Config.Property.StaminaSystem.naturalRecovery = 99999
+end)
+
+print("✓ Loop 2 (Heartbeat) active")
+
+-- ===== LOOP 3: STEPPED (Physics step) =====
+local loop3 = RunService.Stepped:Connect(function()
+    if Value.Stamina ~= maxStamina then
         Value.Stamina = maxStamina
     end
 end)
 
-print("✓ Auto-refill system active")
+print("✓ Loop 3 (Stepped) active")
 
--- ===== STEP 4: HIDE STAMINA BAR =====
+-- ===== LOOP 4: FAST WHILE LOOP (Background task) =====
+local loop4Running = true
 task.spawn(function()
-    task.wait(0.5)
-    local success = pcall(function()
-        local StaminaFrame = Players.LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
-        StaminaFrame.Visible = false
-        StaminaFrame.Frame.Bar.Size = UDim2.fromScale(1, 1)
-        print("✓ Stamina bar hidden")
-    end)
-    if not success then
-        warn("⚠ Could not hide stamina bar (not critical)")
+    while loop4Running do
+        Value.Stamina = maxStamina
+        Value.StaminaConsumeMutil = 0
+        task.wait() -- Runs as fast as possible
     end
 end)
 
--- ===== STEP 5: OVERRIDE BUFF SYSTEM =====
+print("✓ Loop 4 (Fast while) active")
+
+-- ===== LOOP 5: MODERATE WHILE LOOP (Every 0.05 seconds) =====
+local loop5Running = true
+task.spawn(function()
+    while loop5Running do
+        Value.Stamina = maxStamina
+        Config.Property.StaminaSystem.runStaminaConsume = 0
+        Config.Property.StaminaSystem.naturalRecovery = 99999
+        Config.Property.StaminaSystem.delayRecoveryTime = 0
+        task.wait(0.05)
+    end
+end)
+
+print("✓ Loop 5 (Moderate while) active")
+
+-- ===== LOOP 6: SLOW WHILE LOOP (Every 0.5 seconds - for safety) =====
+local loop6Running = true
+task.spawn(function()
+    while loop6Running do
+        -- Force all values
+        Value.Stamina = maxStamina
+        Value.StaminaConsumeMutil = 0
+        Config.Property.StaminaSystem.runStaminaConsume = 0
+        Config.Property.StaminaSystem.naturalRecovery = 99999
+        Config.Property.StaminaSystem.delayRecoveryTime = 0
+        task.wait(0.5)
+    end
+end)
+
+print("✓ Loop 6 (Safety check) active")
+
+-- ===== HIDE STAMINA BAR =====
+task.spawn(function()
+    while true do
+        pcall(function()
+            local StaminaFrame = Players.LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
+            StaminaFrame.Visible = false
+            StaminaFrame.Frame.Bar.Size = UDim2.fromScale(1, 1)
+        end)
+        task.wait(1)
+    end
+end)
+
+print("✓ UI loop active")
+
+-- ===== BUFF SYSTEM PROTECTION =====
 task.spawn(function()
     pcall(function()
         local Buff = require(ReplicatedStorage.Shared.Features.Buff)
         
-        -- Block stamina consumption buffs
-        Buff.OnChanged("StaminaConsumeRate", function()
-            Config.Property.StaminaSystem.runStaminaConsume = 0
-            Value.StaminaConsumeMutil = 0
-        end, { replay = true })
+        -- Keep overriding consumption buffs
+        task.spawn(function()
+            while true do
+                pcall(function()
+                    Buff.OnChanged("StaminaConsumeRate", function()
+                        Config.Property.StaminaSystem.runStaminaConsume = 0
+                        Value.StaminaConsumeMutil = 0
+                    end, { replay = true })
+                end)
+                task.wait(1)
+            end
+        end)
         
-        -- Boost regen buffs
-        Buff.OnChanged("StaminaRegenRate", function()
-            Config.Property.StaminaSystem.naturalRecovery = 99999
-        end, { replay = true })
+        -- Keep overriding regen buffs
+        task.spawn(function()
+            while true do
+                pcall(function()
+                    Buff.OnChanged("StaminaRegenRate", function()
+                        Config.Property.StaminaSystem.naturalRecovery = 99999
+                    end, { replay = true })
+                end)
+                task.wait(1)
+            end
+        end)
         
-        -- Block negative stamina changes
+        -- Block negative stamina
         Buff.OnApply("Stamina", function(arg1, arg2)
             local change = arg2:Get()
             if change < 0 then
-                -- Block any negative stamina change
                 Value.Stamina = maxStamina
             end
         end)
         
-        print("✓ Buff system protected")
+        print("✓ Buff protection loops active")
     end)
 end)
 
--- ===== MONITORING =====
+-- ===== MONITORING LOOP =====
 local monitoring = true
 task.spawn(function()
-    local lastCheck = tick()
+    local checkCount = 0
     while monitoring do
+        checkCount = checkCount + 1
+        local currentStamina = Value.Stamina
+        local percentage = math.floor((currentStamina / maxStamina) * 100)
+        
+        print(string.format("💪 [Check #%d] Stamina: %.0f/%d (%d%%) | All loops running", 
+            checkCount, currentStamina, maxStamina, percentage))
+        
         task.wait(5)
-        local currentTime = tick()
-        local timePassed = currentTime - lastCheck
-        
-        print(string.format("💪 Status: Stamina = %.0f/%d (100%%) | Uptime: %.0fs", 
-            Value.Stamina, maxStamina, timePassed))
-        
-        lastCheck = currentTime
     end
 end)
 
@@ -107,27 +171,37 @@ print("━━━━━━━━━━━━━━━━━━━━━━━━�
 print("✅ INFINITY STAMINA ACTIVE!")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("")
-print("Your stamina will NEVER decrease!")
-print("You can run forever without stopping!")
+print("🔥 6 AGGRESSIVE LOOPS RUNNING:")
+print("  ✓ Loop 1: RenderStepped")
+print("  ✓ Loop 2: Heartbeat")
+print("  ✓ Loop 3: Stepped")
+print("  ✓ Loop 4: Fast while (instant)")
+print("  ✓ Loop 5: Moderate while (0.05s)")
+print("  ✓ Loop 6: Safety check (0.5s)")
+print("  ✓ UI hide loop")
+print("  ✓ Buff protection loops")
 print("")
-print("Features active:")
-print("  ✓ Zero consumption")
-print("  ✓ Instant regen (99999)")
-print("  ✓ Auto-refill every frame")
-print("  ✓ Buff system protected")
-print("  ✓ Stamina bar hidden")
+print("Your stamina is LOCKED at maximum!")
+print("Press F9 to see loop status")
 print("")
-print("Press F9 to see status updates")
-print("To disable: _G.DisableInfinity()")
-print("")
+print("To disable all loops: _G.StopAllLoops()")
 
--- Disable function
-_G.DisableInfinity = function()
+-- Disable function - stops ALL loops
+_G.StopAllLoops = function()
     monitoring = false
-    if keepFullConnection then
-        keepFullConnection:Disconnect()
-    end
-    print("❌ Infinity Stamina DISABLED")
+    loop4Running = false
+    loop5Running = false
+    loop6Running = false
+    
+    if loop1 then loop1:Disconnect() end
+    if loop2 then loop2:Disconnect() end
+    if loop3 then loop3:Disconnect() end
+    
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("❌ ALL LOOPS STOPPED!")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Infinity Stamina has been disabled")
 end
 
-print("🎮 Ready! Go run and test it!")
+print("🎮 All loops are now running!")
+print("🎮 Your stamina will NEVER decrease!")
