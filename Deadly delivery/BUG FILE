@@ -1,67 +1,133 @@
--- Infinity Stamina Script
--- Path: game:GetService("Players").LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
+-- Infinity Stamina - Direct Active (No consumption at all)
+-- Stamina will never decrease and always stay full
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
--- Tunggu hingga player dan GUI siap
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-local Main = PlayerGui:WaitForChild("Main")
-local HomePage = Main:WaitForChild("HomePage")
-local Property = HomePage:WaitForChild("Property")
-local StaminaFrame = Property:WaitForChild("Stamina")
-local Bar = StaminaFrame:WaitForChild("Frame"):WaitForChild("Bar")
+print("⏳ Loading Infinity Stamina...")
+task.wait(1)
 
--- Akses Value module
+-- Load required modules
 local Value = require(ReplicatedStorage.Shared.Core.Value)
 local Config = require(ReplicatedStorage.Config)
 
--- Dapatkan nilai stamina maksimal
+-- Get max stamina value
 local maxStamina = Config.Property.StaminaSystem.stamina.default
 
--- Fungsi untuk set infinity stamina
-local function setInfinityStamina()
-    -- Set stamina ke maksimal
-    Value.Stamina = maxStamina
-    
-    -- Sembunyikan stamina bar (karena selalu penuh)
-    StaminaFrame.Visible = false
-    
-    -- Set ukuran bar ke penuh
-    Bar.Size = UDim2.fromScale(1, 1)
-end
+print("📊 Max Stamina:", maxStamina)
+print("🔧 Activating Infinity Stamina...")
 
--- Hook RunService untuk terus mengisi stamina
-local connection = RunService.PreRender:Connect(function()
-    -- Selalu set stamina ke maksimal
-    Value.Stamina = maxStamina
-    
-    -- Pastikan running selalu enabled (tidak kehabisan stamina)
-    if Value.Run then
-        Value.Run = Value.Run
+-- Set initial stamina to max
+Value.Stamina = maxStamina
+
+-- ===== STEP 1: SET CONSUMPTION TO ZERO =====
+Config.Property.StaminaSystem.runStaminaConsume = 0
+Value.StaminaConsumeMutil = 0
+
+print("✓ Stamina consumption set to 0")
+
+-- ===== STEP 2: SET SUPER FAST REGEN =====
+Config.Property.StaminaSystem.naturalRecovery = 99999
+Config.Property.StaminaSystem.delayRecoveryTime = 0
+
+print("✓ Regen speed: 99999")
+print("✓ Regen delay: 0")
+
+-- ===== STEP 3: KEEP STAMINA ALWAYS FULL =====
+-- This ensures stamina never goes below max
+local keepFullConnection = RunService.Heartbeat:Connect(function()
+    if Value.Stamina < maxStamina then
+        Value.Stamina = maxStamina
     end
-    
-    -- Set bar size ke penuh
-    Bar.Size = UDim2.fromScale(1, 1)
 end)
 
--- Set infinity stamina pertama kali
-setInfinityStamina()
+print("✓ Auto-refill system active")
 
-print("Infinity Stamina Activated!")
-print("Press F9 to see console messages")
-
--- Fungsi untuk disable (opsional)
-local function disableInfinityStamina()
-    if connection then
-        connection:Disconnect()
-        print("Infinity Stamina Disabled!")
+-- ===== STEP 4: HIDE STAMINA BAR =====
+task.spawn(function()
+    task.wait(0.5)
+    local success = pcall(function()
+        local StaminaFrame = Players.LocalPlayer.PlayerGui.Main.HomePage.Property.Stamina
+        StaminaFrame.Visible = false
+        StaminaFrame.Frame.Bar.Size = UDim2.fromScale(1, 1)
+        print("✓ Stamina bar hidden")
+    end)
+    if not success then
+        warn("⚠ Could not hide stamina bar (not critical)")
     end
+end)
+
+-- ===== STEP 5: OVERRIDE BUFF SYSTEM =====
+task.spawn(function()
+    pcall(function()
+        local Buff = require(ReplicatedStorage.Shared.Features.Buff)
+        
+        -- Block stamina consumption buffs
+        Buff.OnChanged("StaminaConsumeRate", function()
+            Config.Property.StaminaSystem.runStaminaConsume = 0
+            Value.StaminaConsumeMutil = 0
+        end, { replay = true })
+        
+        -- Boost regen buffs
+        Buff.OnChanged("StaminaRegenRate", function()
+            Config.Property.StaminaSystem.naturalRecovery = 99999
+        end, { replay = true })
+        
+        -- Block negative stamina changes
+        Buff.OnApply("Stamina", function(arg1, arg2)
+            local change = arg2:Get()
+            if change < 0 then
+                -- Block any negative stamina change
+                Value.Stamina = maxStamina
+            end
+        end)
+        
+        print("✓ Buff system protected")
+    end)
+end)
+
+-- ===== MONITORING =====
+local monitoring = true
+task.spawn(function()
+    local lastCheck = tick()
+    while monitoring do
+        task.wait(5)
+        local currentTime = tick()
+        local timePassed = currentTime - lastCheck
+        
+        print(string.format("💪 Status: Stamina = %.0f/%d (100%%) | Uptime: %.0fs", 
+            Value.Stamina, maxStamina, timePassed))
+        
+        lastCheck = currentTime
+    end
+end)
+
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("✅ INFINITY STAMINA ACTIVE!")
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("")
+print("Your stamina will NEVER decrease!")
+print("You can run forever without stopping!")
+print("")
+print("Features active:")
+print("  ✓ Zero consumption")
+print("  ✓ Instant regen (99999)")
+print("  ✓ Auto-refill every frame")
+print("  ✓ Buff system protected")
+print("  ✓ Stamina bar hidden")
+print("")
+print("Press F9 to see status updates")
+print("To disable: _G.DisableInfinity()")
+print("")
+
+-- Disable function
+_G.DisableInfinity = function()
+    monitoring = false
+    if keepFullConnection then
+        keepFullConnection:Disconnect()
+    end
+    print("❌ Infinity Stamina DISABLED")
 end
 
--- Return fungsi disable jika ingin dimatikan nanti
-return {
-    Disable = disableInfinityStamina
-}
+print("🎮 Ready! Go run and test it!")
