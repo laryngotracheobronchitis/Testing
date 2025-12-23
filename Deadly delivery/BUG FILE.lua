@@ -1,61 +1,78 @@
-local function enableInfiniteStamina()
-    -- Method 1: Direct UI manipulation
-    task.spawn(function()
-        while task.wait(0.5) do
-            pcall(function()
-                local player = game.Players.LocalPlayer
-                local gui = player.PlayerGui
-                
-                -- Search for stamina UI in all possible locations
-                for _, child in pairs(gui:GetDescendants()) do
-                    if child.Name:lower():find("stamina") and child:IsA("Frame") then
-                        -- Found stamina UI
-                        if child:FindFirstChild("Bar") or child:FindFirstChild("Progress") then
-                            local bar = child:FindFirstChild("Bar") or child:FindFirstChild("Progress")
-                            if bar and bar:IsA("Frame") then
-                                bar.Size = UDim2.fromScale(1, 1)
-                                child.Visible = false
-                            end
-                        end
-                    end
-                end
-            end)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local remoteEvents = {}
+
+-- Cari semua RemoteEvent/RemoteFunction dan stamina
+local function findStaminaRemotes()
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
+            if obj.Name:lower():find("stamina") then
+                table.insert(remoteEvents, obj)
+            end
         end
-    end)
+    end
     
-    -- Method 2: Hook network requests
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    -- Cari di Workspace dan lainnya
+    for _, location in pairs({workspace, game:GetService("Players")}) do
+        for _, obj in pairs(location:GetDescendants()) do
+            if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
+                if obj.Name:lower():find("stamina") then
+                    table.insert(remoteEvents, obj)
+                end
+            end
+        end
+    end
+end
+
+-- Hook FireServer/InvokeServer
+local function hookRemotes()
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    
+    setreadonly(mt, false)
+    
+    mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
-        local args = {...}
         
-        -- Block stamina-related remote events
-        if method == "InvokeServer" or method == "FireServer" then
-            local remoteName = tostring(self)
-            if remoteName:lower():find("stamina") then
-                return nil  -- Block the call
+        -- Intercept stamina-related calls
+        if method == "FireServer" or method == "InvokeServer" then
+            local remoteName = self.Name:lower()
+            
+            -- Block stamina consumption calls
+            if remoteName:find("stamina") or remoteName:find("energy") then
+                -- Cek argumen
+                local args = {...}
+                local firstArg = tostring(args[1] or ""):lower()
+                
+                if firstArg:find("consume") or firstArg:find("use") or 
+                   firstArg:find("drain") or firstArg:find("reduce") then
+                    return nil  -- Block call
+                end
             end
         end
         
         return oldNamecall(self, ...)
     end)
     
-    -- Method 3: Find and freeze stamina values
-    task.spawn(function()
-        while task.wait(1) do
-            pcall(function()
-                for _, obj in pairs(game:GetDescendants()) do
-                    if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-                        if obj.Name:lower():find("stamina") then
-                            obj.Value = 100  -- Set to max
-                        end
-                    end
-                end
-            end)
-        end
-    end)
+    setreadonly(mt, true)
 end
 
--- Wait for game to load
-task.wait(5)
-enableInfiniteStamina()
+-- Main
+task.wait(3)
+findStaminaRemotes()
+hookRemotes()
+
+-- UI Control
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local gui = Players.LocalPlayer.PlayerGui
+            local stamina = gui:FindFirstChild("Main") and 
+                           gui.Main.HomePage.Property.Stamina
+            
+            if stamina then
+                stamina.Frame.Bar.Size = UDim2.fromScale(1, 1)
+                stamina.Visible = false
+            end
+        end)
+    end
+end)
