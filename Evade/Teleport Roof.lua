@@ -4,9 +4,10 @@ local RunService = game:GetService("RunService")
 
 local buttonVisible = true
 local isDragging = false
+local currentDragInput -- Hanya simpan 1 input untuk drag
 local dragStartOffset = Vector2.new(0, 0)
 
--- Fungsi teleport 
+-- Fungsi teleport
 local function teleportRoof()
     if not player.Character then return end
     
@@ -14,12 +15,10 @@ local function teleportRoof()
     local humanoid = player.Character:FindFirstChild("Humanoid")
     
     if root and humanoid and humanoid.Health > 0 then
-        -- Cek jika karakter sedang duduk/terbaring
         if humanoid.Sit or humanoid.PlatformStand then
             return
         end
         
-        -- Teleport ke atas
         local currentPos = root.Position
         root.CFrame = CFrame.new(currentPos.X, currentPos.Y + 500, currentPos.Z)
     end
@@ -32,53 +31,45 @@ screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Main container - Lebih besar untuk mobile touch
+-- Main container
 local mainContainer = Instance.new("Frame")
 mainContainer.Name = "MainContainer"
-mainContainer.Size = UDim2.new(0, 200, 0, 60) -- Lebih besar untuk mobile
-mainContainer.Position = UDim2.new(0.02, 0, 0.85, 0) -- Posisi lebih ke atas
+mainContainer.Size = UDim2.new(0, 200, 0, 60)
+mainContainer.Position = UDim2.new(0.02, 0, 0.85, 0)
 mainContainer.BackgroundTransparency = 1
 mainContainer.Active = true
-mainContainer.Selectable = true
 mainContainer.Parent = screenGui
 
--- Background untuk area drag
-local dragArea = Instance.new("Frame")
-dragArea.Name = "DragArea"
-dragArea.Size = UDim2.new(1, 0, 1, 0)
-dragArea.BackgroundTransparency = 1
-dragArea.Parent = mainContainer
-
--- Teleport button (lebih besar untuk mobile)
-local teleportButton = Instance.new("TextButton")
-teleportButton.Name = "RoofTPButton"
-teleportButton.Size = UDim2.new(0.85, 0, 1, 0) -- 85% width
-teleportButton.Position = UDim2.new(0, 0, 0, 0)
-teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-teleportButton.Text = "🔝 Teleport Roof"
-teleportButton.Font = Enum.Font.GothamSemibold
-teleportButton.TextSize = 16 -- Lebih besar untuk mobile
-teleportButton.TextScaled = true -- Auto scale text
-teleportButton.AutoButtonColor = false -- Manual hover effect
-teleportButton.Parent = mainContainer
-
--- Toggle button
+-- **TOGGLE BUTTON DI KIRI**
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.new(0.15, 0, 1, 0) -- 15% width
-toggleButton.Position = UDim2.new(0.85, 0, 0, 0)
+toggleButton.Size = UDim2.new(0, 50, 0, 60) -- Lebar 50, tinggi sama
+toggleButton.Position = UDim2.new(0, 0, 0, 0) -- Posisi kiri
 toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Text = "▼"
 toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 20 -- Lebih besar
+toggleButton.TextSize = 20
 toggleButton.AutoButtonColor = false
 toggleButton.Parent = mainContainer
 
--- Styling dengan UICorner
+-- **TELEPORT BUTTON DI KANAN (setelah toggle)**
+local teleportButton = Instance.new("TextButton")
+teleportButton.Name = "RoofTPButton"
+teleportButton.Size = UDim2.new(0, 150, 0, 60) -- Lebar 150 (200-50)
+teleportButton.Position = UDim2.new(0, 50, 0, 0) -- Mulai dari posisi 50 (setelah toggle)
+teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportButton.Text = "🔝 Teleport Roof"
+teleportButton.Font = Enum.Font.GothamSemibold
+teleportButton.TextSize = 16
+teleportButton.TextScaled = true
+teleportButton.AutoButtonColor = false
+teleportButton.Parent = mainContainer
+
+-- Styling
 local teleportCorner = Instance.new("UICorner")
-teleportCorner.CornerRadius = UDim.new(0, 12) -- Corner lebih besar
+teleportCorner.CornerRadius = UDim.new(0, 12)
 teleportCorner.Parent = teleportButton
 
 local toggleCorner = Instance.new("UICorner")
@@ -96,42 +87,74 @@ toggleStroke.Color = Color3.fromRGB(30, 30, 30)
 toggleStroke.Thickness = 2
 toggleStroke.Parent = toggleButton
 
--- Efek hover untuk teleport button
+-- Efek visual untuk teleport button
 teleportButton.MouseButton1Down:Connect(function()
     teleportButton.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
 end)
 
 teleportButton.MouseButton1Up:Connect(function()
     teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    teleportRoof()
 end)
 
 teleportButton.MouseLeave:Connect(function()
     teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
 end)
 
--- Efek hover untuk toggle button
+-- Untuk mobile touch
+teleportButton.TouchTap:Connect(teleportRoof)
+
+teleportButton.TouchLongPress:Connect(function()
+    -- Long press untuk mulai drag (opsional)
+end)
+
+-- Efek visual untuk toggle button
 toggleButton.MouseButton1Down:Connect(function()
     toggleButton.BackgroundColor3 = Color3.fromRGB(44, 62, 80)
 end)
 
 toggleButton.MouseButton1Up:Connect(function()
     toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
+    
+    -- Toggle show/hide
+    buttonVisible = not buttonVisible
+    
+    if buttonVisible then
+        teleportButton.Visible = true
+        toggleButton.Text = "▼"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
+        teleportButton.Size = UDim2.new(0, 150, 0, 60)
+    else
+        teleportButton.Visible = false
+        toggleButton.Text = "▲"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
+        -- Saat hide, toggle button perlu lebih lebar
+        toggleButton.Size = UDim2.new(0, 60, 0, 60)
+    end
 end)
 
 toggleButton.MouseLeave:Connect(function()
-    toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
+    if buttonVisible then
+        toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
+    else
+        toggleButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
+    end
 end)
 
--- **DRAG SYSTEM YANG SUPPORT MOBILE**
+-- **DRAG SYSTEM YANG FIX UNTUK MOBILE (Anti Multi-Touch)**
+local dragConnection
+
 local function startDrag(input)
-    -- Cek jika input adalah touch atau mouse click
+    -- Hanya proses jika belum ada drag aktif
+    if isDragging then return end
+    
     local isTouch = input.UserInputType == Enum.UserInputType.Touch
     local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
     
     if isTouch or isMouse then
         isDragging = true
+        currentDragInput = input -- Simpan input yang sedang drag
         
-        -- Hitung offset antara posisi klik dan posisi container
         local containerPos = mainContainer.AbsolutePosition
         local inputPos = input.Position
         dragStartOffset = Vector2.new(
@@ -139,123 +162,145 @@ local function startDrag(input)
             containerPos.Y - inputPos.Y
         )
         
-        -- Visual feedback saat drag
-        teleportButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
+        -- Visual feedback
+        if teleportButton.Visible then
+            teleportButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
+        end
         
-        -- Connect untuk end drag
-        local connection
-        connection = input.Changed:Connect(function()
+        -- Gunakan RenderStepped untuk smooth dragging
+        dragConnection = RunService.RenderStepped:Connect(function()
+            if isDragging and currentDragInput then
+                local currentInputPos
+                
+                -- Dapatkan posisi input yang benar
+                if isTouch then
+                    -- Untuk touch, gunakan posisi dari input yang disimpan
+                    currentInputPos = currentDragInput.Position
+                else
+                    -- Untuk mouse, gunakan posisi mouse saat ini
+                    currentInputPos = UserInputService:GetMouseLocation()
+                end
+                
+                if currentInputPos then
+                    -- Hitung posisi baru
+                    local newX = currentInputPos.X + dragStartOffset.X
+                    local newY = currentInputPos.Y + dragStartOffset.Y
+                    
+                    -- Pastikan tidak keluar dari layar
+                    local screenSize = workspace.CurrentCamera.ViewportSize
+                    newX = math.clamp(newX, 0, screenSize.X - mainContainer.AbsoluteSize.X)
+                    newY = math.clamp(newY, 0, screenSize.Y - mainContainer.AbsoluteSize.Y)
+                    
+                    -- Update posisi
+                    mainContainer.Position = UDim2.new(0, newX, 0, newY)
+                end
+            end
+        end)
+        
+        -- Connect end drag
+        local endConnection
+        endConnection = input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
-                isDragging = false
-                teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-                if connection then
-                    connection:Disconnect()
+                -- Hanya stop drag jika ini adalah input yang sama
+                if currentDragInput == input then
+                    isDragging = false
+                    currentDragInput = nil
+                    
+                    if dragConnection then
+                        dragConnection:Disconnect()
+                        dragConnection = nil
+                    end
+                    
+                    -- Kembalikan warna
+                    if teleportButton.Visible then
+                        teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+                    end
+                end
+                
+                if endConnection then
+                    endConnection:Disconnect()
                 end
             end
         end)
     end
 end
 
-local function updateDrag(input)
-    if isDragging then
-        -- Update posisi container berdasarkan input posisi + offset
-        local newX = input.Position.X + dragStartOffset.X
-        local newY = input.Position.Y + dragStartOffset.Y
-        
-        -- Konversi ke UDim2
-        local screenSize = workspace.CurrentCamera.ViewportSize
-        local newUDim2 = UDim2.new(
-            0, newX,
-            0, newY
-        )
-        
-        mainContainer.Position = newUDim2
+-- **DRAG HANYA PADA TOGGLE BUTTON SAAT HIDE**
+-- Saat teleport button visible, drag dari mana saja
+teleportButton.InputBegan:Connect(function(input)
+    if teleportButton.Visible then
+        startDrag(input)
     end
-end
+end)
 
--- Untuk drag area (seluruh container)
-dragArea.InputBegan:Connect(startDrag)
+-- Saat teleport button hidden, hanya toggle button yang bisa drag
+toggleButton.InputBegan:Connect(function(input)
+    startDrag(input)
+end)
 
--- Untuk teleport button (juga bisa drag)
-teleportButton.InputBegan:Connect(startDrag)
+-- Juga bisa drag dari area kosong (jika ada)
+mainContainer.InputBegan:Connect(function(input)
+    startDrag(input)
+end)
 
--- Update drag position
-UserInputService.InputChanged:Connect(function(input)
-    if isDragging then
-        local isTouchMove = input.UserInputType == Enum.UserInputType.Touch
-        local isMouseMove = input.UserInputType == Enum.UserInputType.MouseMovement
+-- **FIX: Tangani ketika touch lain muncul saat sedang drag**
+UserInputService.TouchStarted:Connect(function(input)
+    if isDragging and currentDragInput and currentDragInput ~= input then
+        -- Jika sudah ada drag aktif dengan input lain, ignore touch baru
+        return
+    end
+end)
+
+UserInputService.TouchEnded:Connect(function(input)
+    if currentDragInput == input then
+        isDragging = false
+        currentDragInput = nil
         
-        if isTouchMove or isMouseMove then
-            updateDrag(input)
+        if dragConnection then
+            dragConnection:Disconnect()
+            dragConnection = nil
         end
     end
 end)
 
--- **ALTERNATIVE: Drag dengan RenderStepped (lebih smooth untuk mobile)**
-local dragConnection
-dragArea.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or 
-       input.UserInputType == Enum.UserInputType.MouseButton1 then
-        
-        isDragging = true
-        local startPos = mainContainer.Position
-        local startInputPos = input.Position
-        
-        dragConnection = RunService.RenderStepped:Connect(function()
-            if isDragging then
-                local currentInput = UserInputService:GetMouseLocation()
-                if not currentInput then return end
-                
-                local delta = Vector2.new(
-                    currentInput.X - startInputPos.X,
-                    currentInput.Y - startInputPos.Y
-                )
-                
-                mainContainer.Position = UDim2.new(
-                    startPos.X.Scale,
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Scale,
-                    startPos.Y.Offset + delta.Y
-                )
+-- **FIX: Tangani input changed untuk semua input**
+UserInputService.InputChanged:Connect(function(input)
+    if isDragging and currentDragInput then
+        -- Update posisi drag input jika input yang sama
+        if input.UserInputType == currentDragInput.UserInputType then
+            -- Untuk mouse movement, update posisi
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                currentDragInput = input
             end
-        end)
-        
-        local endConnection
-        endConnection = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                isDragging = false
-                if dragConnection then
-                    dragConnection:Disconnect()
-                end
-                if endConnection then
-                    endConnection:Disconnect()
-                end
-                teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-            end
-        end)
+        end
     end
 end)
 
--- Toggle show/hide
-toggleButton.MouseButton1Click:Connect(function()
-    buttonVisible = not buttonVisible
+-- **Untuk memastikan drag berhenti saat semua touch dilepas**
+UserInputService.TouchEnded:Connect(function()
+    -- Cek jika masih ada touch aktif
+    local touches = UserInputService:GetTouchCount()
+    if touches == 0 then
+        isDragging = false
+        currentDragInput = nil
+        
+        if dragConnection then
+            dragConnection:Disconnect()
+            dragConnection = nil
+        end
+    end
+end)
+
+-- **FIX: Reset drag state jika game pause atau lainnya**
+game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
+    isDragging = false
+    currentDragInput = nil
     
-    if buttonVisible then
-        teleportButton.Visible = true
-        toggleButton.Text = "▼"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
-    else
-        teleportButton.Visible = false
-        toggleButton.Text = "▲"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
+    if dragConnection then
+        dragConnection:Disconnect()
+        dragConnection = nil
     end
 end)
 
--- Teleport function
-teleportButton.MouseButton1Click:Connect(teleportRoof)
-
--- mobile touch, juga support tap
-teleportButton.TouchTap:Connect(teleportRoof)
-
--- button tidak terhalang oleh elemen lain
+-- Pastikan GUI di atas
 screenGui.DisplayOrder = 999
