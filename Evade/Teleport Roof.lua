@@ -31,18 +31,18 @@ screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Main container - UKURAN LEBIH KECIL
+-- Main container
 local mainContainer = Instance.new("Frame")
 mainContainer.Name = "MainContainer"
-mainContainer.Size = UDim2.new(0, 180, 0, 55) -- Lebih kecil
+mainContainer.Size = UDim2.new(0, 180, 0, 55)
 mainContainer.Position = UDim2.new(0.02, 0, 0.85, 0)
 mainContainer.BackgroundTransparency = 1
 mainContainer.Parent = screenGui
 
--- **TOGGLE BUTTON DI KIRI (UKURAN KECIL)**
+-- **TOGGLE BUTTON DI KIRI**
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.new(0, 40, 0, 55) -- Lebar kecil: 40
+toggleButton.Size = UDim2.new(0, 40, 0, 55)
 toggleButton.Position = UDim2.new(0, 0, 0, 0)
 toggleButton.BackgroundColor3 = Color3.fromRGB(52, 73, 94)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -55,14 +55,13 @@ toggleButton.Parent = mainContainer
 -- **TELEPORT BUTTON DI KANAN**
 local teleportButton = Instance.new("TextButton")
 teleportButton.Name = "RoofTPButton"
-teleportButton.Size = UDim2.new(0, 140, 0, 55) -- 180 - 40 = 140
-teleportButton.Position = UDim2.new(0, 40, 0, 0) -- Mulai dari posisi 40
+teleportButton.Size = UDim2.new(0, 140, 0, 55)
+teleportButton.Position = UDim2.new(0, 40, 0, 0)
 teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
 teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 teleportButton.Text = "🔝 Teleport Roof"
 teleportButton.Font = Enum.Font.GothamSemibold
 teleportButton.TextSize = 14
-toggleButton.TextScaled = false
 teleportButton.TextScaled = true
 teleportButton.AutoButtonColor = false
 teleportButton.Parent = mainContainer
@@ -88,30 +87,28 @@ toggleStroke.Thickness = 1.5
 toggleStroke.Parent = toggleButton
 
 -- **VARIABEL UNTUK TRACK INPUT**
-local activeInputs = {} -- Simpan semua input yang aktif
-local lastClickTime = 0
-local CLICK_DELAY = 0.2 -- Delay untuk mencegah accidental drag
+local activeInputs = {}
+local dragConnection = nil
+local isInputInsideButton = false -- Flag untuk cek jika input dimulai di dalam button
 
--- **FUNGSI UNTUK MENGECEK JIKA INPUT MULAI DARI BUTTON**
-local function isInputOnButton(input)
-    local inputPos = input.Position
-    
-    -- Cek jika input berada di toggle button
+-- **FUNGSI UNTUK MENGECEK POSISI INPUT**
+local function isPositionInsideButton(position)
+    -- Cek jika posisi berada di toggle button
     local toggleAbsPos = toggleButton.AbsolutePosition
     local toggleAbsSize = toggleButton.AbsoluteSize
     
-    if inputPos.X >= toggleAbsPos.X and inputPos.X <= toggleAbsPos.X + toggleAbsSize.X and
-       inputPos.Y >= toggleAbsPos.Y and inputPos.Y <= toggleAbsPos.Y + toggleAbsSize.Y then
+    if position.X >= toggleAbsPos.X and position.X <= toggleAbsPos.X + toggleAbsSize.X and
+       position.Y >= toggleAbsPos.Y and position.Y <= toggleAbsPos.Y + toggleAbsSize.Y then
         return "toggle"
     end
     
-    -- Cek jika input berada di teleport button (hanya jika visible)
+    -- Cek jika posisi berada di teleport button (hanya jika visible)
     if teleportButton.Visible then
         local teleportAbsPos = teleportButton.AbsolutePosition
         local teleportAbsSize = teleportButton.AbsoluteSize
         
-        if inputPos.X >= teleportAbsPos.X and inputPos.X <= teleportAbsPos.X + teleportAbsSize.X and
-           inputPos.Y >= teleportAbsPos.Y and inputPos.Y <= teleportAbsPos.Y + teleportAbsSize.Y then
+        if position.X >= teleportAbsPos.X and position.X <= teleportAbsPos.X + teleportAbsSize.X and
+           position.Y >= teleportAbsPos.Y and position.Y <= teleportAbsPos.Y + teleportAbsSize.Y then
             return "teleport"
         end
     end
@@ -119,17 +116,12 @@ local function isInputOnButton(input)
     return nil
 end
 
--- **DRAG SYSTEM YANG HANYA AKTIF SAAT TEKAN BUTTON**
-local dragConnection = nil
-
+-- **DRAG SYSTEM YANG HANYA BEKERJA JIKA MULAI DARI BUTTON**
 local function startDrag(input)
-    -- Hanya mulai drag jika input dimulai dari button
-    local buttonType = isInputOnButton(input)
-    if not buttonType then return end
-    
-    -- Cegah accidental drag saat klik cepat
-    local currentTime = tick()
-    if currentTime - lastClickTime < CLICK_DELAY then
+    -- Pastikan input dimulai dari dalam button
+    local buttonType = isPositionInsideButton(input.Position)
+    if not buttonType then
+        -- Input dimulai dari luar button, ABORT!
         return
     end
     
@@ -141,6 +133,7 @@ local function startDrag(input)
     if isTouch or isMouse then
         isDragging = true
         currentDragInput = input
+        isInputInsideButton = true
         
         local containerPos = mainContainer.AbsolutePosition
         local inputPos = input.Position
@@ -149,7 +142,7 @@ local function startDrag(input)
             containerPos.Y - inputPos.Y
         )
         
-        -- Visual feedback untuk button yang ditekan
+        -- Visual feedback
         if buttonType == "teleport" then
             teleportButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
         elseif buttonType == "toggle" then
@@ -162,13 +155,8 @@ local function startDrag(input)
                 local currentInputPos
                 
                 if isTouch then
-                    -- Cari input touch yang sesuai
-                    for _, touch in pairs(UserInputService:GetTouches()) do
-                        if touch.UserInputType == Enum.UserInputType.Touch then
-                            currentInputPos = touch.Position
-                            break
-                        end
-                    end
+                    -- Untuk touch, gunakan posisi input yang sedang drag
+                    currentInputPos = currentDragInput.Position
                 else
                     currentInputPos = UserInputService:GetMouseLocation()
                 end
@@ -195,6 +183,7 @@ local function startDrag(input)
                 if currentDragInput == input then
                     isDragging = false
                     currentDragInput = nil
+                    isInputInsideButton = false
                     
                     if dragConnection then
                         dragConnection:Disconnect()
@@ -216,19 +205,21 @@ local function startDrag(input)
     end
 end
 
--- **HANDLE INPUT UNTUK BUTTON (TANPA AREA LUAR)**
--- Toggle button events
+-- **TOGGLE BUTTON EVENTS**
 toggleButton.InputBegan:Connect(function(input)
     local isTouch = input.UserInputType == Enum.UserInputType.Touch
     local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
     
     if isTouch or isMouse then
         toggleButton.BackgroundColor3 = Color3.fromRGB(44, 62, 80)
-        activeInputs[input] = true
+        activeInputs[input] = "toggle"
+        
+        -- Tandai bahwa input dimulai dari dalam button
+        isInputInsideButton = true
         
         -- Mulai drag setelah delay kecil
         task.delay(0.1, function()
-            if activeInputs[input] and not isDragging then
+            if activeInputs[input] == "toggle" and not isDragging and isInputInsideButton then
                 startDrag(input)
             end
         end)
@@ -236,13 +227,11 @@ toggleButton.InputBegan:Connect(function(input)
 end)
 
 toggleButton.InputEnded:Connect(function(input)
-    if activeInputs[input] then
+    if activeInputs[input] == "toggle" then
         activeInputs[input] = nil
         
         -- Jika tidak drag, berarti klik
         if not isDragging then
-            lastClickTime = tick()
-            
             -- Toggle show/hide
             buttonVisible = not buttonVisible
             
@@ -256,26 +245,31 @@ toggleButton.InputEnded:Connect(function(input)
                 teleportButton.Visible = false
                 toggleButton.Text = "▲"
                 toggleButton.BackgroundColor3 = Color3.fromRGB(41, 128, 185)
-                toggleButton.Size = UDim2.new(0, 50, 0, 55) -- Sedikit lebih lebar saat hide
+                toggleButton.Size = UDim2.new(0, 50, 0, 55) -- Lebih lebar saat hide
             end
         end
         
-        toggleButton.BackgroundColor3 = buttonVisible and Color3.fromRGB(52, 73, 94) or Color3.fromRGB(41, 128, 185)
+        if not isDragging then
+            toggleButton.BackgroundColor3 = buttonVisible and Color3.fromRGB(52, 73, 94) or Color3.fromRGB(41, 128, 185)
+        end
     end
 end)
 
--- Teleport button events
+-- **TELEPORT BUTTON EVENTS**
 teleportButton.InputBegan:Connect(function(input)
     local isTouch = input.UserInputType == Enum.UserInputType.Touch
     local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
     
     if isTouch or isMouse then
         teleportButton.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
-        activeInputs[input] = true
+        activeInputs[input] = "teleport"
+        
+        -- Tandai bahwa input dimulai dari dalam button
+        isInputInsideButton = true
         
         -- Mulai drag setelah delay
         task.delay(0.15, function()
-            if activeInputs[input] and not isDragging then
+            if activeInputs[input] == "teleport" and not isDragging and isInputInsideButton then
                 startDrag(input)
             end
         end)
@@ -283,31 +277,76 @@ teleportButton.InputBegan:Connect(function(input)
 end)
 
 teleportButton.InputEnded:Connect(function(input)
-    if activeInputs[input] then
+    if activeInputs[input] == "teleport" then
         activeInputs[input] = nil
         
         -- Jika tidak drag, teleport
         if not isDragging then
-            lastClickTime = tick()
             teleportRoof()
         end
         
-        teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        if not isDragging then
+            teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        end
     end
 end)
 
--- **PREVENT DRAG DARI AREA LUAR BUTTON**
--- Non-aktifkan input untuk mainContainer agar tidak trigger drag
+-- **CEGAH DRAG DARI AREA LUAR BUTTON**
+-- Main container TIDAK BISA trigger drag
 mainContainer.InputBegan:Connect(function(input)
-    -- Hanya biarkan event melalui jika tidak ada button yang terkena
-    local buttonType = isInputOnButton(input)
-    if not buttonType then
-        -- Jika input di luar button, kita tidak proses
-        return
+    local isTouch = input.UserInputType == Enum.UserInputType.Touch
+    local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
+    
+    if isTouch or isMouse then
+        -- Cek jika posisi input di luar button
+        local buttonType = isPositionInsideButton(input.Position)
+        if not buttonType then
+            -- Input dimulai dari luar button, TANDAI agar tidak bisa drag
+            isInputInsideButton = false
+            return
+        end
     end
 end)
 
--- **HANDLE TOUCH/MOUSE LEAVE**
+-- **HANDLE GLOBAL INPUT UNTUK MENCEGAH DRAG DARI LUAR**
+-- Track semua input mulai
+UserInputService.InputBegan:Connect(function(input)
+    local isTouch = input.UserInputType == Enum.UserInputType.Touch
+    local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
+    
+    if isTouch or isMouse then
+        -- Cek jika input dimulai di dalam button manapun
+        local buttonType = isPositionInsideButton(input.Position)
+        if not buttonType then
+            -- Input dimulai dari LUAR button, set flag ke false
+            isInputInsideButton = false
+        end
+    end
+end)
+
+-- **HANDLE MOUSE/TOUCH MOVE GLOBAL**
+-- Ini penting: cegah drag jika input bergerak dari luar ke dalam
+UserInputService.InputChanged:Connect(function(input)
+    if not isDragging then
+        -- Jika belum drag tapi ada input movement, cek posisi awal
+        local isTouchMove = input.UserInputType == Enum.UserInputType.Touch
+        local isMouseMove = input.UserInputType == Enum.UserInputType.MouseMovement
+        
+        if (isTouchMove or isMouseMove) and not isInputInsideButton then
+            -- Input bergerak tapi TIDAK dimulai dari dalam button
+            -- Jadi kita ABORT semua kemungkinan drag
+            return
+        end
+    end
+end)
+
+-- **FIX: Reset state saat input berakhir**
+UserInputService.InputEnded:Connect(function(input)
+    activeInputs[input] = nil
+    isInputInsideButton = false
+end)
+
+-- **HANDLE MOUSE/TOUCH LEAVE**
 teleportButton.MouseLeave:Connect(function()
     if not isDragging then
         teleportButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
@@ -320,15 +359,14 @@ toggleButton.MouseLeave:Connect(function()
     end
 end)
 
--- **CLEANUP ACTIVE INPUTS SAAT RELEASE**
-UserInputService.InputEnded:Connect(function(input)
-    activeInputs[input] = nil
-end)
+-- **DRAG BISA DARI TOGGLE BUTTON SAAT HIDE JUGA**
+-- Saat hide, toggle button tetap bisa drag karena masih visible
 
--- **FIX: Reset semua state saat character respawn**
+-- **Reset semua saat character respawn**
 player.CharacterAdded:Connect(function()
     isDragging = false
     currentDragInput = nil
+    isInputInsideButton = false
     activeInputs = {}
     
     if dragConnection then
@@ -337,7 +375,7 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
--- **Untuk mobile: handle touch khusus**
+-- **Untuk mobile tap cepat**
 teleportButton.TouchTap:Connect(function()
     if not isDragging then
         teleportRoof()
