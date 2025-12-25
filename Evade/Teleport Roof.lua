@@ -6,7 +6,7 @@ local buttonVisible = true
 local isDragging = false
 local dragStartPos, buttonStartPos
 
--- Fungsi teleport (tanpa print)
+-- Fungsi teleport
 local function teleportRoof()
     if not player.Character then return end
     
@@ -25,7 +25,7 @@ local function teleportRoof()
     end
 end
 
--- Buat GUI utama
+-- GUI utama
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TeleportRoofGUI"
 screenGui.ResetOnSpawn = false
