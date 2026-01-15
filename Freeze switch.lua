@@ -22,7 +22,7 @@ local creditLabel = Instance.new("TextLabel")
 creditLabel.Size = UDim2.new(0, 300, 0, 50)
 creditLabel.Position = UDim2.new(0.5, -150, 0.5, -25)
 creditLabel.BackgroundTransparency = 1
-creditLabel.Text = "by yar"
+creditLabel.Text = "by zenxyyv"
 creditLabel.TextColor3 = Color3.new(1, 1, 1)
 creditLabel.TextScaled = true
 creditLabel.Font = Enum.Font.SciFi
@@ -82,7 +82,7 @@ SettingsButton.Size = UDim2.new(0, 25, 0, 25)
 SettingsButton.Position = UDim2.new(1, -30, 0, 5)
 SettingsButton.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
 SettingsButton.BackgroundTransparency = 0.2
-SettingsButton.Text = "⚙"
+SettingsButton.Text = "âš™"
 SettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
 SettingsButton.TextSize = 14
 SettingsButton.Font = Enum.Font.GothamBold
@@ -587,5 +587,4 @@ local function EnableBlurEffect()
     )
     blurTween:Play()
     
-
-    local darkenTween = TweenServic
+    local darkenTween = TweenService
