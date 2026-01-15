@@ -22,7 +22,7 @@ local creditLabel = Instance.new("TextLabel")
 creditLabel.Size = UDim2.new(0, 300, 0, 50)
 creditLabel.Position = UDim2.new(0.5, -150, 0.5, -25)
 creditLabel.BackgroundTransparency = 1
-creditLabel.Text = "by zenxyyv"
+creditLabel.Text = "by yar"
 creditLabel.TextColor3 = Color3.new(1, 1, 1)
 creditLabel.TextScaled = true
 creditLabel.Font = Enum.Font.SciFi
@@ -587,4 +587,5 @@ local function EnableBlurEffect()
     )
     blurTween:Play()
     
+
     local darkenTween = TweenServic
