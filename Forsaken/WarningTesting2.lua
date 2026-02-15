@@ -1,7 +1,6 @@
 -- ========================================
--- ATTACK WARNING SYSTEM - FIXED VERSION
--- Warning "!" muncul di ATAS KILLER saat SOUNDSTRIGGER terdeteksi
--- Bentuk seperti sebelumnya (simbol "!" besar)
+-- ATTACK WARNING SYSTEM - SIMPLE "!" ON KILLER
+-- Warning "!" sederhana di atas killer saat SOUNDSTRIGGER terdeteksi
 -- ========================================
 
 local Players = game:GetService("Players")
@@ -87,7 +86,8 @@ local showPingDisplay = false          -- Ping display
 
 -- DELAY SETTINGS
 local warningDelay = 0
-local detectionCounter = 0
+local lastWarningTime = {}              -- Cooldown per killer
+local warningCooldown = 0.5             -- Cooldown antar warning untuk killer yang sama
 
 -- ========================================
 -- KILLER NAME ESP SYSTEM
@@ -188,130 +188,77 @@ local function setupKillerESP()
 end
 
 -- ========================================
--- WARNING "!" DI ATAS KILLER (BENTUK SEPERTI SEBELUMNYA)
+-- WARNING "!" SEDERHANA DI ATAS KILLER
 -- ========================================
 local activeWarnings = {}  -- Menyimpan warning yang aktif
 
 local function createWarningOnKiller(killer)
-    if not killer or not soundWarningEnabled then return end
+    if not killer or not killer.Parent then return end
+    if not soundWarningEnabled then return end
     
-    -- Cek apakah killer masih ada
-    if not killer.Parent then return end
+    -- CEK COOLDOWN per killer
+    local now = tick()
+    if lastWarningTime[killer] and (now - lastWarningTime[killer] < warningCooldown) then
+        return
+    end
+    lastWarningTime[killer] = now
     
     local root = killer:FindFirstChild("HumanoidRootPart") or killer:FindFirstChildWhichIsA("BasePart")
     if not root then return end
     
     -- Buat warning ID unik
-    local warningId = tostring(tick()) .. "_" .. math.random(1000, 9999)
+    local warningId = tostring(now) .. "_" .. math.random(1000, 9999)
     
-    -- Billboard untuk warning (BENTUK SEPERTI SEBELUMNYA)
+    -- Billboard untuk warning "!" sederhana
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "AttackWarning_" .. warningId
+    billboard.Name = "Warning_" .. warningId
     billboard.Adornee = root
-    billboard.Size = UDim2.new(0, 80, 0, 80)  -- Ukuran seperti sebelumnya
-    billboard.StudsOffset = Vector3.new(0, 6, 0)  -- Lebih tinggi dari ESP
+    billboard.Size = UDim2.new(0, 60, 0, 60)
+    billboard.StudsOffset = Vector3.new(0, 5, 0)
     billboard.AlwaysOnTop = true
     billboard.LightInfluence = 0
     billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     billboard.Parent = killer
     
-    -- Frame utama (seperti sebelumnya)
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(1, 0, 1, 0)
-    mainFrame.BackgroundTransparency = 0.2
-    mainFrame.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = billboard
-    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+    -- Label "!" sederhana (tanpa frame tambahan)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "!"
+    label.TextColor3 = warningColor
+    label.TextSize = 50
+    label.Font = Enum.Font.GothamBlack
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Parent = billboard
     
-    -- Outer glow (seperti sebelumnya)
-    local glowFrame = Instance.new("Frame")
-    glowFrame.Size = UDim2.new(1.2, 0, 1.2, 0)
-    glowFrame.Position = UDim2.new(-0.1, 0, -0.1, 0)
-    glowFrame.BackgroundTransparency = 0.5
-    glowFrame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    glowFrame.BorderSizePixel = 0
-    glowFrame.Parent = mainFrame
-    Instance.new("UICorner", glowFrame).CornerRadius = UDim.new(0, 10)
+    -- Efek fade in
+    label.TextTransparency = 0.3
+    label.Rotation = -3
     
-    -- Exclamation mark container
-    local exMark = Instance.new("Frame")
-    exMark.Size = UDim2.new(1, 0, 1, 0)
-    exMark.BackgroundTransparency = 1
-    exMark.Parent = mainFrame
-    
-    -- Top dot of "!" (seperti sebelumnya)
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0.4, 0, 0.4, 0)
-    dot.Position = UDim2.new(0.3, 0, 0.1, 0)
-    dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    dot.BorderSizePixel = 0
-    dot.Parent = exMark
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-    
-    -- Bottom line of "!" (seperti sebelumnya)
-    local line = Instance.new("Frame")
-    line.Size = UDim2.new(0.3, 0, 0.5, 0)
-    line.Position = UDim2.new(0.35, 0, 0.4, 0)
-    line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    line.BorderSizePixel = 0
-    line.Parent = exMark
-    Instance.new("UICorner", line).CornerRadius = UDim.new(0.3, 0)
-    
-    -- Gradient (seperti sebelumnya)
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 100)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 0, 0))
-    })
-    gradient.Parent = mainFrame
-    
-    -- Pulse animation (seperti sebelumnya)
-    local pulseTween = TweenService:Create(billboard, 
-        TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), 
-        {Size = UDim2.new(0, 90, 0, 90)}
+    -- Animasi sederhana
+    local tweenIn = TweenService:Create(label, 
+        TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), 
+        {TextSize = 60, Rotation = 3, TextTransparency = 0}
     )
-    pulseTween:Play()
-    
-    -- Rotation animation (seperti sebelumnya)
-    local rotateTween = TweenService:Create(billboard, 
-        TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), 
-        {Rotation = 5}
-    )
-    rotateTween:Play()
+    tweenIn:Play()
     
     -- Simpan warning
     activeWarnings[warningId] = {
         billboard = billboard,
-        pulseTween = pulseTween,
-        rotateTween = rotateTween,
-        createdAt = tick()
+        label = label,
+        createdAt = now
     }
     
     -- Auto remove setelah durasi
     task.delay(warningDuration, function()
         if activeWarnings[warningId] then
             -- Fade out
-            local fadeTween = TweenService:Create(mainFrame, 
+            local fadeOut = TweenService:Create(label, 
                 TweenInfo.new(0.2), 
-                {BackgroundTransparency = 1}
+                {TextTransparency = 1, TextSize = 40}
             )
-            fadeTween:Play()
-            
-            local dotFade = TweenService:Create(dot, 
-                TweenInfo.new(0.2), 
-                {BackgroundTransparency = 1}
-            )
-            dotFade:Play()
-            
-            local lineFade = TweenService:Create(line, 
-                TweenInfo.new(0.2), 
-                {BackgroundTransparency = 1}
-            )
-            lineFade:Play()
-            
-            pulseTween:Cancel()
-            rotateTween:Cancel()
+            fadeOut:Play()
             
             task.delay(0.2, function()
                 if billboard and billboard.Parent then
@@ -387,6 +334,7 @@ end
 -- ========================================
 local KillersFolder = workspace:WaitForChild("Players"):WaitForChild("Killers")
 local soundHooks = {}
+local isProcessingSound = {}  -- Mencegah multiple trigger untuk sound yang sama
 
 local function extractNumericSoundId(sound)
     if not sound or not sound.SoundId then return nil end
@@ -403,13 +351,15 @@ end
 local function onAttackSoundDetected(sound, killerModel)
     if not soundWarningEnabled then return end
     if not sound or not sound:IsA("Sound") then return end
+    if not killerModel or not killerModel.Parent then return end
+    
+    -- Cegah multiple trigger untuk sound yang sama
+    if isProcessingSound[sound] then return end
+    isProcessingSound[sound] = true
     
     local soundId = extractNumericSoundId(sound)
-    if not soundId then return end
-    
-    -- CEK APAKAH INI ATTACK SOUND (SOUNDSTRIGGER)
-    if autoBlockTriggerSounds[soundId] then
-        -- Verifikasi bahwa sound ini dari killer
+    if soundId and autoBlockTriggerSounds[soundId] then
+        -- Verifikasi sound dari killer yang benar
         local char = getCharacterFromDescendant(sound)
         if char and char == killerModel then
             -- Terapkan delay jika ada
@@ -420,6 +370,11 @@ local function onAttackSoundDetected(sound, killerModel)
             createWarningOnKiller(killerModel)
         end
     end
+    
+    -- Reset flag setelah beberapa saat
+    task.delay(0.3, function()
+        isProcessingSound[sound] = nil
+    end)
 end
 
 local function monitorKillerSounds(killerModel)
@@ -428,27 +383,12 @@ local function monitorKillerSounds(killerModel)
     -- Hook semua sound yang ada
     for _, sound in pairs(killerModel:GetDescendants()) do
         if sound:IsA("Sound") and not soundHooks[sound] then
-            -- Hook Played event
+            -- Hook Played event (hanya sekali)
             local playedConn = sound.Played:Connect(function()
                 onAttackSoundDetected(sound, killerModel)
             end)
             
-            -- Hook IsPlaying change (untuk jaga-jaga)
-            local propConn = sound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
-                if sound.IsPlaying then
-                    onAttackSoundDetected(sound, killerModel)
-                end
-            end)
-            
-            -- Cleanup saat sound dihapus
-            local destroyConn = sound.Destroying:Connect(function()
-                playedConn:Disconnect()
-                propConn:Disconnect()
-                destroyConn:Disconnect()
-                soundHooks[sound] = nil
-            end)
-            
-            soundHooks[sound] = {playedConn, propConn, destroyConn}
+            soundHooks[sound] = playedConn
             
             -- Cek jika sound sudah playing
             if sound.IsPlaying then
@@ -464,21 +404,7 @@ local function monitorKillerSounds(killerModel)
             local playedConn = desc.Played:Connect(function()
                 onAttackSoundDetected(desc, killerModel)
             end)
-            
-            local propConn = desc:GetPropertyChangedSignal("IsPlaying"):Connect(function()
-                if desc.IsPlaying then
-                    onAttackSoundDetected(desc, killerModel)
-                end
-            end)
-            
-            local destroyConn = desc.Destroying:Connect(function()
-                playedConn:Disconnect()
-                propConn:Disconnect()
-                destroyConn:Disconnect()
-                soundHooks[desc] = nil
-            end)
-            
-            soundHooks[desc] = {playedConn, propConn, destroyConn}
+            soundHooks[desc] = playedConn
             
             if desc.IsPlaying then
                 onAttackSoundDetected(desc, killerModel)
@@ -819,13 +745,14 @@ KillersFolder.ChildRemoved:Connect(function(killer)
             activeWarnings[id] = nil
         end
     end
+    lastWarningTime[killer] = nil
 end)
 
 task.spawn(function()
     task.wait(1)
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "⚡ Attack Warning";
-        Text = "Warning ON KILLERS with SoundsTrigger";
+        Text = "Simple '!' on Killers";
         Duration = 2;
     })
 end)
