@@ -1,6 +1,7 @@
 -- ========================================
 -- ATTACK WARNING SYSTEM - WITH TOGGLES (NO SOUND)
 -- Mobile UI + Show Hint (DRAGGABLE) + Ping Display (DRAGGABLE) + DELAY INPUT (MANUAL)
+-- SEMUA TOGGLE OFF DEFAULT
 -- ========================================
 
 local Players = game:GetService("Players")
@@ -40,7 +41,7 @@ local autoBlockTriggerSounds = {
 -- ========================================
 -- PING COMPENSATION
 -- ========================================
-local pingCompensation = true
+local pingCompensation = true  -- Ini fitur, bukan toggle utama
 local averagePing = 0
 local pingHistory = {}
 local maxPingHistory = 10
@@ -73,20 +74,20 @@ local function getWarningAdvanceTime()
 end
 
 -- ========================================
--- CONFIGURATION WITH TOGGLES
+-- CONFIGURATION WITH TOGGLES - SEMUA OFF DEFAULT
 -- ========================================
-local soundWarningEnabled = true
+local soundWarningEnabled = false      -- OFF DEFAULT
 local warningSize = 200
 local warningDuration = 0.4
 local warningColor = Color3.fromRGB(255, 50, 50)
 
--- TOGGLES
-local showHint = true           -- Toggle untuk petunjuk di bawah
-local showPingDisplay = true    -- Toggle untuk ping di atas layar
+-- TOGGLES - SEMUA OFF DEFAULT
+local showHint = false                 -- OFF DEFAULT
+local showPingDisplay = false          -- OFF DEFAULT
 
--- DELAY SETTINGS (BISA DIISI MANUAL)
-local warningDelay = 0          -- Default 0 detik
-local detectionCounter = 0      -- Internal counter
+-- DELAY SETTINGS
+local warningDelay = 0                  -- Default 0 detik
+local detectionCounter = 0              -- Internal counter
 
 -- ========================================
 -- PING DISPLAY (DI ATAS LAYAR) - BISA DI-DRAG
@@ -114,7 +115,7 @@ local function createPingDisplay()
     frame.BackgroundTransparency = 0.3
     frame.BorderSizePixel = 0
     frame.Active = true
-    frame.Draggable = true  -- BISA DI-DRAG
+    frame.Draggable = true
     frame.Parent = pingDisplayGui
     
     local corner = Instance.new("UICorner")
@@ -147,8 +148,8 @@ local function createPingDisplay()
         end
     end)
     
-    -- Visibility berdasarkan toggle
-    pingDisplayGui.Enabled = showPingDisplay
+    -- Visibility berdasarkan toggle (OFF DEFAULT)
+    pingDisplayGui.Enabled = showPingDisplay  -- false
 end
 
 -- ========================================
@@ -173,7 +174,7 @@ local function createWarningIndicator()
     
     local warningFrame = Instance.new("Frame")
     warningFrame.Name = "WarningFrame"
-    warningFrame.Size = UDim2.new(0, 300, 0, 300)  -- Tinggi 300
+    warningFrame.Size = UDim2.new(0, 300, 0, 300)
     warningFrame.Position = UDim2.new(0.5, -150, 0.4, -150)
     warningFrame.BackgroundTransparency = 1
     warningFrame.Parent = warningGui
@@ -202,9 +203,9 @@ local function createWarningIndicator()
     hintFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 100)
     hintFrame.BorderSizePixel = 0
     hintFrame.Active = true
-    hintFrame.Draggable = true  -- BISA DI-DRAG
-    hintFrame.Visible = showHint
-    hintFrame.Parent = warningGui  -- Parent ke ScreenGui, bukan warningFrame
+    hintFrame.Draggable = true
+    hintFrame.Visible = showHint  -- false (OFF DEFAULT)
+    hintFrame.Parent = warningGui
     
     local hintCorner = Instance.new("UICorner")
     hintCorner.CornerRadius = UDim.new(0, 8)
@@ -226,7 +227,7 @@ local function createWarningIndicator()
 end
 
 -- ========================================
--- SHOW WARNING (dengan DELAY MANUAL)
+-- SHOW WARNING
 -- ========================================
 local lastWarningTime = 0
 local warningCooldown = 0.1
@@ -236,7 +237,7 @@ local function showAttackWarning()
     if now - lastWarningTime < warningCooldown then return end
     lastWarningTime = now
     
-    detectionCounter = detectionCounter + 1  -- Internal counter
+    detectionCounter = detectionCounter + 1
     
     if not warningLabel then
         createWarningIndicator()
@@ -281,7 +282,6 @@ local function showAttackWarning()
             })
             hintFade:Play()
             
-            -- Hint frame tetap visible (transparan) agar bisa di-drag
             task.delay(0.2, function()
                 if hintFrame and not showHint then
                     hintFrame.Visible = false
@@ -292,7 +292,7 @@ local function showAttackWarning()
 end
 
 -- ========================================
--- SISTEM DETEKSI (DENGAN DELAY MANUAL)
+-- SISTEM DETEKSI
 -- ========================================
 local KillersFolder = workspace:WaitForChild("Players"):WaitForChild("Killers")
 local soundHooks = {}
@@ -315,12 +315,11 @@ local function monitorKillerSounds(killerModel)
     for _, sound in pairs(killerModel:GetDescendants()) do
         if sound:IsA("Sound") and not soundHooks[sound] then
             local function checkSound()
-                if not soundWarningEnabled then return end
+                if not soundWarningEnabled then return end  -- Cek toggle (OFF DEFAULT)
                 local soundId = extractNumericSoundId(sound)
                 if soundId and autoBlockTriggerSounds[soundId] then
                     local char = getCharacterFromDescendant(sound)
                     if char then
-                        -- APPLY DELAY MANUAL
                         if warningDelay > 0 then
                             task.wait(warningDelay)
                         end
@@ -353,10 +352,9 @@ local function monitorKillerSounds(killerModel)
     killerModel.DescendantAdded:Connect(function(desc)
         if desc:IsA("Sound") and not soundHooks[desc] then
             local function checkNewSound()
-                if not soundWarningEnabled then return end
+                if not soundWarningEnabled then return end  -- Cek toggle (OFF DEFAULT)
                 local soundId = extractNumericSoundId(desc)
                 if soundId and autoBlockTriggerSounds[soundId] then
-                    -- APPLY DELAY MANUAL
                     if warningDelay > 0 then
                         task.wait(warningDelay)
                     end
@@ -433,14 +431,14 @@ local function createMobileControlGUI()
     
     local yPos = 40
     
-    -- Toggle Warning
+    -- Toggle Warning (OFF DEFAULT)
     local toggleSound = Instance.new("TextButton")
     toggleSound.Name = "ToggleSound"
     toggleSound.Size = UDim2.new(1, -20, 0, 35)
     toggleSound.Position = UDim2.new(0, 10, 0, yPos)
-    toggleSound.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+    toggleSound.BackgroundColor3 = Color3.fromRGB(150, 150, 150)  -- GREY (OFF)
     toggleSound.BorderSizePixel = 0
-    toggleSound.Text = "🔊 Warning: ON"
+    toggleSound.Text = "🔊 Warning: OFF"
     toggleSound.TextColor3 = Color3.fromRGB(255, 255, 255)
     toggleSound.TextSize = 13
     toggleSound.Font = Enum.Font.GothamBold
@@ -452,14 +450,14 @@ local function createMobileControlGUI()
     
     yPos = yPos + 40
     
-    -- Toggle Hint
+    -- Toggle Hint (OFF DEFAULT)
     local toggleHint = Instance.new("TextButton")
     toggleHint.Name = "ToggleHint"
     toggleHint.Size = UDim2.new(1, -20, 0, 35)
     toggleHint.Position = UDim2.new(0, 10, 0, yPos)
-    toggleHint.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+    toggleHint.BackgroundColor3 = Color3.fromRGB(200, 40, 40)  -- RED (OFF)
     toggleHint.BorderSizePixel = 0
-    toggleHint.Text = "✅ Hint: ON"
+    toggleHint.Text = "❌ Hint: OFF"
     toggleHint.TextColor3 = Color3.fromRGB(255, 255, 255)
     toggleHint.TextSize = 13
     toggleHint.Font = Enum.Font.GothamBold
@@ -471,14 +469,14 @@ local function createMobileControlGUI()
     
     yPos = yPos + 40
     
-    -- Toggle Ping Display
+    -- Toggle Ping Display (OFF DEFAULT)
     local togglePingDisplay = Instance.new("TextButton")
     togglePingDisplay.Name = "TogglePingDisplay"
     togglePingDisplay.Size = UDim2.new(1, -20, 0, 35)
     togglePingDisplay.Position = UDim2.new(0, 10, 0, yPos)
-    togglePingDisplay.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+    togglePingDisplay.BackgroundColor3 = Color3.fromRGB(200, 40, 40)  -- RED (OFF)
     togglePingDisplay.BorderSizePixel = 0
-    togglePingDisplay.Text = "📶 Ping: ON"
+    togglePingDisplay.Text = "📶 Ping: OFF"
     togglePingDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
     togglePingDisplay.TextSize = 13
     togglePingDisplay.Font = Enum.Font.GothamBold
@@ -490,7 +488,7 @@ local function createMobileControlGUI()
     
     yPos = yPos + 40
     
-    -- DELAY INPUT SECTION (DENGAN TEXTBOX)
+    -- DELAY INPUT SECTION
     local delayFrame = Instance.new("Frame")
     delayFrame.Name = "DelayFrame"
     delayFrame.Size = UDim2.new(1, -20, 0, 60)
@@ -516,7 +514,6 @@ local function createMobileControlGUI()
     delayLabel.TextXAlignment = Enum.TextXAlignment.Left
     delayLabel.Parent = delayFrame
     
-    -- TextBox untuk input delay
     local delayInput = Instance.new("TextBox")
     delayInput.Name = "DelayInput"
     delayInput.Size = UDim2.new(1, -20, 0, 25)
@@ -537,7 +534,6 @@ local function createMobileControlGUI()
     corner5.CornerRadius = UDim.new(0, 6)
     corner5.Parent = delayInput
     
-    -- Set button untuk apply
     local applyBtn = Instance.new("TextButton")
     applyBtn.Name = "ApplyBtn"
     applyBtn.Size = UDim2.new(0.3, 0, 0, 20)
@@ -553,12 +549,12 @@ local function createMobileControlGUI()
     
     yPos = yPos + 65
     
-    -- Ping Comp Toggle
+    -- Ping Comp Toggle (ON DEFAULT - fitur)
     local togglePingComp = Instance.new("TextButton")
     togglePingComp.Name = "TogglePingComp"
     togglePingComp.Size = UDim2.new(1, -20, 0, 35)
     togglePingComp.Position = UDim2.new(0, 10, 0, yPos)
-    togglePingComp.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+    togglePingComp.BackgroundColor3 = Color3.fromRGB(40, 200, 40)  -- GREEN (ON)
     togglePingComp.BorderSizePixel = 0
     togglePingComp.Text = "✅ Comp: ON"
     togglePingComp.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -626,11 +622,11 @@ local function createMobileControlGUI()
     toggleSound.MouseButton1Click:Connect(function()
         soundWarningEnabled = not soundWarningEnabled
         if soundWarningEnabled then
-            toggleSound.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+            toggleSound.BackgroundColor3 = Color3.fromRGB(100, 200, 100)  -- GREEN
             toggleSound.Text = "🔊 Warning: ON"
         else
-            toggleSound.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
-            toggleSound.Text = "🔇 Warning: OFF"
+            toggleSound.BackgroundColor3 = Color3.fromRGB(150, 150, 150)  -- GREY
+            toggleSound.Text = "🔊 Warning: OFF"
         end
     end)
     
@@ -641,10 +637,10 @@ local function createMobileControlGUI()
             hintFrame.Visible = showHint
         end
         if showHint then
-            toggleHint.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+            toggleHint.BackgroundColor3 = Color3.fromRGB(40, 200, 40)  -- GREEN
             toggleHint.Text = "✅ Hint: ON"
         else
-            toggleHint.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+            toggleHint.BackgroundColor3 = Color3.fromRGB(200, 40, 40)  -- RED
             toggleHint.Text = "❌ Hint: OFF"
         end
     end)
@@ -656,24 +652,22 @@ local function createMobileControlGUI()
             pingDisplayGui.Enabled = showPingDisplay
         end
         if showPingDisplay then
-            togglePingDisplay.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+            togglePingDisplay.BackgroundColor3 = Color3.fromRGB(40, 200, 40)  -- GREEN
             togglePingDisplay.Text = "📶 Ping: ON"
         else
-            togglePingDisplay.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+            togglePingDisplay.BackgroundColor3 = Color3.fromRGB(200, 40, 40)  -- RED
             togglePingDisplay.Text = "📶 Ping: OFF"
         end
     end)
     
-    -- Apply Delay dari TextBox
+    -- Apply Delay
     applyBtn.MouseButton1Click:Connect(function()
-        local input = delayInput.Text:gsub(",", ".")  -- Ganti koma dengan titik
+        local input = delayInput.Text:gsub(",", ".")
         local delay = tonumber(input)
         if delay then
-            -- Batasi delay antara 0 - 3 detik
             warningDelay = math.max(0, math.min(3, delay))
             delayInput.Text = string.format("%.1f", warningDelay)
             
-            -- Animasi apply button
             applyBtn.Size = UDim2.new(0.3, -2, 0, 18)
             task.wait(0.05)
             applyBtn.Size = UDim2.new(0.3, 0, 0, 20)
@@ -682,7 +676,6 @@ local function createMobileControlGUI()
         end
     end)
     
-    -- Enter key untuk apply
     delayInput.FocusLost:Connect(function(enterPressed)
         if enterPressed then
             local input = delayInput.Text:gsub(",", ".")
@@ -761,7 +754,7 @@ task.spawn(function()
     task.wait(1)
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "⚡ Attack Warning";
-        Text = "Hint DRAGGABLE + Manual Delay";
+        Text = "All Features OFF by Default";
         Duration = 2;
     })
 end)
