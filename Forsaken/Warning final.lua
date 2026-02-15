@@ -748,6 +748,7 @@ KillersFolder.ChildRemoved:Connect(function(killer)
     lastWarningTime[killer] = nil
 end)
 
+--[[
 task.spawn(function()
     task.wait(1)
     game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -756,3 +757,4 @@ task.spawn(function()
         Duration = 2;
     })
 end)
+--]]
