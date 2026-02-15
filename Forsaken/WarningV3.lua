@@ -1,6 +1,6 @@
 -- ========================================
--- ATTACK WARNING SYSTEM - PERFECTED
--- Fast Ping Update | Draggable UI | No Counter
+-- ATTACK WARNING SYSTEM - FULL FEATURES
+-- Ukuran Normal | Warning Fix | Banyak Fitur
 -- ========================================
 
 local Players = game:GetService("Players")
@@ -9,10 +9,9 @@ local PlayerGui = lp:WaitForChild("PlayerGui")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 -- ========================================
--- AUTO BLOCK TRIGGER SOUNDS
+-- AUTO BLOCK TRIGGER SOUNDS (LENGKAP)
 -- ========================================
 local autoBlockTriggerSounds = {
     ["102228729296384"] = true, ["140242176732868"] = true, ["112809109188560"] = true, ["136323728355613"] = true,
@@ -39,47 +38,43 @@ local autoBlockTriggerSounds = {
 }
 
 -- ========================================
--- PING COMPENSATION (CEPAT & AKURAT)
+-- PING COMPENSATION
 -- ========================================
 local pingCompensation = true
 local currentPing = 0
-local compensationMultiplier = 1.2
 
--- Update ping setiap frame (sangat cepat)
 RunService.RenderStepped:Connect(function()
     currentPing = lp:GetNetworkPing() * 1000
 end)
 
 local function getWarningAdvanceTime()
     if not pingCompensation then return 0 end
-    return (currentPing / 1000) * compensationMultiplier
+    return currentPing / 1000 * 1.2
 end
 
 -- ========================================
--- CONFIGURATION
+-- CONFIGURATION (SEMUA FITUR)
 -- ========================================
 local soundWarningEnabled = true
-local warningSize = 220
-local warningDuration = 0.35
+local warningSize = 200
+local warningDuration = 0.45
 local warningColor = Color3.fromRGB(255, 50, 50)
+
+-- TOGGLES (SEMUA FITUR)
 local showHint = true
 local showPingDisplay = true
+local showPingInfo = true
+local showCounter = true
+local showKillerName = true
+local showDistance = true
 
 -- ========================================
--- PING DISPLAY (DI ATAS - BISA DI-DRAG)
+-- PING DISPLAY (ATAS - UKURAN NORMAL)
 -- ========================================
-local pingDisplay = {
-    gui = nil,
-    frame = nil,
-    label = nil,
-    dragStart = nil,
-    dragPos = nil
-}
+local pingDisplay = {gui = nil, frame = nil, label = nil}
 
 local function createPingDisplay()
-    if pingDisplay.gui then
-        pingDisplay.gui:Destroy()
-    end
+    if pingDisplay.gui then pingDisplay.gui:Destroy() end
     
     local gui = Instance.new("ScreenGui")
     gui.Name = "PingDisplay"
@@ -90,25 +85,23 @@ local function createPingDisplay()
     gui.Enabled = showPingDisplay
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 140, 0, 28)
-    frame.Position = UDim2.new(0.5, -70, 0, 5)
+    frame.Size = UDim2.new(0, 200, 0, 35)
+    frame.Position = UDim2.new(0.5, -100, 0, 8)
     frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    frame.BackgroundTransparency = 0.2
+    frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.Draggable = true
     frame.Parent = gui
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 14)
-    corner.Parent = frame
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = "📶 0ms | +0ms"
+    label.Text = "📶 Ping: 0ms | +0ms"
     label.TextColor3 = Color3.fromRGB(255, 255, 100)
-    label.TextSize = 13
+    label.TextSize = 14
     label.Font = Enum.Font.GothamBold
     label.Parent = frame
     
@@ -116,10 +109,9 @@ local function createPingDisplay()
     pingDisplay.frame = frame
     pingDisplay.label = label
     
-    -- Update ping setiap frame (real-time)
     RunService.RenderStepped:Connect(function()
         if pingDisplay.label and showPingDisplay then
-            pingDisplay.label.Text = string.format("📶 %dms | +%dms", 
+            pingDisplay.label.Text = string.format("📶 Ping: %dms | +%dms", 
                 math.floor(currentPing),
                 math.floor(getWarningAdvanceTime() * 1000)
             )
@@ -128,16 +120,19 @@ local function createPingDisplay()
 end
 
 -- ========================================
--- WARNING INDICATOR (SEDERHANA & BESAR)
+-- WARNING INDICATOR (UKURAN NORMAL + BANYAK INFO)
 -- ========================================
 local warningGui = nil
 local warningLabel = nil
 local hintLabel = nil
+local pingInfoLabel = nil
+local counterLabel = nil
+local killerLabel = nil
+local distanceLabel = nil
+local detectionCounter = 0
 
 local function createWarningIndicator()
-    if warningGui then
-        warningGui:Destroy()
-    end
+    if warningGui then warningGui:Destroy() end
     
     warningGui = Instance.new("ScreenGui")
     warningGui.Name = "AttackWarning"
@@ -147,14 +142,15 @@ local function createWarningIndicator()
     warningGui.Parent = PlayerGui
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 300)
-    frame.Position = UDim2.new(0.5, -150, 0.4, -150)
+    frame.Size = UDim2.new(0, 350, 0, 400)
+    frame.Position = UDim2.new(0.5, -175, 0.35, -200)
     frame.BackgroundTransparency = 1
     frame.Parent = warningGui
     
     -- Warning "!" BESAR
     warningLabel = Instance.new("TextLabel")
-    warningLabel.Size = UDim2.new(1, 0, 1, 0)
+    warningLabel.Size = UDim2.new(1, 0, 0, 250)
+    warningLabel.Position = UDim2.new(0, 0, 0, 0)
     warningLabel.BackgroundTransparency = 1
     warningLabel.Text = "!"
     warningLabel.TextColor3 = warningColor
@@ -165,42 +161,135 @@ local function createWarningIndicator()
     warningLabel.TextTransparency = 1
     warningLabel.Parent = frame
     
-    -- Hint di bawah "!" (KECIL)
+    local yPos = 260
+    
+    -- HINT
     hintLabel = Instance.new("TextLabel")
-    hintLabel.Size = UDim2.new(1, 0, 0, 25)
-    hintLabel.Position = UDim2.new(0, 0, 0.8, 0)
+    hintLabel.Size = UDim2.new(1, -20, 0, 30)
+    hintLabel.Position = UDim2.new(0, 10, 0, yPos)
     hintLabel.BackgroundTransparency = 0.3
-    hintLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    hintLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 100)
     hintLabel.BorderSizePixel = 0
-    hintLabel.Text = "⚡ KILLER ATTACK ⚡"
+    hintLabel.Text = "⚡ KILLER ATTACK DETECTED ⚡"
     hintLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-    hintLabel.TextSize = 14
+    hintLabel.TextSize = 16
     hintLabel.Font = Enum.Font.GothamBold
     hintLabel.TextTransparency = 1
     hintLabel.Visible = showHint
     hintLabel.Parent = frame
+    Instance.new("UICorner", hintLabel).CornerRadius = UDim.new(0, 8)
     
-    local hintCorner = Instance.new("UICorner")
-    hintCorner.CornerRadius = UDim.new(0, 8)
-    hintCorner.Parent = hintLabel
+    yPos = yPos + 35
+    
+    -- COUNTER
+    counterLabel = Instance.new("TextLabel")
+    counterLabel.Size = UDim2.new(0.45, -5, 0, 30)
+    counterLabel.Position = UDim2.new(0, 10, 0, yPos)
+    counterLabel.BackgroundTransparency = 0.3
+    counterLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    counterLabel.BorderSizePixel = 0
+    counterLabel.Text = "Detected: 0"
+    counterLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    counterLabel.TextSize = 14
+    counterLabel.Font = Enum.Font.GothamBold
+    counterLabel.TextTransparency = 1
+    counterLabel.Visible = showCounter
+    counterLabel.Parent = frame
+    Instance.new("UICorner", counterLabel).CornerRadius = UDim.new(0, 8)
+    
+    -- KILLER NAME
+    killerLabel = Instance.new("TextLabel")
+    killerLabel.Size = UDim2.new(0.45, -5, 0, 30)
+    killerLabel.Position = UDim2.new(0.5, 5, 0, yPos)
+    killerLabel.BackgroundTransparency = 0.3
+    killerLabel.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+    killerLabel.BorderSizePixel = 0
+    killerLabel.Text = "Killer: Unknown"
+    killerLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
+    killerLabel.TextSize = 14
+    killerLabel.Font = Enum.Font.GothamBold
+    killerLabel.TextTransparency = 1
+    killerLabel.Visible = showKillerName
+    killerLabel.Parent = frame
+    Instance.new("UICorner", killerLabel).CornerRadius = UDim.new(0, 8)
+    
+    yPos = yPos + 35
+    
+    -- DISTANCE
+    distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(0.45, -5, 0, 30)
+    distanceLabel.Position = UDim2.new(0, 10, 0, yPos)
+    distanceLabel.BackgroundTransparency = 0.3
+    distanceLabel.BackgroundColor3 = Color3.fromRGB(0, 50, 0)
+    distanceLabel.BorderSizePixel = 0
+    distanceLabel.Text = "Distance: 0 studs"
+    distanceLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+    distanceLabel.TextSize = 14
+    distanceLabel.Font = Enum.Font.GothamBold
+    distanceLabel.TextTransparency = 1
+    distanceLabel.Visible = showDistance
+    distanceLabel.Parent = frame
+    Instance.new("UICorner", distanceLabel).CornerRadius = UDim.new(0, 8)
+    
+    -- PING INFO
+    pingInfoLabel = Instance.new("TextLabel")
+    pingInfoLabel.Size = UDim2.new(0.45, -5, 0, 30)
+    pingInfoLabel.Position = UDim2.new(0.5, 5, 0, yPos)
+    pingInfoLabel.BackgroundTransparency = 0.3
+    pingInfoLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    pingInfoLabel.BorderSizePixel = 0
+    pingInfoLabel.Text = "Ping: 0ms"
+    pingInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    pingInfoLabel.TextSize = 14
+    pingInfoLabel.Font = Enum.Font.GothamBold
+    pingInfoLabel.TextTransparency = 1
+    pingInfoLabel.Visible = showPingInfo
+    pingInfoLabel.Parent = frame
+    Instance.new("UICorner", pingInfoLabel).CornerRadius = UDim.new(0, 8)
 end
 
 -- ========================================
--- SHOW WARNING (CEPAT & HALUS)
+-- SHOW WARNING (FIXED - PASTI MUNCUL)
 -- ========================================
 local lastWarningTime = 0
-local warningCooldown = 0.05
+local warningCooldown = 0.1
 
-local function showAttackWarning()
+local function showAttackWarning(killerName, distance)
     local now = tick()
     if now - lastWarningTime < warningCooldown then return end
     lastWarningTime = now
     
+    detectionCounter = detectionCounter + 1
+    
     if not warningGui then
         createWarningIndicator()
+        task.wait(0.05)
     end
     
-    -- Reset
+    -- PASTIKAN SEMUA ELEMEN ADA
+    if not warningLabel then
+        createWarningIndicator()
+        task.wait(0.05)
+    end
+    
+    -- UPDATE INFO
+    if counterLabel and showCounter then
+        counterLabel.Text = "Detected: " .. detectionCounter
+    end
+    
+    if killerLabel and showKillerName then
+        killerLabel.Text = "Killer: " .. (killerName or "Unknown")
+    end
+    
+    if distanceLabel and showDistance then
+        distanceLabel.Text = string.format("Distance: %.0f studs", distance or 0)
+    end
+    
+    if pingInfoLabel and showPingInfo then
+        pingInfoLabel.Text = string.format("Ping: %dms", math.floor(currentPing))
+    end
+    
+    -- RESET TRANSPARANSI
     warningLabel.TextTransparency = 0
     warningLabel.TextSize = warningSize * 0.7
     warningLabel.Rotation = -3
@@ -209,91 +298,161 @@ local function showAttackWarning()
         hintLabel.TextTransparency = 0
     end
     
-    -- Animasi masuk
+    if showCounter and counterLabel then
+        counterLabel.TextTransparency = 0
+    end
+    
+    if showKillerName and killerLabel then
+        killerLabel.TextTransparency = 0
+    end
+    
+    if showDistance and distanceLabel then
+        distanceLabel.TextTransparency = 0
+    end
+    
+    if showPingInfo and pingInfoLabel then
+        pingInfoLabel.TextTransparency = 0
+    end
+    
+    -- ANIMASI
     local tweenIn = TweenService:Create(warningLabel, 
-        TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out), 
+        TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), 
         {TextSize = warningSize, Rotation = 3}
     )
     tweenIn:Play()
     
-    -- Animasi keluar
-    task.delay(warningDuration - 0.1, function()
+    -- FADE OUT
+    task.delay(warningDuration - 0.15, function()
         if not warningLabel then return end
         
-        local tweenOut = TweenService:Create(warningLabel, 
-            TweenInfo.new(0.1), 
-            {TextTransparency = 1, TextSize = warningSize * 0.5}
-        )
-        tweenOut:Play()
+        local fadeInfo = TweenInfo.new(0.15)
+        TweenService:Create(warningLabel, fadeInfo, {TextTransparency = 1, TextSize = warningSize * 0.5}):Play()
         
         if hintLabel and showHint then
-            local hintOut = TweenService:Create(hintLabel, 
-                TweenInfo.new(0.1), 
-                {TextTransparency = 1}
-            )
-            hintOut:Play()
+            TweenService:Create(hintLabel, fadeInfo, {TextTransparency = 1}):Play()
+        end
+        
+        if counterLabel and showCounter then
+            TweenService:Create(counterLabel, fadeInfo, {TextTransparency = 1}):Play()
+        end
+        
+        if killerLabel and showKillerName then
+            TweenService:Create(killerLabel, fadeInfo, {TextTransparency = 1}):Play()
+        end
+        
+        if distanceLabel and showDistance then
+            TweenService:Create(distanceLabel, fadeInfo, {TextTransparency = 1}):Play()
+        end
+        
+        if pingInfoLabel and showPingInfo then
+            TweenService:Create(pingInfoLabel, fadeInfo, {TextTransparency = 1}):Play()
         end
     end)
 end
 
 -- ========================================
--- SOUND DETECTION (EFISIEN)
+-- SOUND DETECTION (FIXED - AGGRESSIVE)
 -- ========================================
 local KillersFolder = workspace:WaitForChild("Players"):WaitForChild("Killers")
 local soundConnections = {}
 
 local function extractSoundId(sound)
-    local id = sound and sound.SoundId
-    return id and tostring(id):match("%d+")
+    if not sound then return nil end
+    local id = tostring(sound.SoundId):match("%d+")
+    return id
 end
 
-local function onKillerSound(sound)
+local function getDistanceFromKiller(killer)
+    if not lp.Character then return 999 end
+    local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+    local killerRoot = killer and killer:FindFirstChild("HumanoidRootPart")
+    if not myRoot or not killerRoot then return 999 end
+    return (killerRoot.Position - myRoot.Position).Magnitude
+end
+
+local function onSoundPlayed(sound, killer)
     if not soundWarningEnabled then return end
-    local id = extractSoundId(sound)
-    if id and autoBlockTriggerSounds[id] then
-        showAttackWarning()
+    if not sound or not sound.IsPlaying then return end
+    
+    local soundId = extractSoundId(sound)
+    if not soundId then return end
+    
+    if autoBlockTriggerSounds[soundId] then
+        local killerName = killer and killer.Name or "Unknown"
+        local distance = getDistanceFromKiller(killer)
+        showAttackWarning(killerName, distance)
     end
 end
 
 local function setupKillerHooks(killer)
     if not killer or not killer:IsA("Model") then return end
     
-    -- Hook semua sound yang ada
-    for _, sound in pairs(killer:GetDescendants()) do
-        if sound:IsA("Sound") and not soundConnections[sound] then
-            local conn = sound.Played:Connect(function()
-                onKillerSound(sound)
-            end)
-            soundConnections[sound] = conn
-            
-            -- Cek jika sudah playing
-            if sound.IsPlaying then
-                onKillerSound(sound)
+    -- HOOK SEMUA SOUND (AGGRESSIVE)
+    local function hookAllSounds()
+        for _, sound in pairs(killer:GetDescendants()) do
+            if sound:IsA("Sound") and not soundConnections[sound] then
+                -- CONNECT PLAYED
+                local conn = sound.Played:Connect(function()
+                    onSoundPlayed(sound, killer)
+                end)
+                soundConnections[sound] = conn
+                
+                -- CEK LANSUNG JIKA SEDANG PLAYING
+                if sound.IsPlaying then
+                    onSoundPlayed(sound, killer)
+                end
+                
+                -- CONNECT PROPERTY CHANGED (UNTUK JAGA-JAGA)
+                sound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
+                    if sound.IsPlaying then
+                        onSoundPlayed(sound, killer)
+                    end
+                end)
             end
         end
     end
     
-    -- Hook sound baru
+    -- HOOK SEMUA YANG ADA
+    hookAllSounds()
+    
+    -- HOOK UNTUK SOUND BARU
     killer.DescendantAdded:Connect(function(desc)
+        task.wait(0.1)
         if desc:IsA("Sound") and not soundConnections[desc] then
             local conn = desc.Played:Connect(function()
-                onKillerSound(desc)
+                onSoundPlayed(desc, killer)
             end)
             soundConnections[desc] = conn
+            
+            if desc.IsPlaying then
+                onSoundPlayed(desc, killer)
+            end
+            
+            desc:GetPropertyChangedSignal("IsPlaying"):Connect(function()
+                if desc.IsPlaying then
+                    onSoundPlayed(desc, killer)
+                end
+            end)
+        end
+    end)
+    
+    -- SCAN BERKALA (UNTUK JAGA-JAGA)
+    task.spawn(function()
+        while task.wait(2) do
+            if not killer or not killer.Parent then break end
+            hookAllSounds()
         end
     end)
 end
 
 -- ========================================
--- CONTROL UI (RAPI & BISA DI-DRAG)
+-- CONTROL UI (UKURAN NORMAL + BANYAK TOGGLE)
 -- ========================================
 local controlGui = nil
 local controlFrame = nil
 
 local function createControlUI()
-    if controlGui then
-        controlGui:Destroy()
-    end
+    if controlGui then controlGui:Destroy() end
     
     controlGui = Instance.new("ScreenGui")
     controlGui.Name = "WarningControl"
@@ -303,8 +462,8 @@ local function createControlUI()
     controlGui.Parent = PlayerGui
     
     controlFrame = Instance.new("Frame")
-    controlFrame.Size = UDim2.new(0, 150, 0, 120)
-    controlFrame.Position = UDim2.new(1, -160, 0, 10)
+    controlFrame.Size = UDim2.new(0, 200, 0, 320)
+    controlFrame.Position = UDim2.new(1, -210, 0, 10)
     controlFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     controlFrame.BackgroundTransparency = 0.1
     controlFrame.BorderSizePixel = 0
@@ -312,114 +471,137 @@ local function createControlUI()
     controlFrame.Draggable = true
     controlFrame.Parent = controlGui
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = controlFrame
+    Instance.new("UICorner", controlFrame).CornerRadius = UDim.new(0, 12)
     
-    -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -10, 0, 25)
+    title.Size = UDim2.new(1, -10, 0, 35)
     title.Position = UDim2.new(0, 5, 0, 5)
     title.BackgroundTransparency = 1
-    title.Text = "⚠️ WARNING"
+    title.Text = "⚡ ATTACK WARNING"
     title.TextColor3 = Color3.fromRGB(255, 200, 100)
-    title.TextSize = 13
+    title.TextSize = 14
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = controlFrame
     
-    local y = 35
+    local yPos = 45
     
-    -- Toggle Warning
-    local warnBtn = Instance.new("TextButton")
-    warnBtn.Size = UDim2.new(1, -10, 0, 30)
-    warnBtn.Position = UDim2.new(0, 5, 0, y)
-    warnBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-    warnBtn.BorderSizePixel = 0
-    warnBtn.Text = "🔊 ON"
-    warnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    warnBtn.TextSize = 12
-    warnBtn.Font = Enum.Font.GothamBold
-    warnBtn.Parent = controlFrame
-    Instance.new("UICorner", warnBtn).CornerRadius = UDim.new(0, 6)
+    -- FUNCTION TO CREATE TOGGLE BUTTON
+    local function createToggle(y, text, var, color1, color2)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -20, 0, 30)
+        btn.Position = UDim2.new(0, 10, 0, y)
+        btn.BackgroundColor3 = var and color1 or color2
+        btn.BorderSizePixel = 0
+        btn.Text = text .. (var and " ON" or " OFF")
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 12
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = controlFrame
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        return btn
+    end
     
-    y = y + 35
+    -- MAIN TOGGLE
+    local warnBtn = createToggle(yPos, "🔊 WARNING", soundWarningEnabled, Color3.fromRGB(100,200,100), Color3.fromRGB(150,150,150))
+    warnBtn.MouseButton1Click:Connect(function()
+        soundWarningEnabled = not soundWarningEnabled
+        warnBtn.BackgroundColor3 = soundWarningEnabled and Color3.fromRGB(100,200,100) or Color3.fromRGB(150,150,150)
+        warnBtn.Text = "🔊 WARNING " .. (soundWarningEnabled and "ON" or "OFF")
+    end)
     
-    -- Toggle Hint
-    local hintBtn = Instance.new("TextButton")
-    hintBtn.Size = UDim2.new(1, -10, 0, 30)
-    hintBtn.Position = UDim2.new(0, 5, 0, y)
-    hintBtn.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
-    hintBtn.BorderSizePixel = 0
-    hintBtn.Text = "📝 HINT ON"
-    hintBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    hintBtn.TextSize = 12
-    hintBtn.Font = Enum.Font.GothamBold
-    hintBtn.Parent = controlFrame
-    Instance.new("UICorner", hintBtn).CornerRadius = UDim.new(0, 6)
+    yPos = yPos + 35
     
-    y = y + 35
+    -- HINT TOGGLE
+    local hintBtn = createToggle(yPos, "📝 HINT", showHint, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    hintBtn.MouseButton1Click:Connect(function()
+        showHint = not showHint
+        hintBtn.BackgroundColor3 = showHint and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        hintBtn.Text = "📝 HINT " .. (showHint and "ON" or "OFF")
+        if hintLabel then hintLabel.Visible = showHint end
+    end)
     
-    -- Toggle Ping Display
-    local pingBtn = Instance.new("TextButton")
-    pingBtn.Size = UDim2.new(1, -10, 0, 30)
-    pingBtn.Position = UDim2.new(0, 5, 0, y)
-    pingBtn.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
-    pingBtn.BorderSizePixel = 0
-    pingBtn.Text = "📶 PING ON"
-    pingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    pingBtn.TextSize = 12
-    pingBtn.Font = Enum.Font.GothamBold
-    pingBtn.Parent = controlFrame
-    Instance.new("UICorner", pingBtn).CornerRadius = UDim.new(0, 6)
+    yPos = yPos + 35
     
-    -- Minimize button
+    -- COUNTER TOGGLE
+    local counterBtn = createToggle(yPos, "🔢 COUNTER", showCounter, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    counterBtn.MouseButton1Click:Connect(function()
+        showCounter = not showCounter
+        counterBtn.BackgroundColor3 = showCounter and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        counterBtn.Text = "🔢 COUNTER " .. (showCounter and "ON" or "OFF")
+        if counterLabel then counterLabel.Visible = showCounter end
+    end)
+    
+    yPos = yPos + 35
+    
+    -- KILLER NAME TOGGLE
+    local killerBtn = createToggle(yPos, "👤 KILLER", showKillerName, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    killerBtn.MouseButton1Click:Connect(function()
+        showKillerName = not showKillerName
+        killerBtn.BackgroundColor3 = showKillerName and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        killerBtn.Text = "👤 KILLER " .. (showKillerName and "ON" or "OFF")
+        if killerLabel then killerLabel.Visible = showKillerName end
+    end)
+    
+    yPos = yPos + 35
+    
+    -- DISTANCE TOGGLE
+    local distBtn = createToggle(yPos, "📏 DISTANCE", showDistance, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    distBtn.MouseButton1Click:Connect(function()
+        showDistance = not showDistance
+        distBtn.BackgroundColor3 = showDistance and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        distBtn.Text = "📏 DISTANCE " .. (showDistance and "ON" or "OFF")
+        if distanceLabel then distanceLabel.Visible = showDistance end
+    end)
+    
+    yPos = yPos + 35
+    
+    -- PING DISPLAY TOGGLE
+    local pingBtn = createToggle(yPos, "📶 PING", showPingDisplay, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    pingBtn.MouseButton1Click:Connect(function()
+        showPingDisplay = not showPingDisplay
+        pingBtn.BackgroundColor3 = showPingDisplay and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        pingBtn.Text = "📶 PING " .. (showPingDisplay and "ON" or "OFF")
+        if pingDisplay.gui then pingDisplay.gui.Enabled = showPingDisplay end
+    end)
+    
+    yPos = yPos + 35
+    
+    -- PING INFO TOGGLE
+    local pingInfoBtn = createToggle(yPos, "ℹ️ PING INFO", showPingInfo, Color3.fromRGB(40,200,40), Color3.fromRGB(200,40,40))
+    pingInfoBtn.MouseButton1Click:Connect(function()
+        showPingInfo = not showPingInfo
+        pingInfoBtn.BackgroundColor3 = showPingInfo and Color3.fromRGB(40,200,40) or Color3.fromRGB(200,40,40)
+        pingInfoBtn.Text = "ℹ️ PING INFO " .. (showPingInfo and "ON" or "OFF")
+        if pingInfoLabel then pingInfoLabel.Visible = showPingInfo end
+    end)
+    
+    -- MINIMIZE BUTTON
     local minBtn = Instance.new("TextButton")
-    minBtn.Size = UDim2.new(0, 22, 0, 22)
-    minBtn.Position = UDim2.new(1, -27, 0, 6)
+    minBtn.Size = UDim2.new(0, 25, 0, 25)
+    minBtn.Position = UDim2.new(1, -30, 0, 8)
     minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     minBtn.BorderSizePixel = 0
     minBtn.Text = "−"
     minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    minBtn.TextSize = 14
+    minBtn.TextSize = 16
     minBtn.Font = Enum.Font.GothamBold
     minBtn.Parent = controlFrame
-    Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
     
-    -- Button Functions
-    warnBtn.MouseButton1Click:Connect(function()
-        soundWarningEnabled = not soundWarningEnabled
-        warnBtn.BackgroundColor3 = soundWarningEnabled and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(150, 150, 150)
-        warnBtn.Text = soundWarningEnabled and "🔊 ON" or "🔇 OFF"
-    end)
-    
-    hintBtn.MouseButton1Click:Connect(function()
-        showHint = not showHint
-        hintBtn.BackgroundColor3 = showHint and Color3.fromRGB(40, 200, 40) or Color3.fromRGB(200, 40, 40)
-        hintBtn.Text = showHint and "📝 HINT ON" or "📝 HINT OFF"
-        if hintLabel then
-            hintLabel.Visible = showHint
-        end
-    end)
-    
-    pingBtn.MouseButton1Click:Connect(function()
-        showPingDisplay = not showPingDisplay
-        pingBtn.BackgroundColor3 = showPingDisplay and Color3.fromRGB(40, 200, 40) or Color3.fromRGB(200, 40, 40)
-        pingBtn.Text = showPingDisplay and "📶 PING ON" or "📶 PING OFF"
-        if pingDisplay.gui then
-            pingDisplay.gui.Enabled = showPingDisplay
-        end
-    end)
-    
-    -- Minimize Function
     local minimized = false
     minBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
-        controlFrame.Size = minimized and UDim2.new(0, 150, 0, 35) or UDim2.new(0, 150, 0, 120)
+        controlFrame.Size = minimized and UDim2.new(0, 200, 0, 45) or UDim2.new(0, 200, 0, 320)
         minBtn.Text = minimized and "+" or "−"
+        
         warnBtn.Visible = not minimized
         hintBtn.Visible = not minimized
+        counterBtn.Visible = not minimized
+        killerBtn.Visible = not minimized
+        distBtn.Visible = not minimized
         pingBtn.Visible = not minimized
+        pingInfoBtn.Visible = not minimized
     end)
 end
 
@@ -430,23 +612,20 @@ createControlUI()
 createWarningIndicator()
 createPingDisplay()
 
--- Setup hooks untuk semua killer
 for _, killer in pairs(KillersFolder:GetChildren()) do
     task.spawn(setupKillerHooks, killer)
 end
 
--- Monitor killer baru
 KillersFolder.ChildAdded:Connect(function(killer)
     task.wait(0.5)
     task.spawn(setupKillerHooks, killer)
 end)
 
--- Notification singkat
 task.spawn(function()
     task.wait(1)
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "⚡ READY";
-        Text = "Warning Active";
-        Duration = 1.5;
+        Title = "⚡ ATTACK WARNING";
+        Text = "Full Features Active";
+        Duration = 2;
     })
 end)
