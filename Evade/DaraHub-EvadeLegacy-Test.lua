@@ -83,6 +83,31 @@ elseif type(executor) == "string" then
 else
  print("The injector does not support identifyexecutor()")
 end
+--[[
+Window:Tag({
+Title = "Beta",
+Color = Color3.fromHex("#000111")
+})
+]]
+Tabs = {
+    Main = Window:Tab({ Title = "Main", Icon = "layout-grid" }),
+    Player = Window:Tab({ Title = "Player", Icon = "user" }),
+    Auto = Window:Tab({ Title = "Auto", Icon = "repeat-2" }),
+    Combat = Window:Tab({ Title = "Combat", Icon = "sword" }),
+    Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
+    ESP = Window:Tab({ Title = "ESP", Icon = "eye" }),
+    Utility = Window:Tab({ Title = "Utility", Icon = "wrench" }),
+    Teleport = Window:Tab({ Title = "Teleport", Icon = "navigation" }),
+    Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
+    info = Window:Tab({ Title = "info", Icon = "info" })
+}
+local socialsModule = loadstring(game:HttpGet("https://darahub.vercel.app/Module/info.lua"))()
+
+socialsModule(Tabs)
+
+Window:OnOpen(function()
+game:GetService("CoreGui").Darahub.FloatingButton_Darahub.Visible = false
+end)
 Window:OnClose(function()
     game:GetService("CoreGui").Darahub.FloatingButton_Darahub.Visible = true
 end)
