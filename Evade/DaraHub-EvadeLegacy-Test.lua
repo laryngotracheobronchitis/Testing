@@ -101,9 +101,64 @@ Tabs = {
     Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
     info = Window:Tab({ Title = "info", Icon = "info" })
 }
-local socialsModule = loadstring(game:HttpGet("https://darahub.vercel.app/Module/info.lua"))()
+-- Load info module with fallback
+local success, socialsModule = pcall(function()
+    return loadstring(game:HttpGet("https://darahub.vercel.app/Module/info.lua"))()
+end)
 
-socialsModule(Tabs)
+if success and socialsModule then
+    socialsModule(Tabs)
+else
+    -- Fallback info content if module fails to load
+    Tabs.info:Section({ Title = "DaraHub Information", TextSize = 24 })
+    
+    Tabs.info:Paragraph({
+        Title = "About DaraHub",
+        Desc = "DaraHub is a premium script hub for Evade Legacy. This script provides various features including ESP, auto features, player modifications, and more."
+    })
+    
+    Tabs.info:Divider()
+    
+    Tabs.info:Section({ Title = "Credits", TextSize = 20 })
+    
+    Tabs.info:Paragraph({
+        Title = "Developer",
+        Desc = "Script created and maintained by DaraHub Team"
+    })
+    
+    Tabs.info:Paragraph({
+        Title = "Discord",
+        Desc = "Join our Discord server for support and updates!"
+    })
+    
+    Tabs.info:Button({
+        Title = "Copy Discord Link",
+        Desc = "Click to copy Discord invite link",
+        Icon = "link",
+        Callback = function()
+            setclipboard("https://discord.gg/darahub")
+            WindUI:Notify({
+                Title = "Copied!",
+                Content = "Discord link copied to clipboard",
+                Duration = 3
+            })
+        end
+    })
+    
+    Tabs.info:Divider()
+    
+    Tabs.info:Section({ Title = "Version Info", TextSize = 20 })
+    
+    Tabs.info:Paragraph({
+        Title = "Script Version",
+        Desc = "Version: 2.0.0\nLast Updated: 2024\nGame: Evade Legacy"
+    })
+    
+    Tabs.info:Paragraph({
+        Title = "Features",
+        Desc = "• Player ESP & Enemy ESP\n• Auto Farm & Auto Carry\n• Movement Hacks (Fly, TPWalk, Jump)\n• Visual Enhancements\n• Combat Features\n• Teleport System\n• And many more!"
+    })
+end
 
 Window:OnOpen(function()
 game:GetService("CoreGui").Darahub.FloatingButton_Darahub.Visible = false
