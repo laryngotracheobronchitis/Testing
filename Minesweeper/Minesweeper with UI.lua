@@ -28,7 +28,9 @@ local data = {
 	},
 	timing = {
 		lastPlanTick = 0,
-		planIntervalMs = 0
+		planIntervalMs = 200,
+		lastBuildTime = 0,
+		buildIntervalSec = 3
 	},
 	highlights = {},
 	probLabels = {},
@@ -408,21 +410,23 @@ local function planMove()
 end
 
 local function clearHighlights()
-	for _, highlight in pairs(data.highlights) do
-		if (highlight and highlight.Parent) then
+	for i = #data.highlights, 1, -1 do
+		local highlight = data.highlights[i]
+		if highlight and highlight.Parent then
 			highlight:Destroy()
 		end
+		data.highlights[i] = nil
 	end
-	data.highlights = {}
 end
 
 local function clearProbLabels()
-	for _, label in pairs(data.probLabels) do
-		if (label and label.Parent) then
+	for i = #data.probLabels, 1, -1 do
+		local label = data.probLabels[i]
+		if label and label.Parent then
 			label:Destroy()
 		end
+		data.probLabels[i] = nil
 	end
-	data.probLabels = {}
 end
 
 local function createHighlight(part, color)
@@ -462,6 +466,21 @@ local function createProbLabel(part, probability)
 end
 
 local function highlightCells()
+	-- Skip if no changes detected
+	local newSafeCount = 0
+	local newMineCount = 0
+	for _ in pairs(data.cells.toClear or {}) do
+		newSafeCount = newSafeCount + 1
+	end
+	for _ in pairs(data.cells.toFlag or {}) do
+		newMineCount = newMineCount + 1
+	end
+	
+	-- Only update if there are actual changes
+	if newSafeCount == 0 and newMineCount == 0 and #data.highlights == 0 then
+		return
+	end
+	
 	clearHighlights()
 	clearProbLabels()
 	
@@ -471,7 +490,7 @@ local function highlightCells()
 	for cell, _ in pairs(data.cells.toClear or {}) do
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(0, 255, 0))
-			table.insert(data.highlights, highlight)
+			data.highlights[#data.highlights + 1] = highlight
 			safeCount = safeCount + 1
 		end
 	end
@@ -479,23 +498,21 @@ local function highlightCells()
 	for cell, _ in pairs(data.cells.toFlag or {}) do
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(255, 0, 0))
-			table.insert(data.highlights, highlight)
+			data.highlights[#data.highlights + 1] = highlight
 			mineCount = mineCount + 1
 		end
 	end
 	
-	-- Show probability labels if enabled
+	-- Show probability labels if enabled (limit to prevent lag)
 	if data.ui.showProbability then
+		local probCount = 0
 		for cell, prob in pairs(data.cells.guess or {}) do
-			if cell.part and prob > 0 then
+			if cell.part and prob > 0 and probCount < 50 then -- Limit to 50 labels
 				local label = createProbLabel(cell.part, prob)
-				table.insert(data.probLabels, label)
+				data.probLabels[#data.probLabels + 1] = label
+				probCount = probCount + 1
 			end
 		end
-	end
-	
-	if ((safeCount > 0) or (mineCount > 0)) then
-		print("Highlighted: " .. safeCount .. " safe (green), " .. mineCount .. " mines (red)")
 	end
 end
 
@@ -735,18 +752,28 @@ local function updateStats()
 	statsLabel.Text = '🟢 Safe: ' .. safeCount .. ' | 🔴 Mines: ' .. mineCount
 end
 
--- Main update loop
+-- Main update loop (Optimized to prevent FPS drops)
 local lastBuild = 0
+local frameCount = 0
 local function onUpdate()
 	if not data.enabled then
 		return
 	end
 	
+	-- Only run every 3rd frame to reduce CPU load
+	frameCount = frameCount + 1
+	if frameCount % 3 ~= 0 then
+		return
+	end
+	
 	local now = tick()
-	if ((now - lastBuild) > 2) then
+	
+	-- Build grid less frequently
+	if ((now - lastBuild) > data.timing.buildIntervalSec) then
 		buildGrid()
 		lastBuild = now
 	end
+	
 	if ((data.grid.w == 0) or not data.cache.xs_centers_cached or not data.cache.zs_centers_cached) then
 		return
 	end
@@ -766,7 +793,7 @@ print("======================")
 print("💣 MINESWEEPER SOLVER")
 print("======================")
 print("✓ Loaded successfully!")
-print("⚡ NO DELAY - Instant solving!")
+print("⚡ Optimized - No FPS drops!")
 print("🟢 Green = Safe cells")
 print("🔴 Red = Mines")
 print("📊 Toggle % to show probability")
