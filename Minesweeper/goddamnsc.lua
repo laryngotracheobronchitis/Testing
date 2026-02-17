@@ -606,18 +606,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                 if not W then W = X:FindFirstChild("TextLabel") end
                             end
                             local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then 
-                                Y = true
-                                if R.SetAttribute then R:SetAttribute("PermanentFlag", true) end
-                            end
+                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
                             local Z = nil
-                            if R.GetAttribute then 
-                                Z = R:GetAttribute("Flagged")
-                                if Z then 
-                                    Y = true
-                                    R:SetAttribute("PermanentFlag", true)
-                                end
-                            end
+                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
+                            if Z then Y = true end
                             V = { a = R, b = R.Position, c = R.Size, d = (W and W:IsA("TextLabel")) and W or nil, e = Y, f = Q }
                             A4[U] = V
                         else
@@ -625,18 +617,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             V.c = R.Size
                             V.f = Q
                             local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then 
-                                Y = true
-                                if R.SetAttribute then R:SetAttribute("PermanentFlag", true) end
-                            end
+                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
                             local Z = nil
-                            if R.GetAttribute then 
-                                Z = R:GetAttribute("Flagged")
-                                if Z then 
-                                    Y = true
-                                    R:SetAttribute("PermanentFlag", true)
-                                end
-                            end
+                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
+                            if Z then Y = true end
                             V.e = Y
                             if not V.d then
                                 local X = R:FindFirstChild("NumberGui", true)
@@ -750,17 +734,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                         if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
                             b0[r0][c0].c = V
                             if b0[r0][c0].a ~= "revealed" then
-                                -- PERMANENT FLAG FIX: Once flagged, always flagged
-                                if V.e then 
-                                    b0[r0][c0].a = "flagged"
-                                    -- Mark this cell as permanently flagged
-                                    if V.a and V.a.SetAttribute then
-                                        V.a:SetAttribute("PermanentFlag", true)
-                                    end
-                                elseif V.a and V.a:GetAttribute("PermanentFlag") then
-                                    -- Keep the flag if it was permanently marked
-                                    b0[r0][c0].a = "flagged"
-                                end
+                                if V.e then b0[r0][c0].a = "flagged" end
                             end
                         end
                     end
@@ -1101,15 +1075,23 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                 if v0raw then
                                     local v0 = A7(v0raw)
                                     if tonumber(v0) and v0 >= 0.99 then
-                                        -- This is definitely a bomb, add to flag list
+                                        -- This is definitely a bomb
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
-                                            table.insert(bombsToFlag, {
-                                                part = cellData.c.a,
-                                                row = rr,
-                                                col = cc,
-                                                prob = v0
-                                            })
+                                            local part = cellData.c.a
+                                            -- SKIP if already has flag (manual or auto)
+                                            local alreadyFlagged = part:FindFirstChild("Flag") or 
+                                                                   part:FindFirstChild("Flagged") or
+                                                                   (part.GetAttribute and part:GetAttribute("Flagged"))
+                                            
+                                            if not alreadyFlagged then
+                                                table.insert(bombsToFlag, {
+                                                    part = part,
+                                                    row = rr,
+                                                    col = cc,
+                                                    prob = v0
+                                                })
+                                            end
                                         end
                                     end
                                 end
@@ -1124,16 +1106,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                        local flagged = part:GetAttribute("Flagged")
-                        local permFlag = part:GetAttribute("PermanentFlag")
-                        if not flagged and not permFlag then
+                    if part and part.Parent then
+                        -- CHECK: Skip if flag already exists (manual or auto)
+                        local hasFlag = part:FindFirstChild("Flag") or part:FindFirstChild("Flagged")
+                        local hasFlagAttr = part:GetAttribute and part:GetAttribute("Flagged")
+                        
+                        -- ONLY place flag if NO flag exists at all
+                        if not hasFlag and not hasFlagAttr then
                             task.spawn(function()
                                 pcall(function()
                                     local args = {part}
                                     game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
                                     part:SetAttribute("Flagged", true)
-                                    part:SetAttribute("PermanentFlag", true)
                                 end)
                             end)
                             task.wait(flagSpeed)
