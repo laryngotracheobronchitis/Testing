@@ -48,7 +48,7 @@ local open = n("TextButton", s, {
     BackgroundTransparency = 0.6,
     Size = u(0, 60, 0, 60),
     BorderColor3 = c(100, 100, 100),
-    Text = "W",
+    Text = "☹️",
     TextScaled = true,
     Name = "open",
     Position = u(1, -10, 1, -10)
@@ -83,7 +83,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq (STILL IN DEVELOPMENT, EXPECT BUGS)",
+    Text = "fixed by n4vq (STILL IN DEVELOPMENT, EXPECT BUGS) and Auto Flag is still beta maybe by yar",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
