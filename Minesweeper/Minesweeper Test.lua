@@ -5,47 +5,46 @@ local v4 = v3:WaitForChild('PlayerGui')
 
 -- Minesweeper Solver Data Structure
 local data = {
-	ui = {
-		PROB_FLAG_THRESHOLD = 0.7,
-		PROB_SAFE_THRESHOLD = 0.3,
-		showProbability = false,
-		uiVisible = true,
-	},
-	grid = {
-		w = 0,
-		h = 0,
-	},
-	cache = {
-		xs_centers_cached = nil,
-		zs_centers_cached = nil,
-	},
 	cells = {
-		grid = {},
 		all = {},
 		numbered = {},
 		toFlag = {},
 		toClear = {},
-		guess = {},
+		guess = {}
+	},
+	cache = {
+		xs_centers_cached = nil,
+		zs_centers_cached = nil
+	},
+	grid = {
+		w = 0,
+		h = 0
+	},
+	ui = {
+		PROB_FLAG_THRESHOLD = 0.7,
+		PROB_SAFE_THRESHOLD = 0.3,
+		showProbability = false,
+		uiVisible = true
 	},
 	timing = {
 		lastPlanTick = 0,
-		planIntervalMs = 100,
+		planIntervalMs = 100
 	},
 	highlights = {},
 	probLabels = {},
-	enabled = true,
+	enabled = true
 }
 
 -- Helper functions
 local abs, floor, huge = math.abs, math.floor, math.huge
 local sort = table.sort
 
-local function key(ix, iz)
-	return tostring(ix) .. ":" .. tostring(iz)
-end
-
 local function isNumber(str)
 	return tonumber(str) ~= nil
+end
+
+local function key(ix, iz)
+	return tostring(ix) .. ":" .. tostring(iz)
 end
 
 local function clusterSorted(sorted_list, epsilon)
@@ -132,7 +131,6 @@ local function buildGrid()
 	data.cells.numbered = {}
 	data.cells.grid = {}
 	
-	-- FIXED: Use correct workspace path
 	local root = game.Workspace:FindFirstChild("Flag")
 	if not root then
 		return
@@ -204,53 +202,80 @@ local function buildGrid()
 		if ((ix >= 0) and (ix < data.grid.w) and (iz >= 0) and (iz < data.grid.h)) then
 			local k = key(ix, iz)
 			local cell = data.cells.all[k]
-			if cell then
+			if not cell.part then
 				cell.part = part
 				cell.pos = pos
-				
-				-- Check for number
-				local gui = part:FindFirstChild("Gui")
-				if gui then
-					local label = gui:FindFirstChild("Label")
-					if label and label.Text and isNumber(label.Text) then
-						cell.number = tonumber(label.Text)
-						cell.covered = false
-						cell.state = "number"
-						table.insert(data.cells.numbered, cell)
-					end
+			else
+				local cur_d = abs(((cell.part and cell.part.Position.X) or cell.pos.X) - data.cache.xs_centers_cached[ix + 1]) + abs(((cell.part and cell.part.Position.Z) or cell.pos.Z) - data.cache.zs_centers_cached[iz + 1])
+				local new_d = abs(pos.X - data.cache.xs_centers_cached[ix + 1]) + abs(pos.Z - data.cache.zs_centers_cached[iz + 1])
+				if (new_d < cur_d) then
+					cell.part = part
+					cell.pos = pos
 				end
-				
-				-- Check if flagged
-				if isPartFlagged(part) then
-					cell.state = "flagged"
+			end
+			
+			if part.Color then
+				local color = part.Color
+				local r = color.R or color.r or color[1]
+				local g = color.G or color.g or color[2]
+				local b = color.B or color.b or color[3]
+				if (r and (r <= 1)) then
+					r = math.floor((r * 255) + 0.5)
 				end
+				if (g and (g <= 1)) then
+					g = math.floor((g * 255) + 0.5)
+				end
+				if (b and (b <= 1)) then
+					b = math.floor((b * 255) + 0.5)
+				end
+				cell.color = {R=r, G=g, B=b}
+			end
+			
+			local ngui = part:FindFirstChild("NumberGui")
+			if ngui then
+				local textLabel = ngui:FindFirstChild("TextLabel")
+				if (textLabel and textLabel.Text and isNumber(textLabel.Text)) then
+					cell.number = tonumber(textLabel.Text)
+					cell.covered = false
+				end
+			end
+			
+			if (cell.color and cell.color.R and cell.color.G and cell.color.B) then
+				if ((cell.color.R == 255) and (cell.color.G == 255) and (cell.color.B == 125)) then
+					cell.covered = false
+				end
+			end
+			
+			if isPartFlagged(part) then
+				cell.state = "flagged"
+			end
+			
+			if (cell.number and not cell.covered) then
+				cell.state = "number"
+				table.insert(data.cells.numbered, cell)
 			end
 		end
 	end
 	
-	-- Build neighbors
 	for iz = 0, data.grid.h - 1 do
 		for ix = 0, data.grid.w - 1 do
-			local row = data.cells.grid[ix]
-			local c = row and row[iz]
-			if c then
-				local neigh = {}
-				for dz = -1, 1 do
-					for dx = -1, 1 do
-						if not ((dx == 0) and (dz == 0)) then
-							local jx, jz = ix + dx, iz + dz
-							if ((jx >= 0) and (jx < data.grid.w) and (jz >= 0) and (jz < data.grid.h)) then
-								local rowJ = data.cells.grid[jx]
-								local n = rowJ and rowJ[jz]
-								if n then
-									neigh[#neigh + 1] = n
-								end
+			local c = data.cells.grid[ix][iz]
+			local neigh = {}
+			for dz = -1, 1 do
+				for dx = -1, 1 do
+					if not ((dx == 0) and (dz == 0)) then
+						local jx, jz = ix + dx, iz + dz
+						if ((jx >= 0) and (jx < data.grid.w) and (jz >= 0) and (jz < data.grid.h)) then
+							local row = data.cells.grid[jx]
+							local n = row and row[jz]
+							if n then
+								neigh[#neigh + 1] = n
 							end
 						end
 					end
 				end
-				c.neigh = neigh
 			end
+			c.neigh = neigh
 		end
 	end
 end
@@ -275,7 +300,6 @@ local function planMove()
 	data.cells.toFlag = {}
 	data.cells.toClear = {}
 	data.cells.guess = {}
-	
 	local knownFlag = {}
 	for _, cell in pairs(data.cells.all) do
 		if (cell.state == "flagged") then
@@ -285,7 +309,6 @@ local function planMove()
 	
 	local knownClear = {}
 	local scratch = {}
-	
 	local function computeUnknowns(c)
 		local nbs = neighbors(c.ix, c.iz)
 		for i = 1, #scratch do
@@ -442,10 +465,14 @@ local function highlightCells()
 	clearHighlights()
 	clearProbLabels()
 	
+	local safeCount = 0
+	local mineCount = 0
+	
 	for cell, _ in pairs(data.cells.toClear or {}) do
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(0, 255, 0))
 			table.insert(data.highlights, highlight)
+			safeCount = safeCount + 1
 		end
 	end
 	
@@ -453,6 +480,7 @@ local function highlightCells()
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(255, 0, 0))
 			table.insert(data.highlights, highlight)
+			mineCount = mineCount + 1
 		end
 	end
 	
@@ -465,9 +493,16 @@ local function highlightCells()
 			end
 		end
 	end
+	
+	if ((safeCount > 0) or (mineCount > 0)) then
+		print("Highlighted: " .. safeCount .. " safe (green), " .. mineCount .. " mines (red)")
+	end
 end
 
--- NEW CLEAN UI WITH SHOW/HIDE AND PROBABILITY TOGGLE
+-- =============================================
+-- NEW CLEAN UI WITH SHOW/HIDE AND PROBABILITY
+-- =============================================
+
 local mainGui = Instance.new('ScreenGui')
 mainGui.Name = 'MinesweeperSolverUI'
 mainGui.ResetOnSpawn = false
@@ -516,7 +551,7 @@ statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = controlFrame
 
--- Toggle Button
+-- Toggle Solver Button
 local toggleButton = Instance.new('TextButton')
 toggleButton.Size = UDim2.new(0, 120, 0, 35)
 toggleButton.Position = UDim2.new(0, 10, 0, 70)
@@ -564,7 +599,7 @@ local statsCorner = Instance.new('UICorner')
 statsCorner.CornerRadius = UDim.new(0, 8)
 statsCorner.Parent = statsLabel
 
--- Hide/Show Button (Minimalist)
+-- Hide/Show Button (minimized state)
 local hideButton = Instance.new('TextButton')
 hideButton.Size = UDim2.new(0, 40, 0, 40)
 hideButton.Position = UDim2.new(1, -300, 0, 20)
@@ -622,7 +657,7 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
 	end
 end)
 
--- Toggle Solver
+-- Toggle Solver ON/OFF
 toggleButton.MouseButton1Click:Connect(function()
 	data.enabled = not data.enabled
 	if data.enabled then
@@ -630,6 +665,7 @@ toggleButton.MouseButton1Click:Connect(function()
 		toggleButton.Text = '✓ ENABLED'
 		statusLabel.Text = 'Status: ACTIVE'
 		statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+		print("Minesweeper Solver ENABLED")
 	else
 		toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		toggleButton.Text = '✗ DISABLED'
@@ -637,6 +673,7 @@ toggleButton.MouseButton1Click:Connect(function()
 		statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 		clearHighlights()
 		clearProbLabels()
+		print("Minesweeper Solver DISABLED")
 	end
 end)
 
@@ -646,14 +683,16 @@ probButton.MouseButton1Click:Connect(function()
 	if data.ui.showProbability then
 		probButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
 		probButton.Text = '% ON'
+		print("Probability Display ENABLED")
 	else
 		probButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		probButton.Text = '% OFF'
 		clearProbLabels()
+		print("Probability Display DISABLED")
 	end
 end)
 
--- Hide/Show UI
+-- Hide/Show UI functionality
 hideButton.MouseButton1Click:Connect(function()
 	data.ui.uiVisible = true
 	controlFrame.Visible = true
@@ -670,7 +709,7 @@ titleLabel.InputBegan:Connect(function(input)
 	end
 end)
 
--- Update stats
+-- Update stats display
 local function updateStats()
 	local safeCount = 0
 	local mineCount = 0
@@ -695,7 +734,6 @@ local function onUpdate()
 		buildGrid()
 		lastBuild = now
 	end
-	
 	if ((data.grid.w == 0) or not data.cache.xs_centers_cached or not data.cache.zs_centers_cached) then
 		return
 	end
