@@ -12,10 +12,7 @@ end
 v1:SetAttribute("gay", true)
 
 task.spawn(function()
-    local g = Instance.new("ScreenGui", v1)
-    g.Name = "Notification"
     task.wait(0)
-    g:Destroy()
 end)
 
 local P = v1
@@ -427,28 +424,15 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local partCache = {}
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.05
-        -- Table untuk track semua part yang sudah di-flag (manual atau auto)
-        -- Menggunakan GetDebugId sebagai key agar tidak bisa double-flag
         local flaggedIds = {}
-        local flagEvent = nil
-        pcall(function()
-            flagEvent = game:GetService("ReplicatedStorage")
-                :WaitForChild("Events", 5)
-                :WaitForChild("FlagEvents", 5)
-                :WaitForChild("PlaceFlag", 5)
-        end)
-        -- Monitor flag manual: saat server tambah child ke part, langsung catat
-        local watchedParts = {}
         local function watchPart(part)
             local id = part:GetDebugId()
-            if watchedParts[id] then return end
-            watchedParts[id] = true
+            if flaggedIds["w"..id] then return end
+            flaggedIds["w"..id] = true
             part.ChildAdded:Connect(function()
-                -- Setiap kali ada child baru = flag dipasang server
                 flaggedIds[id] = true
             end)
             part.ChildRemoved:Connect(function()
-                -- Semua child hilang = flag dicabut
                 if #part:GetChildren() == 0 then
                     flaggedIds[id] = nil
                 end
@@ -631,7 +615,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local Z = nil
                             if R.GetAttribute then Z = R:GetAttribute("Flagged") end
                             if Z then Y = true end
-                            if flaggedIds[U] then Y = true end
                             V.e = Y
                             if not V.d then
                                 local X = R:FindFirstChild("NumberGui", true)
@@ -1078,7 +1061,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                     if b0[r0][c0].a == "revealed" then
                         for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
                             local rr, cc = rc[1], rc[2]
-                            -- Hanya "covered" yang diproses, "flagged" dilewati
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
                             end
@@ -1087,29 +1069,36 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
 
-            -- Auto Flag: kumpulkan bomb yang belum di-flag
-            if btnBool(btnAuto) and flagEvent then
-                local flagSpeed = tonum(boxFS.Text) or 0.05
-                for r0 = 1, Hc do
-                    for c0 = 1, Wc do
-                        -- Hanya proses cell "covered", skip "flagged"
-                        if b0[r0][c0].a == "covered" then
-                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                            if v0raw then
-                                local v0 = A7(v0raw)
-                                if tonumber(v0) and v0 >= 0.99 then
-                                    local cellData = b0[r0][c0]
-                                    if cellData and cellData.c and cellData.c.a then
-                                        local part = cellData.c.a
-                                        local id = part:GetDebugId()
-                                        -- Skip jika sudah tercatat di flaggedIds
-                                        if not flaggedIds[id] then
-                                            -- Catat dulu sebelum fire agar cycle berikutnya skip
-                                            flaggedIds[id] = true
-                                            pcall(function()
-                                                flagEvent:FireServer(part, id, true)
-                                            end)
-                                            task.wait(flagSpeed)
+            -- Auto Flag
+            if ac and ac.on then
+                local flagSpeed = ac.intv or 0.05
+                local flagEvent = game:GetService("ReplicatedStorage")
+                    :FindFirstChild("Events") and
+                    game:GetService("ReplicatedStorage").Events
+                    :FindFirstChild("FlagEvents") and
+                    game:GetService("ReplicatedStorage").Events.FlagEvents
+                    :FindFirstChild("PlaceFlag")
+                if flagEvent then
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            -- Hanya covered (skip flagged agar tidak double)
+                            if b0[r0][c0].a == "covered" then
+                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) and v0 >= 0.99 then
+                                        local cellData = b0[r0][c0]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            local part = cellData.c.a
+                                            local id = part:GetDebugId()
+                                            -- Skip jika sudah di-flag (dari flaggedIds atau ChildAdded)
+                                            if not flaggedIds[id] then
+                                                flaggedIds[id] = true
+                                                pcall(function()
+                                                    flagEvent:FireServer(part, id, true)
+                                                end)
+                                                task.wait(flagSpeed)
+                                            end
                                         end
                                     end
                                 end
