@@ -3,41 +3,23 @@ local v1 = game:GetService('Players')
 local v3 = v1.LocalPlayer
 local v4 = v3:WaitForChild('PlayerGui')
 
--- Minesweeper Solver Data Structure
+-- Data structure (sama seperti asli)
 local data = {
-	cells = {
-		all = {},
-		numbered = {},
-		toFlag = {},
-		toClear = {},
-		guess = {}
-	},
-	cache = {
-		xs_centers_cached = nil,
-		zs_centers_cached = nil
-	},
-	grid = {
-		w = 0,
-		h = 0
-	},
+	cells = {all={}, numbered={}, toFlag={}, toClear={}, guess={}},
+	cache = {xs_centers_cached=nil, zs_centers_cached=nil},
+	grid = {w=0, h=0},
 	ui = {
-		PROB_FLAG_THRESHOLD = 0.7,
-		PROB_SAFE_THRESHOLD = 0.3,
-		showProbability = false,
-		uiVisible = true
+		PROB_FLAG_THRESHOLD=0.7,
+		PROB_SAFE_THRESHOLD=0.3,
+		showProbability=false,
+		uiVisible=true
 	},
-	timing = {
-		lastPlanTick = 0,
-		planIntervalMs = 200,
-		lastBuildTime = 0,
-		buildIntervalSec = 3
-	},
+	timing = {lastPlanTick=0, planIntervalMs=100},
 	highlights = {},
 	probLabels = {},
 	enabled = true
 }
 
--- Helper functions
 local abs, floor, huge = math.abs, math.floor, math.huge
 local sort = table.sort
 
@@ -132,7 +114,6 @@ local function buildGrid()
 	data.cells.all = {}
 	data.cells.numbered = {}
 	data.cells.grid = {}
-	
 	local root = game.Workspace:FindFirstChild("Flag")
 	if not root then
 		return
@@ -142,7 +123,6 @@ local function buildGrid()
 		return
 	end
 	local parts = partsFolder:GetChildren()
-	
 	local raw = {}
 	local sumY, countY = 0, 0
 	for _, part in pairs(parts) do
@@ -153,7 +133,6 @@ local function buildGrid()
 			countY = countY + 1
 		end
 	end
-	
 	local centersX, centersZ = {}, {}
 	for _, item in ipairs(raw) do
 		centersX[#centersX + 1] = item.pos.X
@@ -161,7 +140,6 @@ local function buildGrid()
 	end
 	sort(centersX)
 	sort(centersZ)
-	
 	local typicalWX = typicalSpacing(centersX)
 	local typicalWZ = typicalSpacing(centersZ)
 	local epsX = typicalWX * 0.6
@@ -170,7 +148,6 @@ local function buildGrid()
 	data.cache.zs_centers_cached = clusterSorted(centersZ, epsZ)
 	data.grid.w = #data.cache.xs_centers_cached
 	data.grid.h = #data.cache.zs_centers_cached
-	
 	local planeY = ((countY > 0) and (sumY / countY)) or 0
 	for iz = 0, data.grid.h - 1 do
 		for ix = 0, data.grid.w - 1 do
@@ -180,22 +157,11 @@ local function buildGrid()
 				row = {}
 				data.cells.grid[ix] = row
 			end
-			local cell = {
-				ix = ix,
-				iz = iz,
-				part = nil,
-				pos = Vector3.new(data.cache.xs_centers_cached[ix + 1] or 0, planeY, data.cache.zs_centers_cached[iz + 1] or 0),
-				state = "unknown",
-				number = nil,
-				k = k,
-				covered = true,
-				neigh = nil
-			}
+			local cell = {ix=ix, iz=iz, part=nil, pos=Vector3.new(data.cache.xs_centers_cached[ix + 1] or 0, planeY, data.cache.zs_centers_cached[iz + 1] or 0), state="unknown", number=nil, k=k, covered=true, neigh=nil}
 			data.cells.all[k] = cell
 			row[iz] = cell
 		end
 	end
-	
 	for _, item in ipairs(raw) do
 		local part = item.part
 		local pos = item.pos
@@ -215,7 +181,6 @@ local function buildGrid()
 					cell.pos = pos
 				end
 			end
-			
 			if part.Color then
 				local color = part.Color
 				local r = color.R or color.r or color[1]
@@ -232,7 +197,6 @@ local function buildGrid()
 				end
 				cell.color = {R=r, G=g, B=b}
 			end
-			
 			local ngui = part:FindFirstChild("NumberGui")
 			if ngui then
 				local textLabel = ngui:FindFirstChild("TextLabel")
@@ -241,24 +205,20 @@ local function buildGrid()
 					cell.covered = false
 				end
 			end
-			
 			if (cell.color and cell.color.R and cell.color.G and cell.color.B) then
 				if ((cell.color.R == 255) and (cell.color.G == 255) and (cell.color.B == 125)) then
 					cell.covered = false
 				end
 			end
-			
 			if isPartFlagged(part) then
 				cell.state = "flagged"
 			end
-			
 			if (cell.number and not cell.covered) then
 				cell.state = "number"
 				table.insert(data.cells.numbered, cell)
 			end
 		end
 	end
-	
 	for iz = 0, data.grid.h - 1 do
 		for ix = 0, data.grid.w - 1 do
 			local c = data.cells.grid[ix][iz]
@@ -298,7 +258,6 @@ local function planMove()
 		data.cells.guess = {}
 		return
 	end
-	
 	data.cells.toFlag = {}
 	data.cells.toClear = {}
 	data.cells.guess = {}
@@ -308,7 +267,6 @@ local function planMove()
 			knownFlag[cell] = true
 		end
 	end
-	
 	local knownClear = {}
 	local scratch = {}
 	local function computeUnknowns(c)
@@ -327,7 +285,6 @@ local function planMove()
 		end
 		return scratch, flaggedCount
 	end
-	
 	local changed = true
 	local guard = 0
 	while changed and (guard < 64) do
@@ -358,7 +315,6 @@ local function planMove()
 			end
 		end
 	end
-	
 	local accum = {}
 	for _, cell in ipairs(data.cells.numbered) do
 		local num = cell.number or 0
@@ -380,7 +336,6 @@ local function planMove()
 			end
 		end
 	end
-	
 	local pflag = data.ui.PROB_FLAG_THRESHOLD
 	for cell, e in pairs(accum) do
 		local p = ((e.w > 0) and (e.sum / e.w)) or 0
@@ -393,7 +348,6 @@ local function planMove()
 			data.cells.guess[cell] = p
 		end
 	end
-	
 	for cell, _ in pairs(data.cells.toFlag) do
 		data.cells.toClear[cell] = nil
 		data.cells.guess[cell] = nil
@@ -410,23 +364,21 @@ local function planMove()
 end
 
 local function clearHighlights()
-	for i = #data.highlights, 1, -1 do
-		local highlight = data.highlights[i]
-		if highlight and highlight.Parent then
+	for _, highlight in pairs(data.highlights) do
+		if (highlight and highlight.Parent) then
 			highlight:Destroy()
 		end
-		data.highlights[i] = nil
 	end
+	data.highlights = {}
 end
 
 local function clearProbLabels()
-	for i = #data.probLabels, 1, -1 do
-		local label = data.probLabels[i]
-		if label and label.Parent then
+	for _, label in pairs(data.probLabels) do
+		if (label and label.Parent) then
 			label:Destroy()
 		end
-		data.probLabels[i] = nil
 	end
+	data.probLabels = {}
 end
 
 local function createHighlight(part, color)
@@ -466,67 +418,44 @@ local function createProbLabel(part, probability)
 end
 
 local function highlightCells()
-	-- Skip if no changes detected
-	local newSafeCount = 0
-	local newMineCount = 0
-	for _ in pairs(data.cells.toClear or {}) do
-		newSafeCount = newSafeCount + 1
-	end
-	for _ in pairs(data.cells.toFlag or {}) do
-		newMineCount = newMineCount + 1
-	end
-	
-	-- Only update if there are actual changes
-	if newSafeCount == 0 and newMineCount == 0 and #data.highlights == 0 then
-		return
-	end
-	
 	clearHighlights()
 	clearProbLabels()
-	
 	local safeCount = 0
 	local mineCount = 0
-	
 	for cell, _ in pairs(data.cells.toClear or {}) do
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(0, 255, 0))
-			data.highlights[#data.highlights + 1] = highlight
+			table.insert(data.highlights, highlight)
 			safeCount = safeCount + 1
 		end
 	end
-	
 	for cell, _ in pairs(data.cells.toFlag or {}) do
 		if cell.part then
 			local highlight = createHighlight(cell.part, Color3.fromRGB(255, 0, 0))
-			data.highlights[#data.highlights + 1] = highlight
+			table.insert(data.highlights, highlight)
 			mineCount = mineCount + 1
 		end
 	end
-	
-	-- Show probability labels if enabled (limit to prevent lag)
 	if data.ui.showProbability then
-		local probCount = 0
 		for cell, prob in pairs(data.cells.guess or {}) do
-			if cell.part and prob > 0 and probCount < 50 then -- Limit to 50 labels
+			if cell.part and prob > 0 then
 				local label = createProbLabel(cell.part, prob)
-				data.probLabels[#data.probLabels + 1] = label
-				probCount = probCount + 1
+				table.insert(data.probLabels, label)
 			end
 		end
 	end
+	if ((safeCount > 0) or (mineCount > 0)) then
+		print("Highlighted: " .. safeCount .. " safe (green), " .. mineCount .. " mines (red)")
+	end
 end
 
--- =============================================
--- NEW CLEAN UI WITH SHOW/HIDE AND PROBABILITY
--- =============================================
-
+-- UI BARU (Simple Toggle)
 local mainGui = Instance.new('ScreenGui')
 mainGui.Name = 'MinesweeperSolverUI'
 mainGui.ResetOnSpawn = false
 mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 mainGui.Parent = v4
 
--- Main Control Frame
 local controlFrame = Instance.new('Frame')
 controlFrame.Name = 'ControlFrame'
 controlFrame.Size = UDim2.new(0, 280, 0, 210)
@@ -544,7 +473,6 @@ frameStroke.Color = Color3.fromRGB(100, 200, 255)
 frameStroke.Thickness = 3
 frameStroke.Parent = controlFrame
 
--- Title
 local titleLabel = Instance.new('TextLabel')
 titleLabel.Size = UDim2.new(1, -20, 0, 30)
 titleLabel.Position = UDim2.new(0, 10, 0, 10)
@@ -556,7 +484,6 @@ titleLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = controlFrame
 
--- Status Label
 local statusLabel = Instance.new('TextLabel')
 statusLabel.Size = UDim2.new(1, -20, 0, 20)
 statusLabel.Position = UDim2.new(0, 10, 0, 45)
@@ -568,7 +495,6 @@ statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = controlFrame
 
--- Toggle Solver Button
 local toggleButton = Instance.new('TextButton')
 toggleButton.Size = UDim2.new(0, 120, 0, 35)
 toggleButton.Position = UDim2.new(0, 10, 0, 70)
@@ -584,7 +510,6 @@ local toggleCorner = Instance.new('UICorner')
 toggleCorner.CornerRadius = UDim.new(0, 8)
 toggleCorner.Parent = toggleButton
 
--- Show Probability Button
 local probButton = Instance.new('TextButton')
 probButton.Size = UDim2.new(0, 120, 0, 35)
 probButton.Position = UDim2.new(0, 150, 0, 70)
@@ -600,10 +525,9 @@ local probCorner = Instance.new('UICorner')
 probCorner.CornerRadius = UDim.new(0, 8)
 probCorner.Parent = probButton
 
--- Show/Hide UI Button
 local hideUIButton = Instance.new('TextButton')
 hideUIButton.Size = UDim2.new(0, 260, 0, 35)
-hideUIButton.Position = UDim2.new(0, 10, 0, 160)
+hideUIButton.Position = UDim2.new(0, 10, 0, 115)
 hideUIButton.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
 hideUIButton.Text = '👁️ HIDE UI'
 hideUIButton.TextSize = 14
@@ -616,10 +540,9 @@ local hideUICorner = Instance.new('UICorner')
 hideUICorner.CornerRadius = UDim.new(0, 8)
 hideUICorner.Parent = hideUIButton
 
--- Stats Label
 local statsLabel = Instance.new('TextLabel')
 statsLabel.Size = UDim2.new(1, -20, 0, 40)
-statsLabel.Position = UDim2.new(0, 10, 0, 115)
+statsLabel.Position = UDim2.new(0, 10, 0, 160)
 statsLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 statsLabel.Text = '🟢 Safe: 0 | 🔴 Mines: 0'
 statsLabel.TextSize = 14
@@ -632,7 +555,6 @@ local statsCorner = Instance.new('UICorner')
 statsCorner.CornerRadius = UDim.new(0, 8)
 statsCorner.Parent = statsLabel
 
--- Hide/Show Button (minimized state)
 local hideButton = Instance.new('TextButton')
 hideButton.Size = UDim2.new(0, 40, 0, 40)
 hideButton.Position = UDim2.new(1, -300, 0, 20)
@@ -654,7 +576,6 @@ hideStroke.Color = Color3.fromRGB(100, 200, 255)
 hideStroke.Thickness = 3
 hideStroke.Parent = hideButton
 
--- Drag functionality
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -669,7 +590,6 @@ controlFrame.InputBegan:Connect(function(input)
 		dragging = true
 		dragStart = input.Position
 		startPos = controlFrame.Position
-		
 		input.Changed:Connect(function()
 			if input.UserInputState == Enum.UserInputState.End then
 				dragging = false
@@ -690,7 +610,6 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
 	end
 end)
 
--- Toggle Solver ON/OFF
 toggleButton.MouseButton1Click:Connect(function()
 	data.enabled = not data.enabled
 	if data.enabled then
@@ -698,7 +617,6 @@ toggleButton.MouseButton1Click:Connect(function()
 		toggleButton.Text = '✓ ENABLED'
 		statusLabel.Text = 'Status: ACTIVE'
 		statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-		print("Minesweeper Solver ENABLED")
 	else
 		toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		toggleButton.Text = '✗ DISABLED'
@@ -706,40 +624,31 @@ toggleButton.MouseButton1Click:Connect(function()
 		statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 		clearHighlights()
 		clearProbLabels()
-		print("Minesweeper Solver DISABLED")
 	end
 end)
 
--- Toggle Probability Display
 probButton.MouseButton1Click:Connect(function()
 	data.ui.showProbability = not data.ui.showProbability
 	if data.ui.showProbability then
 		probButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
 		probButton.Text = '% ON'
-		print("Probability Display ENABLED")
 	else
 		probButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		probButton.Text = '% OFF'
 		clearProbLabels()
-		print("Probability Display DISABLED")
 	end
 end)
 
--- Hide/Show UI Button functionality
 hideUIButton.MouseButton1Click:Connect(function()
-	data.ui.uiVisible = false
 	controlFrame.Visible = false
 	hideButton.Visible = true
 end)
 
--- Show UI from minimized button
 hideButton.MouseButton1Click:Connect(function()
-	data.ui.uiVisible = true
 	controlFrame.Visible = true
 	hideButton.Visible = false
 end)
 
--- Update stats display
 local function updateStats()
 	local safeCount = 0
 	local mineCount = 0
@@ -752,32 +661,20 @@ local function updateStats()
 	statsLabel.Text = '🟢 Safe: ' .. safeCount .. ' | 🔴 Mines: ' .. mineCount
 end
 
--- Main update loop (Optimized to prevent FPS drops)
+-- Main loop (sama seperti asli)
 local lastBuild = 0
-local frameCount = 0
 local function onUpdate()
 	if not data.enabled then
 		return
 	end
-	
-	-- Only run every 3rd frame to reduce CPU load
-	frameCount = frameCount + 1
-	if frameCount % 3 ~= 0 then
-		return
-	end
-	
 	local now = tick()
-	
-	-- Build grid less frequently
-	if ((now - lastBuild) > data.timing.buildIntervalSec) then
+	if ((now - lastBuild) > 2) then
 		buildGrid()
 		lastBuild = now
 	end
-	
 	if ((data.grid.w == 0) or not data.cache.xs_centers_cached or not data.cache.zs_centers_cached) then
 		return
 	end
-	
 	local nowMs = now * 1000
 	if ((data.timing.lastPlanTick == 0) or ((nowMs - data.timing.lastPlanTick) >= data.timing.planIntervalMs)) then
 		planMove()
@@ -790,13 +687,7 @@ end
 game:GetService("RunService").Heartbeat:Connect(onUpdate)
 
 print("======================")
-print("💣 MINESWEEPER SOLVER")
-print("======================")
-print("✓ Loaded successfully!")
-print("⚡ Optimized - No FPS drops!")
-print("🟢 Green = Safe cells")
-print("🔴 Red = Mines")
-print("📊 Toggle % to show probability")
-print("👁️ Click 'HIDE UI' button to minimize")
-print("📍 Drag panel to move")
+print("Minesweeper Solver Active!")
+print("Green boxes = Safe to step on")
+print("Red boxes = Mine (don't step on)")
 print("======================")
