@@ -1062,36 +1062,28 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
-            local bombsToFlag = {}
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    if b0[r0][c0].a == "revealed" then
-                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
-                            local rr, cc = rc[1], rc[2]
-                            if b0[rr][cc].a == "covered" then
-                                da[B0(rr, cc)] = true
-                                -- Auto Flag: Check if this is a bomb
-                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        -- This is definitely a bomb
-                                        local cellData = b0[rr][cc]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            local part = cellData.c.a
-                                            -- SKIP if already has flag (manual or auto)
-                                            local alreadyFlagged = part:FindFirstChild("Flag") or 
-                                                                   part:FindFirstChild("Flagged") or
-                                                                   (part.GetAttribute and part:GetAttribute("Flagged"))
-                                            
-                                            if not alreadyFlagged then
-                                                table.insert(bombsToFlag, {
-                                                    part = part,
-                                                    row = rr,
-                                                    col = cc,
-                                                    prob = v0
-                                                })
-                                            end
+            
+            -- Auto Flag: Collect bombs to flag
+            if ac and ac.on then
+                for r0 = 1, Hc do
+                    for c0 = 1, Wc do
+                        if b0[r0][c0].a == "covered" then
+                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                            if v0raw then
+                                local v0 = A7(v0raw)
+                                if tonumber(v0) and v0 >= 0.99 then
+                                    local cellData = b0[r0][c0]
+                                    if cellData and cellData.c and cellData.c.a then
+                                        local part = cellData.c.a
+                                        -- Check if NOT already flagged
+                                        if not (part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") or (part.GetAttribute and part:GetAttribute("Flagged"))) then
+                                            -- Safe to flag
+                                            task.spawn(function()
+                                                pcall(function()
+                                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(part)
+                                                end)
+                                            end)
+                                            task.wait(ac.fspd or 0.05)
                                         end
                                     end
                                 end
@@ -1101,26 +1093,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
             
-            -- Auto Flag: Place flags on detected bombs
-            if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.05
-                for _, bombData in ipairs(bombsToFlag) do
-                    local part = bombData.part
-                    if part and part.Parent then
-                        -- CHECK: Skip if flag already exists (manual or auto)
-                        local hasFlag = part:FindFirstChild("Flag") or part:FindFirstChild("Flagged")
-                        local hasFlagAttr = part:GetAttribute and part:GetAttribute("Flagged")
-                        
-                        -- ONLY place flag if NO flag exists at all
-                        if not hasFlag and not hasFlagAttr then
-                            task.spawn(function()
-                                pcall(function()
-                                    local args = {part}
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-                                    part:SetAttribute("Flagged", true)
-                                end)
-                            end)
-                            task.wait(flagSpeed)
+            for r0 = 1, Hc do
+                for c0 = 1, Wc do
+                    if b0[r0][c0].a == "revealed" then
+                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                            local rr, cc = rc[1], rc[2]
+                            if b0[rr][cc].a == "covered" then
+                                da[B0(rr, cc)] = true
+                            end
                         end
                     end
                 end
