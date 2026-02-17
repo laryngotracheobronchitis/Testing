@@ -7,14 +7,15 @@ local v4 = v3:WaitForChild('PlayerGui')
 local data = {
 	ui = {
 		PROB_FLAG_THRESHOLD = 0.7,
+		PROB_SAFE_THRESHOLD = 0.3,
+		showProbability = false,
+		uiVisible = true,
 	},
 	grid = {
 		w = 0,
 		h = 0,
 	},
 	cache = {
-		xs_cached = nil,
-		zs_cached = nil,
 		xs_centers_cached = nil,
 		zs_centers_cached = nil,
 	},
@@ -28,388 +29,357 @@ local data = {
 	},
 	timing = {
 		lastPlanTick = 0,
-		planIntervalMs = 0,
+		planIntervalMs = 100,
 	},
 	highlights = {},
+	probLabels = {},
 	enabled = true,
 }
 
 -- Helper functions
-local function key(ix, iz)
-	return tostring(ix) .. "_" .. tostring(iz);
-end
+local abs, floor, huge = math.abs, math.floor, math.huge
+local sort = table.sort
 
-local function abs(x)
-	return (x >= 0) and x or (-x);
+local function key(ix, iz)
+	return tostring(ix) .. ":" .. tostring(iz)
 end
 
 local function isNumber(str)
-	return str and (str:match("^%d+$") ~= nil);
+	return tonumber(str) ~= nil
+end
+
+local function clusterSorted(sorted_list, epsilon)
+	local clusters = {}
+	if (#sorted_list == 0) then
+		return clusters
+	end
+	local current_center = sorted_list[1]
+	local current_count = 1
+	for i = 2, #sorted_list do
+		local v = sorted_list[i]
+		if (abs(v - current_center) <= epsilon) then
+			current_count = current_count + 1
+			current_center = current_center + ((v - current_center) / current_count)
+		else
+			table.insert(clusters, current_center)
+			current_center = v
+			current_count = 1
+		end
+	end
+	table.insert(clusters, current_center)
+	return clusters
+end
+
+local function median(tbl)
+	if (#tbl == 0) then
+		return nil
+	end
+	sort(tbl)
+	local mid = floor((#tbl + 1) / 2)
+	return tbl[mid]
+end
+
+local function typicalSpacing(sorted_centers)
+	if (#sorted_centers < 2) then
+		return 4
+	end
+	local diffs = {}
+	for i = 2, #sorted_centers do
+		diffs[#diffs + 1] = abs(sorted_centers[i] - sorted_centers[i - 1])
+	end
+	return median(diffs) or 4
+end
+
+local function nearestIndex(v, centers)
+	local bestI = 1
+	local bestD = huge
+	for i = 1, #centers do
+		local d = abs(v - centers[i])
+		if (d < bestD) then
+			bestD = d
+			bestI = i
+		end
+	end
+	return bestI - 1
 end
 
 local function isCoveredCell(cell)
-	return cell.covered;
+	if not cell then
+		return false
+	end
+	if ((cell.state == "number") or (cell.state == "flagged")) then
+		return false
+	end
+	return cell.covered ~= false
 end
 
 local function isPartFlagged(part)
-	if not part then
-		return false;
+	if (not part or not part.GetChildren) then
+		return false
 	end
-	local fg = part:FindFirstChild("FlagGui");
-	if fg then
-		local flag = fg:FindFirstChild("Flag");
-		if (flag and flag.Visible) then
-			return true;
+	local children = part:GetChildren()
+	for _, child in pairs(children) do
+		local name = child and child.Name
+		if (name and (string.sub(name, 1, 4) == "Flag")) then
+			return true
 		end
 	end
-	return false;
-end
-
-local function nearestIndex(val, arr)
-	if (not arr or (#arr == 0)) then
-		return -1;
-	end
-	local best = 0;
-	local bestDist = abs(val - arr[1]);
-	for i = 2, #arr do
-		local d = abs(val - arr[i]);
-		if (d < bestDist) then
-			bestDist = d;
-			best = i - 1;
-		end
-	end
-	return best;
+	return false
 end
 
 local function buildGrid()
-	local boardParts = {};
-	local ok, result = pcall(function()
-		local folder = workspace:FindFirstChild("BoardFolder");
-		if (not folder or (not folder:IsA("Folder") and not folder:IsA("Model"))) then
-			return {};
-		end
-		local out = {};
-		for _, child in pairs(folder:GetChildren()) do
-			if (child:IsA("BasePart") and (child.Name == "Board")) then
-				out[#out + 1] = child;
-			end
-		end
-		return out;
-	end);
-	if not ok then
-		boardParts = {};
-	else
-		boardParts = result;
+	data.cells.all = {}
+	data.cells.numbered = {}
+	data.cells.grid = {}
+	
+	-- FIXED: Use correct workspace path
+	local root = game.Workspace:FindFirstChild("Flag")
+	if not root then
+		return
 	end
-	if (#boardParts == 0) then
-		data.grid.w = 0;
-		data.grid.h = 0;
-		data.cache.xs_cached = nil;
-		data.cache.zs_cached = nil;
-		data.cache.xs_centers_cached = nil;
-		data.cache.zs_centers_cached = nil;
-		return;
+	local partsFolder = root:FindFirstChild("Parts")
+	if not partsFolder then
+		return
 	end
-	local raw = {};
-	for _, board in ipairs(boardParts) do
-		local ok2, pos = pcall(function()
-			return board.Position;
-		end);
-		if ok2 then
-			raw[#raw + 1] = {part=board,pos=pos};
+	local parts = partsFolder:GetChildren()
+	
+	local raw = {}
+	local sumY, countY = 0, 0
+	for _, part in pairs(parts) do
+		local pos = part and part.Position
+		if pos then
+			table.insert(raw, {part=part, pos=pos})
+			sumY = sumY + pos.Y
+			countY = countY + 1
 		end
 	end
-	if (#raw == 0) then
-		data.grid.w = 0;
-		data.grid.h = 0;
-		data.cache.xs_cached = nil;
-		data.cache.zs_cached = nil;
-		data.cache.xs_centers_cached = nil;
-		data.cache.zs_centers_cached = nil;
-		return;
-	end
-	local xs = {};
-	local zs = {};
+	
+	local centersX, centersZ = {}, {}
 	for _, item in ipairs(raw) do
-		local pos = item.pos;
-		xs[#xs + 1] = pos.X;
-		zs[#zs + 1] = pos.Z;
+		centersX[#centersX + 1] = item.pos.X
+		centersZ[#centersZ + 1] = item.pos.Z
 	end
-	table.sort(xs, function(a, b)
-		return a < b;
-	end);
-	table.sort(zs, function(a, b)
-		return a < b;
-	end);
-	local function uniqueRows(arr, eps)
-		if (#arr == 0) then
-			return {};
-		end
-		local out = {arr[1]};
-		for i = 2, #arr do
-			local v = arr[i];
-			local last = out[#out];
-			if (abs(v - last) > eps) then
-				out[#out + 1] = v;
+	sort(centersX)
+	sort(centersZ)
+	
+	local typicalWX = typicalSpacing(centersX)
+	local typicalWZ = typicalSpacing(centersZ)
+	local epsX = typicalWX * 0.6
+	local epsZ = typicalWZ * 0.6
+	data.cache.xs_centers_cached = clusterSorted(centersX, epsX)
+	data.cache.zs_centers_cached = clusterSorted(centersZ, epsZ)
+	data.grid.w = #data.cache.xs_centers_cached
+	data.grid.h = #data.cache.zs_centers_cached
+	
+	local planeY = ((countY > 0) and (sumY / countY)) or 0
+	for iz = 0, data.grid.h - 1 do
+		for ix = 0, data.grid.w - 1 do
+			local k = key(ix, iz)
+			local row = data.cells.grid[ix]
+			if not row then
+				row = {}
+				data.cells.grid[ix] = row
 			end
-		end
-		return out;
-	end
-	local eps = 0.2;
-	local xs_unique = uniqueRows(xs, eps);
-	local zs_unique = uniqueRows(zs, eps);
-	local function centerRows(arr)
-		if (#arr < 2) then
-			return arr;
-		end
-		local out = {};
-		for i = 1, #arr - 1 do
-			local a = arr[i];
-			local b = arr[i + 1];
-			local mid = (a + b) / 2;
-			out[#out + 1] = mid;
-		end
-		return out;
-	end
-	local xs_centers = centerRows(xs_unique);
-	local zs_centers = centerRows(zs_unique);
-	local w = #xs_centers;
-	local h = #zs_centers;
-	if ((w < 4) or (h < 4)) then
-		data.grid.w = 0;
-		data.grid.h = 0;
-		data.cache.xs_cached = nil;
-		data.cache.zs_cached = nil;
-		data.cache.xs_centers_cached = nil;
-		data.cache.zs_centers_cached = nil;
-		return;
-	end
-	data.grid.w = w;
-	data.grid.h = h;
-	data.cache.xs_cached = xs_unique;
-	data.cache.zs_cached = zs_unique;
-	data.cache.xs_centers_cached = xs_centers;
-	data.cache.zs_centers_cached = zs_centers;
-	data.cells.grid = {};
-	data.cells.all = {};
-	data.cells.numbered = {};
-	for ix = 0, w - 1 do
-		local row = {};
-		data.cells.grid[ix] = row;
-		for iz = 0, h - 1 do
-			local k = key(ix, iz);
 			local cell = {
 				ix = ix,
 				iz = iz,
 				part = nil,
-				pos = nil,
-				color = nil,
-				covered = true,
+				pos = Vector3.new(data.cache.xs_centers_cached[ix + 1] or 0, planeY, data.cache.zs_centers_cached[iz + 1] or 0),
 				state = "unknown",
 				number = nil,
-				neigh = {},
-			};
-			data.cells.all[k] = cell;
-			row[iz] = cell;
+				k = k,
+				covered = true,
+				neigh = nil
+			}
+			data.cells.all[k] = cell
+			row[iz] = cell
 		end
 	end
+	
 	for _, item in ipairs(raw) do
-		local part = item.part;
-		local pos = item.pos;
-		local ix = nearestIndex(pos.X, data.cache.xs_centers_cached);
-		local iz = nearestIndex(pos.Z, data.cache.zs_centers_cached);
+		local part = item.part
+		local pos = item.pos
+		local ix = nearestIndex(pos.X, data.cache.xs_centers_cached)
+		local iz = nearestIndex(pos.Z, data.cache.zs_centers_cached)
 		if ((ix >= 0) and (ix < data.grid.w) and (iz >= 0) and (iz < data.grid.h)) then
-			local k = key(ix, iz);
-			local cell = data.cells.all[k];
-			if not cell.part then
-				cell.part = part;
-				cell.pos = pos;
-			else
-				local cur_d = abs(((cell.part and cell.part.Position.X) or cell.pos.X) - data.cache.xs_centers_cached[ix + 1]) + abs(((cell.part and cell.part.Position.Z) or cell.pos.Z) - data.cache.zs_centers_cached[iz + 1]);
-				local new_d = abs(pos.X - data.cache.xs_centers_cached[ix + 1]) + abs(pos.Z - data.cache.zs_centers_cached[iz + 1]);
-				if (new_d < cur_d) then
-					cell.part = part;
-					cell.pos = pos;
+			local k = key(ix, iz)
+			local cell = data.cells.all[k]
+			if cell then
+				cell.part = part
+				cell.pos = pos
+				
+				-- Check for number
+				local gui = part:FindFirstChild("Gui")
+				if gui then
+					local label = gui:FindFirstChild("Label")
+					if label and label.Text and isNumber(label.Text) then
+						cell.number = tonumber(label.Text)
+						cell.covered = false
+						cell.state = "number"
+						table.insert(data.cells.numbered, cell)
+					end
 				end
-			end
-			if part.Color then
-				local color = part.Color;
-				local r = color.R or color.r or color[1];
-				local g = color.G or color.g or color[2];
-				local b = color.B or color.b or color[3];
-				if (r and (r <= 1)) then
-					r = math.floor((r * 255) + 0.5);
+				
+				-- Check if flagged
+				if isPartFlagged(part) then
+					cell.state = "flagged"
 				end
-				if (g and (g <= 1)) then
-					g = math.floor((g * 255) + 0.5);
-				end
-				if (b and (b <= 1)) then
-					b = math.floor((b * 255) + 0.5);
-				end
-				cell.color = {R=r,G=g,B=b};
-			end
-			local ngui = part:FindFirstChild("NumberGui");
-			if ngui then
-				local textLabel = ngui:FindFirstChild("TextLabel");
-				if (textLabel and textLabel.Text and isNumber(textLabel.Text)) then
-					cell.number = tonumber(textLabel.Text);
-					cell.covered = false;
-				end
-			end
-			if (cell.color and cell.color.R and cell.color.G and cell.color.B) then
-				if ((cell.color.R == 255) and (cell.color.G == 255) and (cell.color.B == 125)) then
-					cell.covered = false;
-				end
-			end
-			if isPartFlagged(part) then
-				cell.state = "flagged";
-			end
-			if (cell.number and not cell.covered) then
-				cell.state = "number";
-				table.insert(data.cells.numbered, cell);
 			end
 		end
 	end
+	
+	-- Build neighbors
 	for iz = 0, data.grid.h - 1 do
 		for ix = 0, data.grid.w - 1 do
-			local c = data.cells.grid[ix][iz];
-			local neigh = {};
-			for dz = -1, 1 do
-				for dx = -1, 1 do
-					if not ((dx == 0) and (dz == 0)) then
-						local jx, jz = ix + dx, iz + dz;
-						if ((jx >= 0) and (jx < data.grid.w) and (jz >= 0) and (jz < data.grid.h)) then
-							local row = data.cells.grid[jx];
-							local n = row and row[jz];
-							if n then
-								neigh[#neigh + 1] = n;
+			local row = data.cells.grid[ix]
+			local c = row and row[iz]
+			if c then
+				local neigh = {}
+				for dz = -1, 1 do
+					for dx = -1, 1 do
+						if not ((dx == 0) and (dz == 0)) then
+							local jx, jz = ix + dx, iz + dz
+							if ((jx >= 0) and (jx < data.grid.w) and (jz >= 0) and (jz < data.grid.h)) then
+								local rowJ = data.cells.grid[jx]
+								local n = rowJ and rowJ[jz]
+								if n then
+									neigh[#neigh + 1] = n
+								end
 							end
 						end
 					end
 				end
+				c.neigh = neigh
 			end
-			c.neigh = neigh;
 		end
 	end
 end
 
 local function neighbors(ix, iz)
-	local row = data.cells.grid[ix];
-	local c = row and row[iz];
-	return (c and c.neigh) or {};
+	local row = data.cells.grid[ix]
+	local c = row and row[iz]
+	return (c and c.neigh) or {}
 end
 
 local function planMove()
 	if (not data.cache.xs_centers_cached or not data.cache.zs_centers_cached or (data.grid.w == 0) or (data.grid.h == 0)) then
-		return;
+		return
 	end
 	if (#data.cells.numbered == 0) then
-		data.cells.toFlag = {};
-		data.cells.toClear = {};
-		data.cells.guess = {};
-		return;
+		data.cells.toFlag = {}
+		data.cells.toClear = {}
+		data.cells.guess = {}
+		return
 	end
-	data.cells.toFlag = {};
-	data.cells.toClear = {};
-	data.cells.guess = {};
-	local knownFlag = {};
+	
+	data.cells.toFlag = {}
+	data.cells.toClear = {}
+	data.cells.guess = {}
+	
+	local knownFlag = {}
 	for _, cell in pairs(data.cells.all) do
 		if (cell.state == "flagged") then
-			knownFlag[cell] = true;
+			knownFlag[cell] = true
 		end
 	end
-	local knownClear = {};
-	local scratch = {};
+	
+	local knownClear = {}
+	local scratch = {}
+	
 	local function computeUnknowns(c)
-		local nbs = neighbors(c.ix, c.iz);
+		local nbs = neighbors(c.ix, c.iz)
 		for i = 1, #scratch do
-			scratch[i] = nil;
+			scratch[i] = nil
 		end
-		local flaggedCount = 0;
+		local flaggedCount = 0
 		for i = 1, #nbs do
-			local nb = nbs[i];
+			local nb = nbs[i]
 			if (knownFlag[nb] or (nb.state == "flagged")) then
-				flaggedCount = flaggedCount + 1;
+				flaggedCount = flaggedCount + 1
 			elseif (not knownClear[nb] and isCoveredCell(nb)) then
-				scratch[#scratch + 1] = nb;
+				scratch[#scratch + 1] = nb
 			end
 		end
-		return scratch, flaggedCount;
+		return scratch, flaggedCount
 	end
-	local changed = true;
-	local guard = 0;
+	
+	local changed = true
+	local guard = 0
 	while changed and (guard < 64) do
-		changed = false;
-		guard = guard + 1;
+		changed = false
+		guard = guard + 1
 		for _, cell in ipairs(data.cells.numbered) do
-			local num = cell.number or 0;
-			local unknowns, flaggedCount = computeUnknowns(cell);
-			local remaining = num - flaggedCount;
+			local num = cell.number or 0
+			local unknowns, flaggedCount = computeUnknowns(cell)
+			local remaining = num - flaggedCount
 			if ((remaining > 0) and (remaining == #unknowns)) then
 				for i = 1, #unknowns do
-					local u = unknowns[i];
+					local u = unknowns[i]
 					if not knownFlag[u] then
-						knownFlag[u] = true;
-						data.cells.toFlag[u] = true;
-						changed = true;
+						knownFlag[u] = true
+						data.cells.toFlag[u] = true
+						changed = true
 					end
 				end
 			elseif ((remaining == 0) and (#unknowns > 0)) then
 				for i = 1, #unknowns do
-					local u = unknowns[i];
+					local u = unknowns[i]
 					if not knownClear[u] then
-						knownClear[u] = true;
-						data.cells.toClear[u] = true;
-						changed = true;
+						knownClear[u] = true
+						data.cells.toClear[u] = true
+						changed = true
 					end
 				end
 			end
 		end
 	end
-	local accum = {};
+	
+	local accum = {}
 	for _, cell in ipairs(data.cells.numbered) do
-		local num = cell.number or 0;
-		local unknowns, flaggedCount = computeUnknowns(cell);
-		local remaining = num - flaggedCount;
+		local num = cell.number or 0
+		local unknowns, flaggedCount = computeUnknowns(cell)
+		local remaining = num - flaggedCount
 		if ((remaining > 0) and (#unknowns > 0)) then
-			local p_each = remaining / #unknowns;
+			local p_each = remaining / #unknowns
 			for i = 1, #unknowns do
-				local u = unknowns[i];
+				local u = unknowns[i]
 				if (not knownFlag[u] and not knownClear[u]) then
-					local e = accum[u];
+					local e = accum[u]
 					if not e then
-						e = {sum=0,w=0};
-						accum[u] = e;
+						e = {sum=0, w=0}
+						accum[u] = e
 					end
-					e.sum = e.sum + p_each;
-					e.w = e.w + 1;
+					e.sum = e.sum + p_each
+					e.w = e.w + 1
 				end
 			end
 		end
 	end
-	local pflag = data.ui.PROB_FLAG_THRESHOLD;
+	
+	local pflag = data.ui.PROB_FLAG_THRESHOLD
 	for cell, e in pairs(accum) do
-		local p = ((e.w > 0) and (e.sum / e.w)) or 0;
+		local p = ((e.w > 0) and (e.sum / e.w)) or 0
 		if knownFlag[cell] then
-			data.cells.toFlag[cell] = true;
+			data.cells.toFlag[cell] = true
 		elseif (p >= pflag) then
-			data.cells.toFlag[cell] = true;
-			knownFlag[cell] = true;
+			data.cells.toFlag[cell] = true
+			knownFlag[cell] = true
 		else
-			data.cells.guess[cell] = p;
+			data.cells.guess[cell] = p
 		end
 	end
+	
 	for cell, _ in pairs(data.cells.toFlag) do
-		data.cells.toClear[cell] = nil;
-		data.cells.guess[cell] = nil;
+		data.cells.toClear[cell] = nil
+		data.cells.guess[cell] = nil
 	end
 	for cell, _ in pairs(data.cells.toClear) do
-		data.cells.toFlag[cell] = nil;
-		data.cells.guess[cell] = nil;
+		data.cells.toFlag[cell] = nil
+		data.cells.guess[cell] = nil
 	end
 	for cell, _ in pairs(data.cells.guess) do
 		if knownFlag[cell] then
-			data.cells.guess[cell] = nil;
+			data.cells.guess[cell] = nil
 		end
 	end
 end
@@ -417,43 +387,87 @@ end
 local function clearHighlights()
 	for _, highlight in pairs(data.highlights) do
 		if (highlight and highlight.Parent) then
-			highlight:Destroy();
+			highlight:Destroy()
 		end
 	end
-	data.highlights = {};
+	data.highlights = {}
+end
+
+local function clearProbLabels()
+	for _, label in pairs(data.probLabels) do
+		if (label and label.Parent) then
+			label:Destroy()
+		end
+	end
+	data.probLabels = {}
 end
 
 local function createHighlight(part, color)
-	local highlight = Instance.new("SelectionBox");
-	highlight.Adornee = part;
-	highlight.Color3 = color;
-	highlight.LineThickness = 0.1;
-	highlight.Transparency = 0.3;
-	highlight.Parent = part;
-	return highlight;
+	local highlight = Instance.new("SelectionBox")
+	highlight.Adornee = part
+	highlight.Color3 = color
+	highlight.LineThickness = 0.1
+	highlight.Transparency = 0.3
+	highlight.Parent = part
+	return highlight
+end
+
+local function createProbLabel(part, probability)
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Adornee = part
+	billboardGui.Size = UDim2.new(0, 50, 0, 30)
+	billboardGui.StudsOffset = Vector3.new(0, 1, 0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = part
+	
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	textLabel.BackgroundTransparency = 0.3
+	textLabel.BorderSizePixel = 0
+	textLabel.Text = string.format("%.0f%%", probability * 100)
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+	textLabel.TextSize = 18
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Parent = billboardGui
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 5)
+	corner.Parent = textLabel
+	
+	return billboardGui
 end
 
 local function highlightCells()
-	clearHighlights();
-	local safeCount = 0;
-	local mineCount = 0;
+	clearHighlights()
+	clearProbLabels()
+	
 	for cell, _ in pairs(data.cells.toClear or {}) do
 		if cell.part then
-			local highlight = createHighlight(cell.part, Color3.fromRGB(0, 255, 0));
-			table.insert(data.highlights, highlight);
-			safeCount = safeCount + 1;
+			local highlight = createHighlight(cell.part, Color3.fromRGB(0, 255, 0))
+			table.insert(data.highlights, highlight)
 		end
 	end
+	
 	for cell, _ in pairs(data.cells.toFlag or {}) do
 		if cell.part then
-			local highlight = createHighlight(cell.part, Color3.fromRGB(255, 0, 0));
-			table.insert(data.highlights, highlight);
-			mineCount = mineCount + 1;
+			local highlight = createHighlight(cell.part, Color3.fromRGB(255, 0, 0))
+			table.insert(data.highlights, highlight)
+		end
+	end
+	
+	-- Show probability labels if enabled
+	if data.ui.showProbability then
+		for cell, prob in pairs(data.cells.guess or {}) do
+			if cell.part and prob > 0 then
+				local label = createProbLabel(cell.part, prob)
+				table.insert(data.probLabels, label)
+			end
 		end
 	end
 end
 
--- NEW CLEAN UI - Toggle Control Panel
+-- NEW CLEAN UI WITH SHOW/HIDE AND PROBABILITY TOGGLE
 local mainGui = Instance.new('ScreenGui')
 mainGui.Name = 'MinesweeperSolverUI'
 mainGui.ResetOnSpawn = false
@@ -463,7 +477,7 @@ mainGui.Parent = v4
 -- Main Control Frame
 local controlFrame = Instance.new('Frame')
 controlFrame.Name = 'ControlFrame'
-controlFrame.Size = UDim2.new(0, 280, 0, 120)
+controlFrame.Size = UDim2.new(0, 280, 0, 180)
 controlFrame.Position = UDim2.new(1, -300, 0, 20)
 controlFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 controlFrame.BorderSizePixel = 0
@@ -476,7 +490,6 @@ frameCorner.Parent = controlFrame
 local frameStroke = Instance.new('UIStroke')
 frameStroke.Color = Color3.fromRGB(100, 200, 255)
 frameStroke.Thickness = 3
-frameStroke.Transparency = 0
 frameStroke.Parent = controlFrame
 
 -- Title
@@ -505,40 +518,40 @@ statusLabel.Parent = controlFrame
 
 -- Toggle Button
 local toggleButton = Instance.new('TextButton')
-toggleButton.Size = UDim2.new(0, 120, 0, 40)
+toggleButton.Size = UDim2.new(0, 120, 0, 35)
 toggleButton.Position = UDim2.new(0, 10, 0, 70)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
 toggleButton.Text = '✓ ENABLED'
-toggleButton.TextSize = 16
+toggleButton.TextSize = 14
 toggleButton.Font = Enum.Font.GothamBold
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.BorderSizePixel = 0
 toggleButton.Parent = controlFrame
 
 local toggleCorner = Instance.new('UICorner')
-toggleCorner.CornerRadius = UDim.new(0, 10)
+toggleCorner.CornerRadius = UDim.new(0, 8)
 toggleCorner.Parent = toggleButton
 
--- Info Button
-local infoButton = Instance.new('TextButton')
-infoButton.Size = UDim2.new(0, 120, 0, 40)
-infoButton.Position = UDim2.new(0, 150, 0, 70)
-infoButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-infoButton.Text = 'ℹ INFO'
-infoButton.TextSize = 16
-infoButton.Font = Enum.Font.GothamBold
-infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-infoButton.BorderSizePixel = 0
-infoButton.Parent = controlFrame
+-- Show Probability Button
+local probButton = Instance.new('TextButton')
+probButton.Size = UDim2.new(0, 120, 0, 35)
+probButton.Position = UDim2.new(0, 150, 0, 70)
+probButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+probButton.Text = '% OFF'
+probButton.TextSize = 14
+probButton.Font = Enum.Font.GothamBold
+probButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+probButton.BorderSizePixel = 0
+probButton.Parent = controlFrame
 
-local infoCorner = Instance.new('UICorner')
-infoCorner.CornerRadius = UDim.new(0, 10)
-infoCorner.Parent = infoButton
+local probCorner = Instance.new('UICorner')
+probCorner.CornerRadius = UDim.new(0, 8)
+probCorner.Parent = probButton
 
 -- Stats Label
 local statsLabel = Instance.new('TextLabel')
-statsLabel.Size = UDim2.new(0, 260, 0, 50)
-statsLabel.Position = UDim2.new(0, 10, 1, 10)
+statsLabel.Size = UDim2.new(1, -20, 0, 40)
+statsLabel.Position = UDim2.new(0, 10, 0, 115)
 statsLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 statsLabel.Text = '🟢 Safe: 0 | 🔴 Mines: 0'
 statsLabel.TextSize = 14
@@ -548,13 +561,30 @@ statsLabel.BorderSizePixel = 0
 statsLabel.Parent = controlFrame
 
 local statsCorner = Instance.new('UICorner')
-statsCorner.CornerRadius = UDim.new(0, 10)
+statsCorner.CornerRadius = UDim.new(0, 8)
 statsCorner.Parent = statsLabel
 
-local statsStroke = Instance.new('UIStroke')
-statsStroke.Color = Color3.fromRGB(100, 200, 255)
-statsStroke.Thickness = 2
-statsStroke.Parent = statsLabel
+-- Hide/Show Button (Minimalist)
+local hideButton = Instance.new('TextButton')
+hideButton.Size = UDim2.new(0, 40, 0, 40)
+hideButton.Position = UDim2.new(1, -300, 0, 20)
+hideButton.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+hideButton.Text = '◀'
+hideButton.TextSize = 20
+hideButton.Font = Enum.Font.GothamBold
+hideButton.TextColor3 = Color3.fromRGB(100, 200, 255)
+hideButton.BorderSizePixel = 0
+hideButton.Parent = mainGui
+hideButton.Visible = false
+
+local hideCorner = Instance.new('UICorner')
+hideCorner.CornerRadius = UDim.new(0, 10)
+hideCorner.Parent = hideButton
+
+local hideStroke = Instance.new('UIStroke')
+hideStroke.Color = Color3.fromRGB(100, 200, 255)
+hideStroke.Thickness = 3
+hideStroke.Parent = hideButton
 
 -- Drag functionality
 local dragging = false
@@ -563,6 +593,7 @@ local dragInput, dragStart, startPos
 local function update(input)
 	local delta = input.Position - dragStart
 	controlFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	hideButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
 controlFrame.InputBegan:Connect(function(input)
@@ -591,7 +622,7 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
 	end
 end)
 
--- Toggle Button Functionality
+-- Toggle Solver
 toggleButton.MouseButton1Click:Connect(function()
 	data.enabled = not data.enabled
 	if data.enabled then
@@ -599,30 +630,47 @@ toggleButton.MouseButton1Click:Connect(function()
 		toggleButton.Text = '✓ ENABLED'
 		statusLabel.Text = 'Status: ACTIVE'
 		statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-		print("Minesweeper Solver ENABLED")
 	else
 		toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		toggleButton.Text = '✗ DISABLED'
 		statusLabel.Text = 'Status: INACTIVE'
 		statusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 		clearHighlights()
-		print("Minesweeper Solver DISABLED")
+		clearProbLabels()
 	end
 end)
 
--- Info Button Functionality
-infoButton.MouseButton1Click:Connect(function()
-	print("======================")
-	print("MINESWEEPER SOLVER INFO")
-	print("======================")
-	print("🟢 Green boxes = Safe cells")
-	print("🔴 Red boxes = Mine locations")
-	print("Toggle ON/OFF to control solver")
-	print("Drag the panel to move it")
-	print("======================")
+-- Toggle Probability Display
+probButton.MouseButton1Click:Connect(function()
+	data.ui.showProbability = not data.ui.showProbability
+	if data.ui.showProbability then
+		probButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+		probButton.Text = '% ON'
+	else
+		probButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		probButton.Text = '% OFF'
+		clearProbLabels()
+	end
 end)
 
--- Update stats display
+-- Hide/Show UI
+hideButton.MouseButton1Click:Connect(function()
+	data.ui.uiVisible = true
+	controlFrame.Visible = true
+	hideButton.Visible = false
+	hideButton.Text = '◀'
+end)
+
+titleLabel.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		data.ui.uiVisible = false
+		controlFrame.Visible = false
+		hideButton.Visible = true
+		hideButton.Text = '▶'
+	end
+end)
+
+-- Update stats
 local function updateStats()
 	local safeCount = 0
 	local mineCount = 0
@@ -635,6 +683,7 @@ local function updateStats()
 	statsLabel.Text = '🟢 Safe: ' .. safeCount .. ' | 🔴 Mines: ' .. mineCount
 end
 
+-- Main update loop
 local lastBuild = 0
 local function onUpdate()
 	if not data.enabled then
@@ -646,14 +695,18 @@ local function onUpdate()
 		buildGrid()
 		lastBuild = now
 	end
+	
 	if ((data.grid.w == 0) or not data.cache.xs_centers_cached or not data.cache.zs_centers_cached) then
 		return
 	end
 	
-	planMove()
-	highlightCells()
-	updateStats()
-	data.timing.lastPlanTick = now * 1000
+	local nowMs = now * 1000
+	if ((data.timing.lastPlanTick == 0) or ((nowMs - data.timing.lastPlanTick) >= data.timing.planIntervalMs)) then
+		planMove()
+		highlightCells()
+		updateStats()
+		data.timing.lastPlanTick = nowMs
+	end
 end
 
 game:GetService("RunService").Heartbeat:Connect(onUpdate)
@@ -662,7 +715,9 @@ print("======================")
 print("💣 MINESWEEPER SOLVER")
 print("======================")
 print("✓ Loaded successfully!")
-print("🟢 Green = Safe")
-print("🔴 Red = Mines")
+print("🟢 Green = Safe cells")
+print("🔴 Red = Mine locations")
+print("📊 Toggle % to show probability")
+print("🖱️ Right-click title to hide/show UI")
 print("📍 Drag panel to move")
 print("======================")
