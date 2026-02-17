@@ -11,9 +11,7 @@ end
 
 v1:SetAttribute("gay", true)
 
-task.spawn(function()
-    task.wait(0)
-end)
+task.spawn(function() task.wait(0) end)
 
 local P = v1
 local c = Color3.fromRGB
@@ -392,14 +390,24 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                 if lbl and lbl:IsA("TextLabel") and lbl.Text == utf8.char(0x1F4A5) then
                                     local part = sg2.Adornee
                                     if (part.Position - root.Position).Magnitude <= ac.rad then
-                                        local cd = part:FindFirstChildOfClass("ClickDetector", true)
-                                        if cd then
-                                            local alreadyClicked = part:GetAttribute("AutoClicked")
-                                            if not alreadyClicked then
-                                                pcall(function()
-                                                    fireclickdetector(cd)
-                                                    part:SetAttribute("AutoClicked", true)
-                                                end)
+                                        -- SKIP jika tile sudah ada bendera (manual atau auto)
+                                        local isFlagged = false
+                                        for _, child in ipairs(part:GetChildren()) do
+                                            if child.Name:lower():find("flag") or child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+                                                isFlagged = true
+                                                break
+                                            end
+                                        end
+                                        if not isFlagged then
+                                            local cd = part:FindFirstChildOfClass("ClickDetector", true)
+                                            if cd then
+                                                local alreadyClicked = part:GetAttribute("AutoClicked")
+                                                if not alreadyClicked then
+                                                    pcall(function()
+                                                        fireclickdetector(cd)
+                                                        part:SetAttribute("AutoClicked", true)
+                                                    end)
+                                                end
                                             end
                                         end
                                     end
@@ -424,20 +432,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local partCache = {}
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.05
-        local flaggedIds = {}
-        local function watchPart(part)
-            local id = part:GetDebugId()
-            if flaggedIds["w"..id] then return end
-            flaggedIds["w"..id] = true
-            part.ChildAdded:Connect(function()
-                flaggedIds[id] = true
-            end)
-            part.ChildRemoved:Connect(function()
-                if #part:GetChildren() == 0 then
-                    flaggedIds[id] = nil
-                end
-            end)
-        end
         
         local function A6()
             local parent = cg or A5
@@ -602,8 +596,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local Z = nil
                             if R.GetAttribute then Z = R:GetAttribute("Flagged") end
                             if Z then Y = true end
-                            if flaggedIds[U] then Y = true end
-                            watchPart(R)
                             V = { a = R, b = R.Position, c = R.Size, d = (W and W:IsA("TextLabel")) and W or nil, e = Y, f = Q }
                             A4[U] = V
                         else
@@ -1056,6 +1048,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
+            local bombsToFlag = {}
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1063,46 +1056,45 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                                -- Auto Flag: Check if this is a bomb
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) and v0 >= 0.99 then
+                                        -- This is definitely a bomb, add to flag list
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(bombsToFlag, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
                 end
             end
-
-            -- Auto Flag
-            if ac and ac.on then
-                local flagSpeed = ac.intv or 0.05
-                local flagEvent = game:GetService("ReplicatedStorage")
-                    :FindFirstChild("Events") and
-                    game:GetService("ReplicatedStorage").Events
-                    :FindFirstChild("FlagEvents") and
-                    game:GetService("ReplicatedStorage").Events.FlagEvents
-                    :FindFirstChild("PlaceFlag")
-                if flagEvent then
-                    for r0 = 1, Hc do
-                        for c0 = 1, Wc do
-                            -- Hanya covered (skip flagged agar tidak double)
-                            if b0[r0][c0].a == "covered" then
-                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        local cellData = b0[r0][c0]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            local part = cellData.c.a
-                                            local id = part:GetDebugId()
-                                            -- Skip jika sudah di-flag (dari flaggedIds atau ChildAdded)
-                                            if not flaggedIds[id] then
-                                                flaggedIds[id] = true
-                                                pcall(function()
-                                                    flagEvent:FireServer(part, id, true)
-                                                end)
-                                                task.wait(flagSpeed)
-                                            end
-                                        end
-                                    end
-                                end
-                            end
+            
+            -- Auto Flag: Place flags on detected bombs
+            if ac and ac.on and #bombsToFlag > 0 then
+                local flagSpeed = ac.fspd or 0.05
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData.part
+                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                        local flagged = part:GetAttribute("Flagged")
+                        if not flagged then
+                            task.spawn(function()
+                                pcall(function()
+                                    local args = {part}
+                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+                                    part:SetAttribute("Flagged", true)
+                                end)
+                            end)
+                            task.wait(flagSpeed)
                         end
                     end
                 end
