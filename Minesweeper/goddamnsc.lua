@@ -13,28 +13,9 @@ v1:SetAttribute("gay", true)
 
 task.spawn(function()
     local g = Instance.new("ScreenGui", v1)
-    g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     g.Name = "Notification"
-    local l = Instance.new("TextLabel", g)
-    l.TextWrapped = true
-    l.BorderSizePixel = 0
-    l.TextSize = 20
-    l.TextScaled = true
-    l.BackgroundColor3 = Color3.new(0, 0, 0)
-    l.FontFace = Font.new("rbxasset://fonts/families/SourceSansBold.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-    l.TextColor3 = Color3.new(255, 255, 255)
-    l.BackgroundTransparency = 0.3
-    l.AnchorPoint = Vector2.new(0.5, 1)
-    l.Size = UDim2.new(0.4, 0, 0.08, 0)
-    l.BorderColor3 = Color3.new(0, 0, 0)
-    l.Text = "This script was a mess. The Hub is located in the bottom-right corner. For more details, check the Console (F9)"
-    l.Position = UDim2.new(0.5, 0, 0.9, 0)
-    task.spawn(function()
-        task.wait(5)
-        game:GetService("TweenService"):Create(l, TweenInfo.new(2), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
-        task.wait(2)
-        g:Destroy()
-    end)
+    task.wait(0)
+    g:Destroy()
 end)
 
 local P = v1
@@ -446,6 +427,33 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local partCache = {}
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.05
+        -- Table untuk track semua part yang sudah di-flag (manual atau auto)
+        -- Menggunakan GetDebugId sebagai key agar tidak bisa double-flag
+        local flaggedIds = {}
+        local flagEvent = nil
+        pcall(function()
+            flagEvent = game:GetService("ReplicatedStorage")
+                :WaitForChild("Events", 5)
+                :WaitForChild("FlagEvents", 5)
+                :WaitForChild("PlaceFlag", 5)
+        end)
+        -- Monitor flag manual: saat server tambah child ke part, langsung catat
+        local watchedParts = {}
+        local function watchPart(part)
+            local id = part:GetDebugId()
+            if watchedParts[id] then return end
+            watchedParts[id] = true
+            part.ChildAdded:Connect(function()
+                -- Setiap kali ada child baru = flag dipasang server
+                flaggedIds[id] = true
+            end)
+            part.ChildRemoved:Connect(function()
+                -- Semua child hilang = flag dicabut
+                if #part:GetChildren() == 0 then
+                    flaggedIds[id] = nil
+                end
+            end)
+        end
         
         local function A6()
             local parent = cg or A5
@@ -610,6 +618,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local Z = nil
                             if R.GetAttribute then Z = R:GetAttribute("Flagged") end
                             if Z then Y = true end
+                            if flaggedIds[U] then Y = true end
+                            watchPart(R)
                             V = { a = R, b = R.Position, c = R.Size, d = (W and W:IsA("TextLabel")) and W or nil, e = Y, f = Q }
                             A4[U] = V
                         else
@@ -621,6 +631,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local Z = nil
                             if R.GetAttribute then Z = R:GetAttribute("Flagged") end
                             if Z then Y = true end
+                            if flaggedIds[U] then Y = true end
                             V.e = Y
                             if not V.d then
                                 local X = R:FindFirstChild("NumberGui", true)
@@ -1062,11 +1073,26 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
-            
-            -- Auto Flag: Collect bombs to flag
-            if ac and ac.on then
+            for r0 = 1, Hc do
+                for c0 = 1, Wc do
+                    if b0[r0][c0].a == "revealed" then
+                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                            local rr, cc = rc[1], rc[2]
+                            -- Hanya "covered" yang diproses, "flagged" dilewati
+                            if b0[rr][cc].a == "covered" then
+                                da[B0(rr, cc)] = true
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Auto Flag: kumpulkan bomb yang belum di-flag
+            if btnBool(btnAuto) and flagEvent then
+                local flagSpeed = tonum(boxFS.Text) or 0.05
                 for r0 = 1, Hc do
                     for c0 = 1, Wc do
+                        -- Hanya proses cell "covered", skip "flagged"
                         if b0[r0][c0].a == "covered" then
                             local v0raw = (pr[r0] and pr[r0][c0]) or gP
                             if v0raw then
@@ -1075,31 +1101,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                     local cellData = b0[r0][c0]
                                     if cellData and cellData.c and cellData.c.a then
                                         local part = cellData.c.a
-                                        -- Check if NOT already flagged
-                                        if not (part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") or (part.GetAttribute and part:GetAttribute("Flagged"))) then
-                                            -- Safe to flag
-                                            task.spawn(function()
-                                                pcall(function()
-                                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(part)
-                                                end)
+                                        local id = part:GetDebugId()
+                                        -- Skip jika sudah tercatat di flaggedIds
+                                        if not flaggedIds[id] then
+                                            -- Catat dulu sebelum fire agar cycle berikutnya skip
+                                            flaggedIds[id] = true
+                                            pcall(function()
+                                                flagEvent:FireServer(part, id, true)
                                             end)
-                                            task.wait(ac.fspd or 0.05)
+                                            task.wait(flagSpeed)
                                         end
                                     end
                                 end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    if b0[r0][c0].a == "revealed" then
-                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
-                            local rr, cc = rc[1], rc[2]
-                            if b0[rr][cc].a == "covered" then
-                                da[B0(rr, cc)] = true
                             end
                         end
                     end
