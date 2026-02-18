@@ -1,4 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
+-- MODIFIED: Auto Solver hanya teleport (tanpa click), Auto Flag tetap normal
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -371,8 +372,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             return { add = add, stop = stop }
         end
         local RotCtl = mkRotCtl(rot)
-        
-        -- AUTO CLICKER (untuk membuka tile di sekitar) - TETAP PAKAI CLICK DETECTOR
         if ac.on then
             task.spawn(function()
                 local l = game:GetService("Players")
@@ -719,7 +718,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     if V then
                         local r0 = gy - offGY
                         local c0 = gx - offGX
-                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wn then
+                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
                             b0[r0][c0].c = V
                             if b0[r0][c0].a ~= "revealed" then
                                 if V.e then b0[r0][c0].a = "flagged" end
@@ -1058,11 +1057,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
-                                -- AUTO FLAG: Kumpulkan bom (probabilitas >= 0.99)
+                                -- Auto Flag: Check if this is a bomb
                                 local v0raw = (pr[rr] and pr[rr][cc]) or gP
                                 if v0raw then
                                     local v0 = A7(v0raw)
                                     if tonumber(v0) and v0 >= 0.99 then
+                                        -- This is definitely a bomb, add to flag list
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
                                             table.insert(bombsToFlag, {
@@ -1080,11 +1080,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO FLAG: Tandai bom (TETAP MENGGUNAKAN CLICK DETECTOR UNTUK FLAG)
+            -- Auto Flag: ONLY flag bombs (v0 >= 0.99), NOT safe tiles!
             if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
+                    -- Double check: ONLY flag if probability >= 0.99 (bomb)
                     if bombData.prob and bombData.prob >= 0.99 then
                         if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
                             local flagged = part:GetAttribute("Flagged")
@@ -1103,7 +1104,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: HANYA TELEPORT (TANPA KLIK!)
+            -- ============================================
+            -- AUTO SOLVER: ONLY teleport (NO CLICKING!)
+            -- Tile akan terbuka dengan cara diinjak
+            -- ============================================
             if state and state.b then
                 task.spawn(function()
                     pcall(function()
@@ -1115,7 +1119,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         local teleportDelay = ac.delay or 0.1
                         local safeTiles = {}
                         
-                        -- Kumpulkan tile aman (probabilitas <= 0.1) - HANYA UNTUK TELEPORT
+                        -- Kumpulkan tile aman (probabilitas rendah) - HANYA UNTUK TELEPORT
                         for r0 = 1, Hc do
                             for c0 = 1, Wc do
                                 local cell = b0[r0][c0]
@@ -1157,6 +1161,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             -- TELEPORT KE ATAS TILE (TANPA KLIK!)
                             if target and target.part then
                                 pcall(function()
+                                    -- Teleport ke atas tile agar "menginjak" dan membuka
                                     root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
                                     target.part:SetAttribute("SolverDone", true)
                                 end)
@@ -1168,7 +1173,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end)
             end
             
-            -- VISUAL: Tampilkan probabilitas di tile
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1190,9 +1194,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             else
                                 local v0 = A7(v0raw)
                                 if tonumber(v0) and v0 >= 0.99 then
-                                    -- Tampilkan bom dengan persentase, BUKAN bendera
-                                    local pct = v0 * 100
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = string.format("%.0f%%", pct), color = A8(v0)}
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                                 elseif tonumber(v0) and v0 <= 0.01 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                                 else
