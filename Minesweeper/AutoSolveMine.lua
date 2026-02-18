@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED: Auto Guess lebih cerdas, deteksi corner/border, Range slider
+-- FIXED: Auto Guess kembali, deteksi corner lebih akurat, support 0.01, render jauh
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -114,10 +114,12 @@ local function ico(name, y)
     return i
 end
 
-local btnRange  = ico("range", .37886)
-local btnAuto   = ico("autoclick", .61352)
-local btnScript = ico("script", .14419)
-local btnRot    = ico("rotation", .84818)
+-- Urutan tombol: Run, Range, Flag, Rotation, Guess
+local btnScript = ico("script", .14419)  -- Run
+local btnRange  = ico("range", .37886)   -- Range
+local btnAuto   = ico("autoclick", .61352) -- Flag
+local btnRot    = ico("rotation", .84818) -- Rotation
+local btnGuess  = ico("guess", .05)       -- Auto Guess (posisi baru)
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -156,6 +158,7 @@ lbl("Run", .2796, .05033, .06, .15)
 lbl("Range", .29895, .28344, .07, .13)
 lbl("Flag", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
+lbl("Auto Guess", .29895, .01656, .07, .13)  -- Label Auto Guess
 
 local patchedLabel = n("TextLabel", a, {
     Text = "(Working!)",
@@ -213,6 +216,7 @@ local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
 local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
 local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 local boxGuessThresh = txt("guess", "0.3", .16214, .79948, .30729, "0.3")
+local boxSpeed = txt("speed", "0.01", .16214, .40588, .77, "0.01")  -- Support 0.01
 
 local img = n("ImageLabel", a, {
     ZIndex = 9,
@@ -272,7 +276,7 @@ local function e(vv)
     return vv and true or false
 end
 
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, speedVal)
     local i = state
     local j = e(t)
     local function k()
@@ -300,7 +304,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
             on = e(x1), 
             rad = tonumber(v1) or 20, 
             intv = tonumber(n1) or 0.05,
-            guessThresh = tonumber(guessThresh) or 0.3
+            fspd = 0.05,
+            guess = e(guessOn),
+            guessThresh = tonumber(guessThresh) or 0.3,
+            speed = tonumber(speedVal) or 0.01  -- Support 0.01
         },
         rot = {
             on = rotOn == nil and false or rotOn,
@@ -1057,52 +1064,45 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
             local da = {}
             local bombsToFlag = {}
             
-            -- DETEKSI CORNER/BORDER YANG LEBIH CERDAS
-            -- Identifikasi tile yang pasti aman berdasarkan logika minesweeper
+            -- DETEKSI CORNER/BORDER YANG AKURAT
             local function isDefinitelySafe(r, c)
-                -- Cek semua tetangga yang sudah terbuka
+                -- Cek apakah tile ini di pinggir papan yang sudah terbuka
                 local neighbors = B3(r, c, Hc, Wc)
-                local totalMinesAround = 0
-                local flaggedAround = 0
-                local coveredAround = 0
+                local revealedNeighbors = 0
                 
-                for _, rc in ipairs(neighbors) do
-                    local nr, nc = rc[1], rc[2]
-                    if b0[nr] and b0[nr][nc] then
-                        if b0[nr][nc].a == "revealed" then
-                            -- Hitung jumlah bom di sekitar tile terbuka ini
-                            local num = b0[nr][nc].b or 0
-                            totalMinesAround = totalMinesAround + num
-                        elseif b0[nr][nc].a == "flagged" then
-                            flaggedAround = flaggedAround + 1
-                        elseif b0[nr][nc].a == "covered" then
-                            coveredAround = coveredAround + 1
-                        end
-                    end
-                end
-                
-                -- Jika semua bom sudah terdeteksi di sekitar, tile ini aman
                 for _, rc in ipairs(neighbors) do
                     local nr, nc = rc[1], rc[2]
                     if b0[nr] and b0[nr][nc] and b0[nr][nc].a == "revealed" then
+                        revealedNeighbors = revealedNeighbors + 1
                         local num = b0[nr][nc].b or 0
-                        local flaggedNearby = 0
-                        local coveredNearby = 0
+                        local flaggedAround = 0
                         
                         -- Hitung flag di sekitar tile terbuka ini
                         for _, rc2 in ipairs(B3(nr, nc, Hc, Wc)) do
                             local nnr, nnc = rc2[1], rc2[2]
-                            if b0[nnr] and b0[nnr][nnc] then
-                                if b0[nnr][nnc].a == "flagged" then
-                                    flaggedNearby = flaggedNearby + 1
-                                elseif b0[nnr][nnc].a == "covered" then
-                                    coveredNearby = coveredNearby + 1
+                            if b0[nnr] and b0[nnr][nnc] and b0[nnr][nnc].a == "flagged" then
+                                flaggedAround = flaggedAround + 1
+                            end
+                        end
+                        
+                        -- Jika semua bom sudah terdeteksi, tile ini aman
+                        if flaggedAround == num then
+                            return true
+                        end
+                        
+                        -- Kasus khusus: tile di pojok dengan angka 1 dan hanya 1 tetangga tertutup
+                        local coveredCount = 0
+                        for _, rc2 in ipairs(B3(nr, nc, Hc, Wc)) do
+                            local nnr, nnc = rc2[1], rc2[2]
+                            if b0[nnr] and b0[nnr][nnc] and b0[nnr][nnc].a == "covered" then
+                                coveredCount = coveredCount + 1
+                                if nnr == r and nnc == c then
+                                    -- Ini tile yang kita cek
                                 end
                             end
                         end
                         
-                        -- Jika jumlah flag = angka tile, tile yang dimaksud aman
-                        if flaggedNearby == num and coveredNearby > 0 then
+                        if coveredCount == 1 and num - flaggedAround == 0 then
                             return true
                         end
                     end
@@ -1162,9 +1162,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                 end
             end
             
-            -- AUTO SOLVER: Hanya teleport (tanpa klik) dengan prioritas:
-            -- 1. Tile yang pasti aman (berdasarkan logika corner/border)
-            -- 2. Tile dengan probabilitas terendah
+            -- AUTO SOLVER: Dengan prioritas dan support tile jauh
             if state and state.b then
                 task.spawn(function()
                     pcall(function()
@@ -1173,11 +1171,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                         local root = player.Character:FindFirstChild("HumanoidRootPart")
                         if not root then return end
                         
-                        local teleportDelay = ac.delay or 0.1
+                        local teleportDelay = ac.speed or 0.01  -- Support 0.01
                         local safeTiles = {}
                         local guessTiles = {}
                         
-                        -- Kumpulkan tile yang bisa dibuka
+                        -- Kumpulkan semua tile yang bisa dibuka (termasuk yang jauh)
                         for r0 = 1, Hc do
                             for c0 = 1, Wc do
                                 local cell = b0[r0][c0]
@@ -1189,7 +1187,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                                         local part = cellData and cellData.a
                                         
                                         if part and part:IsA("BasePart") and not part:GetAttribute("SolverDone") then
-                                            -- PRIORITAS 1: Tile yang pasti aman (deteksi corner/border)
+                                            -- PRIORITAS 1: Tile yang pasti aman (deteksi corner)
                                             if isDefinitelySafe(r0, c0) then
                                                 table.insert(safeTiles, {
                                                     part = part,
@@ -1207,8 +1205,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                                                     prob = v0,
                                                     priority = 2
                                                 })
-                                            -- PRIORITAS 3: Tile untuk Auto Guess (probabilitas sedang)
-                                            elseif tonumber(v0) and v0 <= ac.guessThresh then
+                                            -- PRIORITAS 3: Tile untuk Auto Guess (jika diaktifkan)
+                                            elseif ac.guess and tonumber(v0) and v0 <= ac.guessThresh then
                                                 table.insert(guessTiles, {
                                                     part = part,
                                                     pos = part.Position,
@@ -1227,6 +1225,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                         
                         -- Prioritaskan safeTiles dulu (priority 1 & 2)
                         if #safeTiles > 0 then
+                            -- Urutkan: priority, prob terendah, jarak terdekat
                             table.sort(safeTiles, function(a, b) 
                                 if a.priority ~= b.priority then
                                     return a.priority < b.priority
@@ -1237,7 +1236,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThresh)
                                 end
                             end)
                             target = safeTiles[1]
-                        -- Auto Guess: jika tidak ada safe tiles, gunakan guessTiles
+                        -- Auto Guess: jika tidak ada safe tiles
                         elseif #guessTiles > 0 then
                             table.sort(guessTiles, function(a, b) 
                                 return a.prob < b.prob
@@ -1399,7 +1398,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
-local toggles = { btnScript, btnRange, btnAuto, btnRot }
+local toggles = { btnScript, btnRange, btnAuto, btnRot, btnGuess }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1420,13 +1419,15 @@ local function pushState()
     local f2  = boxF    and tonum(boxF.Text)    or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
     local roOn = btnBool(btnRot)
+    local guessOn = btnBool(btnGuess)
     local guessThresh = boxGuessThresh and tonum(boxGuessThresh.Text) or 0.3
+    local speedVal = boxSpeed and tonum(boxSpeed.Text) or 0.01
     if sOn == false then
         callS(false)
         return
     end
     callS(false)
-    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessThresh)
+    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessOn, guessThresh, speedVal)
 end
 
 local function bindToggle(bx)
@@ -1443,6 +1444,7 @@ bindToggle(btnScript)
 bindToggle(btnRange)
 bindToggle(btnAuto)
 bindToggle(btnRot)
+bindToggle(btnGuess)
 
 local function bindBox(tb)
     if not tb then return end
@@ -1460,6 +1462,7 @@ bindBox(boxF)
 bindBox(boxFS)
 bindBox(boxText)
 bindBox(boxGuessThresh)
+bindBox(boxSpeed)
 
 local dragging = false
 local dragInput, dragStart, startPos
