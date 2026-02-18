@@ -375,6 +375,7 @@ end
 -- Auto Solve State
 local state = {
     solving = false,
+    needRefresh = false,
     flaggedIds = {},
     frozenConnection = nil
 }
@@ -481,8 +482,72 @@ local function getTileNumber(textLabel)
     return d and tonumber(d) or 0
 end
 
--- Teleport
-local function teleportTo(position)
+-- Find safe revealed tile to stand on (not covered tiles!)
+local function findSafeStandingTile(targetPos, revealedTilesData, bombTilesData, coveredTilesData)
+    local player = Players.LocalPlayer
+    if not player or not player.Character then return nil end
+    local root = player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local candidates = {}
+    
+    -- Only consider REVEALED tiles (already opened, safe to stand on)
+    for _, revealedData in ipairs(revealedTilesData) do
+        if revealedData.part then
+            local dist = (revealedData.part.Position - targetPos).Magnitude
+            
+            -- Within 16 studs and not too close to bombs
+            if dist <= 16 and dist > 2 then
+                local isSafe = true
+                
+                -- Check not near bombs
+                for _, bombData in ipairs(bombTilesData) do
+                    if bombData.part then
+                        local bombDist = (bombData.part.Position - revealedData.part.Position).Magnitude
+                        if bombDist < 4 then -- Extra margin
+                            isSafe = false
+                            break
+                        end
+                    end
+                end
+                
+                -- CRITICAL: Check not near covered tiles (probability/unknown)
+                if isSafe then
+                    for _, coveredData in ipairs(coveredTilesData) do
+                        if coveredData.part then
+                            local covDist = (coveredData.part.Position - revealedData.part.Position).Magnitude
+                            if covDist < 4 then -- Stay away from unknown tiles!
+                                isSafe = false
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if isSafe then
+                    table.insert(candidates, {
+                        part = revealedData.part,
+                        dist = dist,
+                        distFromPlayer = (revealedData.part.Position - root.Position).Magnitude
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Sort by closest to player
+    if #candidates > 0 then
+        table.sort(candidates, function(a, b)
+            return a.distFromPlayer < b.distFromPlayer
+        end)
+        return candidates[1].part
+    end
+    
+    return nil
+end
+
+-- Teleport to safe revealed tile
+local function teleportToSafeTile(part)
     local player = Players.LocalPlayer
     if not player or not player.Character then return false end
     local root = player.Character:FindFirstChild("HumanoidRootPart")
@@ -494,16 +559,40 @@ local function teleportTo(position)
     end
     
     pcall(function()
-        root.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+        root.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
     end)
     
-    task.wait(0.15)
+    task.wait(0.25)
     
     if getState(btnFreeze) and not wasAnchored then
         root.Anchored = true
     end
     
     return true
+end
+
+-- Click tile from distance (don't need to be on top of it)
+local function clickTileFromDistance(part, maxDistance)
+    if not part then return false end
+    
+    local player = Players.LocalPlayer
+    if not player or not player.Character then return false end
+    local root = player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    
+    local dist = (part.Position - root.Position).Magnitude
+    if dist > maxDistance then
+        return false -- Too far
+    end
+    
+    local cd = part:FindFirstChildOfClass("ClickDetector", true)
+    if cd then
+        pcall(function()
+            fireclickdetector(cd)
+        end)
+        return true
+    end
+    return false
 end
 
 -- Place flag
@@ -741,33 +830,92 @@ local function autoSolve()
         end
     end
     
-    -- Execute: Flag bombs first
-    local flaggedCount = 0
-    for _, tile in ipairs(bombTiles) do
-        local data = b0[tile.r][tile.c].data
-        if data and not data.flagged then
-            if placeFlag(data.part) then
-                flaggedCount = flaggedCount + 1
-                statusText.Text = string.format("Flagged: %d bombs", flaggedCount)
-                task.wait(0.05)
+    -- Collect revealed tiles data (safe to stand on)
+    local revealedTilesData = {}
+    local coveredTilesData = {}
+    
+    for r = 1, H do
+        for c = 1, W do
+            if b0[r][c].state == "revealed" and b0[r][c].data then
+                table.insert(revealedTilesData, {
+                    part = b0[r][c].data.part,
+                    r = r,
+                    c = c
+                })
+            elseif b0[r][c].state == "covered" and b0[r][c].data then
+                -- Collect covered tiles (unknown/probability) - NEVER step on these!
+                table.insert(coveredTilesData, {
+                    part = b0[r][c].data.part,
+                    r = r,
+                    c = c
+                })
             end
         end
     end
     
-    -- Execute: Teleport + Click safe tiles
+    -- Execute: Flag bombs in 16 radius from revealed tiles
+    local flaggedCount = 0
+    local bombPartsData = {}
+    
+    for _, tile in ipairs(bombTiles) do
+        local data = b0[tile.r][tile.c].data
+        if data and not data.flagged then
+            table.insert(bombPartsData, {part = data.part, r = tile.r, c = tile.c})
+        end
+    end
+    
+    -- Flag bombs within 16 studs of any revealed tile
+    for _, bombData in ipairs(bombPartsData) do
+        if bombData.part then
+            local shouldFlag = false
+            
+            for _, revData in ipairs(revealedTilesData) do
+                local dist = (bombData.part.Position - revData.part.Position).Magnitude
+                if dist <= 16 then
+                    shouldFlag = true
+                    break
+                end
+            end
+            
+            if shouldFlag then
+                if placeFlag(bombData.part) then
+                    flaggedCount = flaggedCount + 1
+                    statusText.Text = string.format("Flagging: %d", flaggedCount)
+                    task.wait(0.05)
+                end
+            end
+        end
+    end
+    
+    -- Execute: For each safe tile to click
     local clickedCount = 0
+    local skippedCount = 0
+    
     for _, tile in ipairs(safeTiles) do
         local data = b0[tile.r][tile.c].data
         if data then
-            -- Teleport to tile
-            teleportTo(data.part.Position)
-            task.wait(0.2)
+            -- Find revealed tile to stand on (within 16 studs, away from bombs AND covered tiles)
+            local standingTile = findSafeStandingTile(data.part.Position, revealedTilesData, bombPartsData, coveredTilesData)
             
-            -- Click tile
-            if clickTile(data.part) then
-                clickedCount = clickedCount + 1
-                statusText.Text = string.format("Clicked: %d safe", clickedCount)
-                task.wait(0.15)
+            if standingTile then
+                -- Teleport to revealed tile (safe!)
+                if teleportToSafeTile(standingTile) then
+                    task.wait(0.2)
+                    
+                    -- Click target from distance (max 16 studs)
+                    if clickTileFromDistance(data.part, 16) then
+                        clickedCount = clickedCount + 1
+                        statusText.Text = string.format("F:%d C:%d", flaggedCount, clickedCount)
+                        task.wait(0.25)
+                        
+                        -- Auto-refresh after each click to update grid
+                        -- This fixes detection errors (e.g., tile "1" showing 3 bombs)
+                        state.needRefresh = true
+                    end
+                end
+            else
+                -- No safe revealed tile within 16 studs - skip for now
+                skippedCount = skippedCount + 1
             end
         end
     end
@@ -775,19 +923,31 @@ local function autoSolve()
     -- Status
     if flaggedCount == 0 and clickedCount == 0 then
         if uncertainTiles > 0 then
-            statusText.Text = string.format("Skipped %d uncertain", uncertainTiles)
+            statusText.Text = string.format("Waiting: %d uncertain\n(probability tiles)", math.floor(uncertainTiles / 8))
+        elseif skippedCount > 0 then
+            statusText.Text = string.format("Skipped: %d no safe path\n(covered nearby)", skippedCount)
         else
-            statusText.Text = "Puzzle complete!"
+            statusText.Text = "Complete!\nAll safe"
             setVis(btnAutoSolve, false)
         end
     else
-        statusText.Text = string.format("F:%d C:%d", flaggedCount, clickedCount)
+        statusText.Text = string.format("Progress:\nF:%d C:%d", flaggedCount, clickedCount)
+        
+        if skippedCount > 0 then
+            statusText.Text = statusText.Text .. string.format("\nSkip:%d", skippedCount)
+        end
     end
     
     state.solving = false
+    
+    -- If we clicked tiles, trigger refresh scan next cycle
+    if clickedCount > 0 then
+        task.wait(0.5)  -- Wait for tiles to reveal
+        state.needRefresh = false
+    end
 end
 
--- Main loop
+-- Main loop with auto-refresh
 RunService.Heartbeat:Connect(function()
     if getState(btnAutoSolve) and not state.solving then
         task.spawn(autoSolve)
