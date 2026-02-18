@@ -1079,111 +1079,108 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- Auto Flag: Place flags on detected bombs
+            -- Auto Flag: ONLY flag bombs (v0 >= 0.99), NOT safe tiles!
             if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                        local flagged = part:GetAttribute("Flagged")
-                        if not flagged then
-                            task.spawn(function()
-                                pcall(function()
-                                    local args = {part}
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-                                    part:SetAttribute("Flagged", true)
+                    -- Double check: ONLY flag if probability >= 0.99 (bomb)
+                    if bombData.prob and bombData.prob >= 0.99 then
+                        if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                            local flagged = part:GetAttribute("Flagged")
+                            if not flagged then
+                                task.spawn(function()
+                                    pcall(function()
+                                        local args = {part}
+                                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+                                        part:SetAttribute("Flagged", true)
+                                    end)
                                 end)
-                            end)
-                            task.wait(flagSpeed)
+                                task.wait(flagSpeed)
+                            end
                         end
                     end
                 end
             end
             
-            -- AUTO SOLVER: Only teleport + click (NO FLAGGING!)
-            task.spawn(function()
-                pcall(function()
-                    if not (state and state.b) then return end
-                    
-                    local player = game:GetService("Players").LocalPlayer
-                    if not player or not player.Character then return end
-                    local root = player.Character:FindFirstChild("HumanoidRootPart")
-                    if not root then return end
-                    
-                    local teleportDelay = ac.delay or 0.1
-                    local safeTiles = {}
-                    local probTiles = {}
-                    
-                    -- Collect safe and probability tiles from overlays
-                    for r0 = 1, Hc do
-                        for c0 = 1, Wc do
-                            local cell = b0[r0][c0]
-                            if cell.a == "covered" and da[B0(r0, c0)] then
-                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    local cellData = cell.c
-                                    local part = cellData and cellData.a
-                                    
-                                    if part and part:IsA("BasePart") and not part:GetAttribute("SolverProcessed") then
-                                        if tonumber(v0) and v0 <= 0.01 then
-                                            -- Safe tile (✅)
-                                            table.insert(safeTiles, {
-                                                part = part,
-                                                pos = part.Position,
-                                                prob = v0,
-                                                dist = (part.Position - root.Position).Magnitude
-                                            })
-                                        elseif tonumber(v0) and v0 > 0.01 and v0 < 0.99 then
-                                            -- Probability tile (XX%)
-                                            table.insert(probTiles, {
-                                                part = part,
-                                                pos = part.Position,
-                                                prob = v0
-                                            })
+            -- AUTO SOLVER: ONLY teleport + click safe tiles (v0 <= 0.01)
+            -- Runs independently - NO FLAGGING CODE AT ALL!
+            if state and state.b then
+                task.spawn(function()
+                    pcall(function()
+                        local player = game:GetService("Players").LocalPlayer
+                        if not player or not player.Character then return end
+                        local root = player.Character:FindFirstChild("HumanoidRootPart")
+                        if not root then return end
+                        
+                        local teleportDelay = ac.delay or 0.1
+                        local safeTiles = {}
+                        local probTiles = {}
+                        
+                        -- Collect ONLY safe (v0 <= 0.01) and probability tiles
+                        -- NEVER touch bombs (v0 >= 0.99)
+                        for r0 = 1, Hc do
+                            for c0 = 1, Wc do
+                                local cell = b0[r0][c0]
+                                if cell.a == "covered" and da[B0(r0, c0)] then
+                                    local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                    if v0raw then
+                                        local v0 = A7(v0raw)
+                                        local cellData = cell.c
+                                        local part = cellData and cellData.a
+                                        
+                                        if part and part:IsA("BasePart") and not part:GetAttribute("SolverDone") then
+                                            -- ONLY collect safe tiles (NOT bombs!)
+                                            if tonumber(v0) and v0 <= 0.01 then
+                                                table.insert(safeTiles, {
+                                                    part = part,
+                                                    pos = part.Position,
+                                                    dist = (part.Position - root.Position).Magnitude
+                                                })
+                                            elseif tonumber(v0) and v0 > 0.01 and v0 < 0.99 then
+                                                table.insert(probTiles, {
+                                                    part = part,
+                                                    pos = part.Position,
+                                                    prob = v0
+                                                })
+                                            end
+                                            -- SKIP bombs (v0 >= 0.99) entirely - NO ACTION
                                         end
-                                        -- Skip bombs (v0 >= 0.99) - NO ACTION
                                     end
                                 end
                             end
                         end
-                    end
-                    
-                    local target = nil
-                    
-                    -- Priority 1: Safe tiles
-                    if #safeTiles > 0 then
-                        table.sort(safeTiles, function(a, b)
-                            return a.dist < b.dist
-                        end)
-                        target = safeTiles[1]
-                    -- Priority 2: Auto Guess enabled, try lowest probability
-                    elseif ac.guess and #probTiles > 0 then
-                        table.sort(probTiles, function(a, b)
-                            return a.prob < b.prob
-                        end)
-                        target = probTiles[1]
-                    end
-                    
-                    -- Execute teleport + click (NO FLAGGING!)
-                    if target and target.part then
-                        -- Teleport
-                        pcall(function()
-                            root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
-                        end)
-                        task.wait(teleportDelay)
                         
-                        -- Click ONLY
-                        local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
-                        if cd then
-                            pcall(function()
-                                fireclickdetector(cd)
-                                target.part:SetAttribute("SolverProcessed", true)
-                            end)
+                        local target = nil
+                        
+                        -- Try safe tiles first
+                        if #safeTiles > 0 then
+                            table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
+                            target = safeTiles[1]
+                        -- Auto Guess: try lowest probability
+                        elseif ac.guess and #probTiles > 0 then
+                            table.sort(probTiles, function(a, b) return a.prob < b.prob end)
+                            target = probTiles[1]
                         end
-                    end
+                        
+                        -- Execute: ONLY teleport + click, ABSOLUTELY NO FLAGGING!
+                        if target and target.part then
+                            pcall(function()
+                                root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
+                            end)
+                            task.wait(teleportDelay)
+                            
+                            local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
+                            if cd then
+                                pcall(function()
+                                    fireclickdetector(cd)
+                                    target.part:SetAttribute("SolverDone", true)
+                                end)
+                            end
+                        end
+                    end)
                 end)
-            end)
+            end
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1342,7 +1339,7 @@ local function pushState()
     local ps  = boxPS   and tonum(boxPS.Text)   or nil
     local fe  = boxText and parseFont(boxText.Text) or nil
     local r2  = boxR    and tonum(boxR.Text)    or nil
-    local rOn = true  -- Always enabled
+    local rOn = true
     local aOn = btnBool(btnAuto)
     local f2  = boxF    and tonum(boxF.Text)    or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
