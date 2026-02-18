@@ -1494,4 +1494,68 @@ local function updateInputOpen(input)
     if draggingOpen then
         local delta = input.Position - dragStartOpen
         open.Position = UDim2.new(
-            open
+                        openStartPos.X.Scale,
+            openStartPos.X.Offset + delta.X,
+            openStartPos.Y.Scale,
+            openStartPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+panel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+open.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingOpen = true
+        openDragStart = input.Position
+        openStartPos = open.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                draggingOpen = false
+            end
+        end)
+    end
+end)
+
+open.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInputOpen = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput then
+        updateInput(input)
+    elseif input == dragInputOpen then
+        updateInputOpen(input)
+    end
+end)
+
+local clickStart = nil
+open.MouseButton1Down:Connect(function()
+    clickStart = tick()
+end)
+
+open.MouseButton1Up:Connect(function()
+    if clickStart and (tick() - clickStart) < 0.2 and not draggingOpen then
+        panel.Visible = not panel.Visible
+    end
+    clickStart = nil
+end)
