@@ -1,4 +1,4 @@
--- bLockerman's Minesweeper, NothingNesser's Script Fix + Auto Solver Integration + Flag Range (ROBLOX)
+-- bLockerman's Minesweeper, NothingNesser's Script Fix + Auto Solver Fixed (ROBLOX)
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -62,7 +62,7 @@ local panel = n("Frame", s, {
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 700, 0, 380),  -- Diperbesar untuk menampung input baru
+    Size = u(0, 700, 0, 380),
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
@@ -83,7 +83,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "Auto Solver + Flag Range by Modified Version",
+    Text = "Auto Solver Fixed - No Delay",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
@@ -158,14 +158,14 @@ lbl("Auto Guess", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
 
 local patchedLabel = n("TextLabel", a, {
-    Text = "(Flag Range: 16 default)",
+    Text = "(Fixed: Only flag mines, click safe tiles)",
     TextSize = 11,
     TextColor3 = c(100, 255, 100),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.2, 0, 0.06, 0),
+    Size = u(0.3, 0, 0.06, 0),
     Position = u(.10693, 0, .68, 0),
     ZIndex = 5
 })
@@ -210,7 +210,7 @@ local boxPS   = txt("pspeed", "1", .16214, .79948, .07417, "1")
 local boxR    = txt("r", "100", .16214, .40403, .30729, "100")
 local boxGuessThreshold = txt("guess", "0.5", .16398, .40403, .5404, "0.5")
 local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
-local boxFlagRange = txt("flagrange", "16", .16398, .79948, .5404, "16")  -- Input baru untuk Flag Range
+local boxFlagRange = txt("flagrange", "16", .16398, .79948, .5404, "16")
 local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
 local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 
@@ -278,9 +278,44 @@ local function getDistance(part1, part2)
     return (part1.Position - part2.Position).Magnitude
 end
 
--- Fungsi untuk mengklik tile yang aman
-local function clickTile(part, playerChar, flagRange)
+-- Fungsi untuk mengecek apakah tile sudah memiliki flag
+local function hasFlag(part)
     if not part then return false end
+    
+    -- Cek children
+    for _, child in ipairs(part:GetChildren()) do
+        if child.Name:lower():find("flag") or child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            return true
+        end
+    end
+    
+    -- Cek attribute
+    if part:GetAttribute("Flagged") then
+        return true
+    end
+    
+    return false
+end
+
+-- Fungsi untuk mengecek apakah tile sudah pernah diklik
+local function hasBeenClicked(part)
+    if not part then return false end
+    return part:GetAttribute("Clicked") == true
+end
+
+-- Fungsi untuk mengklik tile yang aman (hanya jika benar-benar aman)
+local function clickSafeTile(part, playerChar, flagRange)
+    if not part then return false end
+    
+    -- Jangan klik jika sudah memiliki flag
+    if hasFlag(part) then
+        return false
+    end
+    
+    -- Jangan klik jika sudah pernah diklik
+    if hasBeenClicked(part) then
+        return false
+    end
     
     -- Cek jarak jika flagRange ditentukan
     if playerChar and flagRange and flagRange > 0 then
@@ -292,18 +327,6 @@ local function clickTile(part, playerChar, flagRange)
                 return false
             end
         end
-    end
-    
-    -- Cek apakah tile sudah memiliki flag
-    for _, child in ipairs(part:GetChildren()) do
-        if child.Name:lower():find("flag") or child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
-            return false
-        end
-    end
-    
-    -- Cek apakah sudah pernah diklik
-    if part:GetAttribute("Clicked") then
-        return false
     end
     
     -- Klik tile
@@ -318,9 +341,14 @@ local function clickTile(part, playerChar, flagRange)
     return false
 end
 
--- Fungsi untuk memberi flag dengan jarak
-local function placeFlag(part, playerChar, flagRange)
+-- Fungsi untuk memberi flag pada mine (hanya jika pasti mine)
+local function flagMine(part, playerChar, flagRange)
     if not part then return false end
+    
+    -- Cek apakah sudah memiliki flag
+    if hasFlag(part) then
+        return false
+    end
     
     -- Cek jarak
     if playerChar and flagRange and flagRange > 0 then
@@ -334,24 +362,17 @@ local function placeFlag(part, playerChar, flagRange)
         end
     end
     
-    -- Cek apakah sudah memiliki flag
-    if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
-        return false
-    end
-    
-    local flagged = part:GetAttribute("Flagged")
-    if not flagged then
-        pcall(function()
-            local args = {part}
-            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-            part:SetAttribute("Flagged", true)
-            return true
-        end)
-    end
+    -- Beri flag
+    pcall(function()
+        local args = {part}
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+        part:SetAttribute("Flagged", true)
+        return true
+    end)
     return false
 end
 
--- Fungsi utama Auto Solver (menggabungkan Run + Auto Flag + Flag Range)
+-- Fungsi utama Auto Solver dengan update cepat (tanpa delay)
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, flagRange)
     local i = state
     local j = e(t)
@@ -381,16 +402,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
     local flagRangeNum = tonumber(flagRange) or 16
     
     i.d = {
-        r = tonumber(c1) or 0.2,
+        r = 0.01,  -- Update sangat cepat (0.01 detik)
         s = tonumber(d1) or 3,
         t = f1 or Enum.Font.Arcade,
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
         ac = { 
-            on = true,  -- Auto solver selalu aktif
+            on = true,
             rad = tonumber(v1) or 20, 
-            intv = tonumber(n1) or 0.05,
+            intv = 0.01,  -- Interval cepat untuk auto click
             fspd = tonumber(boxFS.Text) or 0.05
         },
         rot = {
@@ -403,7 +424,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             on = guessOnBool,
             threshold = guessThresh
         },
-        flagRange = flagRangeNum  -- Simpan flag range
+        flagRange = flagRangeNum
     }
     
     if not j then
@@ -418,7 +439,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
     i.b = true
     
     task.spawn(function()
-        local r = i.d.r
+        local r = 0.01  -- Update rate sangat cepat (tanpa delay)
         local s2 = i.d.s
         local t2 = i.d.t
         local u2 = i.d.u
@@ -427,7 +448,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
         local ac = i.d.ac
         local rot = i.d.rot
         local guess = i.d.guess
-        local flagRange = i.d.flagRange  -- Ambil flag range
+        local flagRange = i.d.flagRange
         
         local function mkRotCtl(opt)
             local th = {}
@@ -482,7 +503,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
         
         local RotCtl = mkRotCtl(rot)
         
-        -- Auto Solver utama
         local z = 1e-4
         local A2 = 1e-6
         local A3 = { a = 0, b = nil, c = nil, d = 1, e = nil, f = nil, g = nil, h = 0, i = 0, j = nil, k = 0.5 }
@@ -494,7 +514,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
         local guiCache = {}
         local partCache = {}
         local updateThrottle = 0
-        local THROTTLE_INTERVAL = 0.05
+        local THROTTLE_INTERVAL = 0.01  -- Throttle lebih cepat
         
         local function A6()
             local parent = cg or A5
@@ -510,7 +530,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
         local function T1(sv)
             if type(sv) ~= "string" then return nil end
             local d = sv:match("(%d)")
-            return d and tonumber(d) or nil
+            return d and tonumber(d) or 0
         end
         
         local function A7(a2) 
@@ -651,8 +671,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             return b
         end
         
+        -- Fungsi utama yang dijalankan setiap update
         local function B6()
-            if not (state and state.b and state.c) then return end
+            if not (state and state.b and state.c == q) then return end
+            
             local currentTime = tick()
             if currentTime - updateThrottle < THROTTLE_INTERVAL then
                 return
@@ -661,6 +683,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             
             local L = fd()
             if not L then return end
+            
             local o0 = l.LocalPlayer
             local M = nil
             local playerChar = nil
@@ -668,6 +691,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                 playerChar = o0.Character
                 M = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
             end
+            
             if vb and u2 and u2 > 0 and not M then return end
             local N = vb and (u2 and u2 > 0 and M ~= nil)
             local O = N and (u2 * u2) or nil
@@ -675,6 +699,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             local Q = tick()
             local partsToProcess = L:GetChildren()
             
+            -- Kumpulkan semua part
             for _, R in ipairs(partsToProcess) do
                 if R:IsA("BasePart") and (R.Anchored ~= false) then
                     local S3 = false
@@ -694,23 +719,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                                 end
                                 if not W then W = X:FindFirstChild("TextLabel") end
                             end
-                            local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
-                            local Z = nil
-                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
-                            if Z then Y = true end
+                            local Y = hasFlag(R)
                             V = { a = R, b = R.Position, c = R.Size, d = (W and W:IsA("TextLabel")) and W or nil, e = Y, f = Q }
                             A4[U] = V
                         else
                             V.b = R.Position
                             V.c = R.Size
                             V.f = Q
-                            local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
-                            local Z = nil
-                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
-                            if Z then Y = true end
-                            V.e = Y
+                            V.e = hasFlag(R)
                             if not V.d then
                                 local X = R:FindFirstChild("NumberGui", true)
                                 if X then
@@ -727,7 +743,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     end
                 end
             end
+            
             if #P == 0 then return end
+            
             local a0 = {}
             local a1, a2, a3 = nil, nil, math.huge
             for _, V in ipairs(P) do
@@ -743,9 +761,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     end
                 end
             end
+            
             local Q2 = Q
             local a5 = Q2 - (A3.a or 0)
             local a6 = (a5 >= s2)
+            
             if a6 or (A3.b == nil) then
                 A3.a = Q2
                 if a1 then
@@ -762,6 +782,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     return
                 end
             end
+            
             if not A3.b or not A3.c then
                 local F0 = A6()
                 for _, G in ipairs(F0:GetChildren()) do
@@ -769,15 +790,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                 end
                 return
             end
+            
             local cpos = A3.c
             local d0 = A3.d
             local d1 = {}
             local d2, d3, d4, d5 = math.huge, -math.huge, math.huge, -math.huge
+            
             local function d6(V0)
                 local sx = tonumber(V0.c.X) or 0
                 local sz = tonumber(V0.c.Z) or 0
                 return math.abs(sx * sz)
             end
+            
             for _, V in ipairs(P) do
                 local gx = GridIndex(V.b.X - cpos.X, d0, 0.25)
                 local gy = GridIndex(V.b.Z - cpos.Z, d0, 0.25)
@@ -791,11 +815,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     d1[K3] = V
                 end
             end
+            
             d2, d3, d4, d5 = d2 - 1, d3 + 1, d4 - 1, d5 + 1
             local offGX, offGY = (d2 - 1), (d4 - 1)
             local Wc = (d3 - d2 + 1)
             local Hc = (d5 - d4 + 1)
+            
             if Wc <= 0 or Hc <= 0 then return end
+            
             local b0 = {}
             for r0 = 1, Hc do
                 b0[r0] = {}
@@ -803,6 +830,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     b0[r0][c0] = { a = "covered", b = nil, c = nil }
                 end
             end
+            
             for _, V in ipairs(a0) do
                 local gx = GridIndex(V.b.X - cpos.X, d0, 0.25)
                 local gy = GridIndex(V.b.Z - cpos.Z, d0, 0.25)
@@ -814,6 +842,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     b0[r0][c0].c = V
                 end
             end
+            
             for gx = d2, d3 do
                 for gy = d4, d5 do
                     local V = d1[B1(gx, gy)]
@@ -845,6 +874,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                 end
+                
                 local ch = true
                 while ch do
                     ch = false
@@ -891,13 +921,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                 end
+                
                 local knownTotal = (total ~= nil)
                 local rem = nil
                 if knownTotal then
                     rem = math.max((total or 0) - c2, 0)
                 end
+                
                 local vI, iV, cs = {}, {}, {}
                 local function K2(r1, c1x) return tostring(r1) .. ":" .. tostring(c1x) end
+                
                 for r0 = 1, Hn do
                     for c0 = 1, Wn do
                         if E0[r0][c0].a == "revealed" then
@@ -923,6 +956,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                 end
+                
                 local ad = {}
                 for i1 = 1, #iV do ad[i1] = {} end
                 for _, con in ipairs(cs) do
@@ -932,6 +966,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                 end
+                
                 local cId, cm = {}, {}
                 local function dfs(vd, id)
                     cId[vd] = id
@@ -941,6 +976,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         if not cId[nbv] then dfs(nbv, id) end
                     end
                 end
+                
                 local gid = 0
                 for v2 = 1, #iV do
                     if not cId[v2] then
@@ -948,6 +984,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         dfs(v2, gid)
                     end
                 end
+                
                 local gC = {}
                 for i1 = 1, gid do gC[i1] = {} end
                 for _, con in ipairs(cs) do
@@ -958,6 +995,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     end
                     if ok then gC[g][#gC[g] + 1] = con end
                 end
+                
                 local pr = {}
                 for r0 = 1, Hn do pr[r0] = {} end
                 local totalVisited = 0
@@ -1139,6 +1177,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                 end
+                
                 local gP = nil
                 if gP_den > 0 then gP = gP_acc / gP_den end
                 if knownTotal and rem then
@@ -1157,8 +1196,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
-            local bombsToFlag = {}
-            local safeTilesToClick = {}
+            local bombsToFlag = {}      -- Hanya untuk mine (probability ≥ 0.99)
+            local safeTilesToClick = {}  -- Hanya untuk tile aman (probability ≤ 0.01)
             
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
@@ -1167,32 +1206,37 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
-                                -- Check probability
                                 local v0raw = (pr[rr] and pr[rr][cc]) or gP
                                 if v0raw then
                                     local v0 = A7(v0raw)
                                     if tonumber(v0) then
                                         if v0 >= 0.99 then
-                                            -- Definitely a bomb, add to flag list
+                                            -- PASTI MINE (≥ 99%)
                                             local cellData = b0[rr][cc]
                                             if cellData and cellData.c and cellData.c.a then
-                                                table.insert(bombsToFlag, {
-                                                    part = cellData.c.a,
-                                                    row = rr,
-                                                    col = cc,
-                                                    prob = v0
-                                                })
+                                                -- Hanya tambahkan jika belum memiliki flag
+                                                if not hasFlag(cellData.c.a) then
+                                                    table.insert(bombsToFlag, {
+                                                        part = cellData.c.a,
+                                                        row = rr,
+                                                        col = cc,
+                                                        prob = v0
+                                                    })
+                                                end
                                             end
                                         elseif v0 <= 0.01 then
-                                            -- Definitely safe, add to click list
+                                            -- PASTI AMAN (≤ 1%)
                                             local cellData = b0[rr][cc]
                                             if cellData and cellData.c and cellData.c.a then
-                                                table.insert(safeTilesToClick, {
-                                                    part = cellData.c.a,
-                                                    row = rr,
-                                                    col = cc,
-                                                    prob = v0
-                                                })
+                                                -- Hanya tambahkan jika belum diklik dan tidak memiliki flag
+                                                if not hasBeenClicked(cellData.c.a) and not hasFlag(cellData.c.a) then
+                                                    table.insert(safeTilesToClick, {
+                                                        part = cellData.c.a,
+                                                        row = rr,
+                                                        col = cc,
+                                                        prob = v0
+                                                    })
+                                                end
                                             end
                                         end
                                     end
@@ -1203,54 +1247,50 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                 end
             end
             
-            -- Auto Flag: Place flags on detected bombs dengan mempertimbangkan jarak
+            -- FLAG MINES: Hanya flag tile yang PASTI MINE (≥ 99%)
             if #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
                     if part and part.Parent then
-                        -- Place flag dengan mempertimbangkan flag range
-                        local success = placeFlag(part, playerChar, flagRange)
-                        if success then
-                            task.wait(flagSpeed)
-                        end
+                        -- Flag mine (hanya jika pasti mine)
+                        flagMine(part, playerChar, flagRange)
+                        -- Tidak perlu wait, langsung lanjut
                     end
                 end
             end
             
-            -- Auto Click: Click on safe tiles dengan mempertimbangkan jarak
+            -- CLICK SAFE TILES: Hanya klik tile yang PASTI AMAN (≤ 1%)
             if #safeTilesToClick > 0 then
-                -- Sort by probability (lowest first - safest)
+                -- Urutkan dari yang paling aman (probability terendah)
                 table.sort(safeTilesToClick, function(a, b) return a.prob < b.prob end)
                 
                 for _, safeData in ipairs(safeTilesToClick) do
                     local part = safeData.part
                     if part and part.Parent then
-                        local clicked = clickTile(part, playerChar, flagRange)
+                        local clicked = clickSafeTile(part, playerChar, flagRange)
                         if clicked then
                             -- Berhenti setelah mengklik satu tile safe
                             break
                         end
-                        task.wait(ac.intv)
                     end
                 end
             else
-                -- Tidak ada tile yang pasti safe, cek apakah Auto Guess aktif
+                -- TIDAK ADA TILE PASTI AMAN, cek Auto Guess jika aktif
                 if guess.on and gP then
-                    -- Cari tile dengan probability terendah yang masih dalam jangkauan
+                    -- Cari tile dengan probability terendah
                     local lowestProb = 1
                     local bestTile = nil
                     
                     for r0 = 1, Hc do
                         for c0 = 1, Wc do
-                            if b0[r0][c0].a == "covered" then
+                            if b0[r0][c0].a == "covered" and not hasFlag(b0[r0][c0].c and b0[r0][c0].c.a) then
                                 local v0raw = (pr[r0] and pr[r0][c0]) or gP
                                 if v0raw then
                                     local v0 = A7(v0raw)
                                     if v0 < lowestProb then
                                         local cellData = b0[r0][c0]
                                         if cellData and cellData.c and cellData.c.a then
-                                            -- Cek jarak sebelum mempertimbangkan
+                                            -- Cek jarak
                                             local part = cellData.c.a
                                             if playerChar and flagRange and flagRange > 0 then
                                                 local root = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
@@ -1272,13 +1312,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                         end
                     end
                     
-                    -- Jika probability di bawah threshold, klik tile
-                    if bestTile and lowestProb <= guess.threshold then
-                        clickTile(bestTile, playerChar, flagRange)
+                    -- Jika probability di bawah threshold, klik tile (GUESS)
+                    if bestTile and lowestProb <= guess.threshold and not hasBeenClicked(bestTile) and not hasFlag(bestTile) then
+                        clickSafeTile(bestTile, playerChar, flagRange)
                     end
                 end
             end
             
+            -- Update GUI (visualisasi probability)
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1291,6 +1332,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
                     if p3 and p3:IsA("BasePart") then
                         local draw
                         if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
+                        
                         if d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                         elseif d8.a == "covered" and draw then
@@ -1346,18 +1388,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, f
             A3.j, A3.k = pr, gP
         end
         
-        pcall(B6)
+        -- Loop utama dengan update sangat cepat (tanpa delay)
         while state and state.b and state.c == q do
-            task.wait(r)
             pcall(B6)
-            local now = tick()
-            if now % 3 < 0.1 then
-                for id, V in pairs(A4) do
-                    if (now - (V.f or 0)) > 10 then
-                        A4[id] = nil
-                    end
-                end
-            end
+            task.wait()  -- Yield ke thread lain, tapi tetap cepat
         end
         
         if not state or state.c == q then 
@@ -1447,7 +1481,7 @@ local function pushState()
     local guessOn = btnBool(btnAutoGuess)
     local gt  = boxGuessThreshold and tonum(boxGuessThreshold.Text) or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
-    local fr  = boxFlagRange and tonum(boxFlagRange.Text) or 16  -- Ambil nilai flag range
+    local fr  = boxFlagRange and tonum(boxFlagRange.Text) or 16
     local roOn = btnBool(btnRot)
     
     if sOn == false then
@@ -1455,7 +1489,6 @@ local function pushState()
         return
     end
     
-    -- Panggil fungsi S dengan parameter flag range
     callS(false)
     callS(sOn, m, us, ps, fe, r2, rOn, aOn, fs, fs, roOn, gt, guessOn, fr)
 end
@@ -1490,7 +1523,7 @@ bindBox(boxPS)
 bindBox(boxR)
 bindBox(boxGuessThreshold)
 bindBox(boxFS)
-bindBox(boxFlagRange)  -- Bind box flag range
+bindBox(boxFlagRange)
 bindBox(boxText)
 
 local dragging = false
