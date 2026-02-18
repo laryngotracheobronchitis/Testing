@@ -1,16 +1,15 @@
--- bLockerman's Minesweeper Auto Solver - Combined Edition
--- Run + Auto Flag Combined | All systems preserved
-
+-- bLockerman's Minesweeper, NothingNesser's Script Fix + Auto Solver Integration + Flag Range (ROBLOX)
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
+    -- warn("nice game")
 end
 
 local v1 = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
 
-if v1:GetAttribute("loaded") then
+if v1:GetAttribute("gay") then
     return
 end
 
-v1:SetAttribute("loaded", true)
+v1:SetAttribute("gay", true)
 
 task.spawn(function() task.wait(0) end)
 
@@ -63,14 +62,14 @@ local panel = n("Frame", s, {
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 308),
+    Size = u(0, 700, 0, 380),  -- Diperbesar untuk menampung input baru
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
 })
 
 n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
-n("UIAspectRatioConstraint", panel, { AspectRatio = 1.95 })
+n("UIAspectRatioConstraint", panel, { AspectRatio = 1.84 })
 
 local a = n("Frame", panel, {
     BorderSizePixel = 0,
@@ -84,15 +83,15 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "Auto Solver - Run + Flag Combined | Range Optional",
+    Text = "Auto Solver + Flag Range by Modified Version",
     TextSize = 18,
-    TextColor3 = c(100, 255, 100),
+    TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.45, 0, 0.08, 0),
-    Position = u(0.53, 0, 0.01, 0),
+    Size = u(0.4, 0, 0.08, 0),
+    Position = u(0.58, 0, 0.01, 0),
     ZIndex = 10
 })
 
@@ -114,11 +113,11 @@ local function ico(name, y)
     return i
 end
 
--- Reordered: Combined Run+Flag, Range (optional), Rotation (optional), Guess (optional)
-local btnScript = ico("script", .14419)    -- Combined Run + Auto Flag (MAIN)
-local btnRange  = ico("range", .37886)      -- Visual Range (optional)
-local btnRot    = ico("rotation", .84818)   -- Rotation (optional)
-local btnGuess  = ico("guess", .61352)      -- Auto Guess (optional - NEW)
+local btnRange  = ico("range", .37886)
+local btnAutoSolver = ico("autosolver", .61352)
+local btnAutoGuess = ico("autoguess", .74867)
+local btnScript = ico("script", .14419)
+local btnRot    = ico("rotation", .84818)
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -153,20 +152,20 @@ local function lbl(txt, sx, py, pt, pb)
     return L
 end
 
-lbl("Run+Flag", .2796, .05033, .06, .15)
-lbl("Visual", .29895, .28344, .07, .13)
-lbl("Guess", .2796, .51656, .08, .12)
+lbl("Auto Solver", .2796, .05033, .06, .15)
+lbl("Range", .29895, .28344, .07, .13)
+lbl("Auto Guess", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
 
-local statusLabel = n("TextLabel", a, {
-    Text = "Ready - Toggle Run+Flag to start",
+local patchedLabel = n("TextLabel", a, {
+    Text = "(Flag Range: 16 default)",
     TextSize = 11,
     TextColor3 = c(100, 255, 100),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.35, 0, 0.06, 0),
+    Size = u(0.2, 0, 0.06, 0),
     Position = u(.10693, 0, .68, 0),
     ZIndex = 5
 })
@@ -206,15 +205,14 @@ local function txt(name, ph, sx, px, py, txtv)
     return t
 end
 
--- Inputs: Max, Update Speed, Process Speed, Visual Range, Flag Range, Flag Speed, Font, Guess Threshold
 local boxMax  = txt("max", "5000", .16214, .40588, .07417, "5000")
-local boxUS   = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 local boxPS   = txt("pspeed", "1", .16214, .79948, .07417, "1")
 local boxR    = txt("r", "100", .16214, .40403, .30729, "100")
-local boxF    = txt("f", "16", .16398, .40403, .5404, "16")
+local boxGuessThreshold = txt("guess", "0.5", .16398, .40403, .5404, "0.5")
 local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
+local boxFlagRange = txt("flagrange", "16", .16398, .79948, .5404, "16")  -- Input baru untuk Flag Range
 local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
-local boxGuess = txt("guess", "50", .16398, .79948, .5404, "50") -- Guess threshold %
+local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 
 local img = n("ImageLabel", a, {
     ZIndex = 9,
@@ -239,7 +237,7 @@ n("TextLabel", img, {
     BackgroundTransparency = 1,
     Size = u(.41045, 0, .0969, 0),
     BorderColor3 = c(0, 0, 0),
-    Text = "SOLVER",
+    Text = "Auto Solver",
     Rotation = -5,
     Position = u(.56212, 0, .14326, 0)
 })
@@ -263,7 +261,7 @@ n("ImageLabel", a, {
 })
 
 local B = "Flags status"
-local state = { b = false, c = 0, d = nil, guessEnabled = false, guessThreshold = 50 }
+local state = { b = false, c = 0, d = nil }
 
 local function e(vv)
     if type(vv) == "boolean" then return vv end
@@ -274,9 +272,90 @@ local function e(vv)
     return vv and true or false
 end
 
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
+-- Fungsi untuk mengecek jarak antara dua part
+local function getDistance(part1, part2)
+    if not part1 or not part2 then return math.huge end
+    return (part1.Position - part2.Position).Magnitude
+end
+
+-- Fungsi untuk mengklik tile yang aman
+local function clickTile(part, playerChar, flagRange)
+    if not part then return false end
+    
+    -- Cek jarak jika flagRange ditentukan
+    if playerChar and flagRange and flagRange > 0 then
+        local root = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
+        if root then
+            local dist = getDistance(part, root)
+            if dist > flagRange then
+                -- Tile terlalu jauh, skip
+                return false
+            end
+        end
+    end
+    
+    -- Cek apakah tile sudah memiliki flag
+    for _, child in ipairs(part:GetChildren()) do
+        if child.Name:lower():find("flag") or child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            return false
+        end
+    end
+    
+    -- Cek apakah sudah pernah diklik
+    if part:GetAttribute("Clicked") then
+        return false
+    end
+    
+    -- Klik tile
+    local cd = part:FindFirstChildOfClass("ClickDetector", true)
+    if cd then
+        pcall(function()
+            fireclickdetector(cd)
+            part:SetAttribute("Clicked", true)
+            return true
+        end)
+    end
+    return false
+end
+
+-- Fungsi untuk memberi flag dengan jarak
+local function placeFlag(part, playerChar, flagRange)
+    if not part then return false end
+    
+    -- Cek jarak
+    if playerChar and flagRange and flagRange > 0 then
+        local root = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
+        if root then
+            local dist = getDistance(part, root)
+            if dist > flagRange then
+                -- Tile terlalu jauh, skip
+                return false
+            end
+        end
+    end
+    
+    -- Cek apakah sudah memiliki flag
+    if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
+        return false
+    end
+    
+    local flagged = part:GetAttribute("Flagged")
+    if not flagged then
+        pcall(function()
+            local args = {part}
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+            part:SetAttribute("Flagged", true)
+            return true
+        end)
+    end
+    return false
+end
+
+-- Fungsi utama Auto Solver (menggabungkan Run + Auto Flag + Flag Range)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessThreshold, guessOn, flagRange)
     local i = state
     local j = e(t)
+    
     local function k()
         local cg = game.CoreGui
         if cg then
@@ -284,6 +363,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             if p0 then p0:Destroy() end
         end
     end
+    
+    -- Parse rotation options
     local rotOn, rotOpt
     if type(y1) == "table" then
         rotOn = e(y1.on == nil and true or y1.on)
@@ -292,9 +373,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
         rotOn = e(y1)
     end
     
-    -- Store guess settings
-    i.guessEnabled = e(guessOn)
-    i.guessThreshold = tonumber(guessThresh) or 50
+    -- Parse auto guess
+    local guessOnBool = e(guessOn)
+    local guessThresh = tonumber(guessThreshold) or 0.5
+    
+    -- Parse flag range (default 16)
+    local flagRangeNum = tonumber(flagRange) or 16
     
     i.d = {
         r = tonumber(c1) or 0.2,
@@ -303,31 +387,35 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { on = e(x1), rad = tonumber(v1) or 16, intv = tonumber(n1) or 0.05 },
+        ac = { 
+            on = true,  -- Auto solver selalu aktif
+            rad = tonumber(v1) or 20, 
+            intv = tonumber(n1) or 0.05,
+            fspd = tonumber(boxFS.Text) or 0.05
+        },
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
             tN = math.max(1, tonumber(rotOpt and rotOpt.tN or 1)),
             uR = (rotOpt and rotOpt.uR == false) and false or true
-        }
+        },
+        guess = {
+            on = guessOnBool,
+            threshold = guessThresh
+        },
+        flagRange = flagRangeNum  -- Simpan flag range
     }
+    
     if not j then
         i.c = i.c + 1
         i.b = false
         k()
         return
     end
+    
     i.c = i.c + 1
     local q = i.c
     i.b = true
-    
-    -- Update status
-    pcall(function()
-        if statusLabel then
-            statusLabel.Text = "Running - Solver Active"
-            statusLabel.TextColor3 = c(100, 255, 100)
-        end
-    end)
     
     task.spawn(function()
         local r = i.d.r
@@ -338,8 +426,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
         local w2 = i.d.w
         local ac = i.d.ac
         local rot = i.d.rot
-        local guessMode = i.guessEnabled
-        local guessThresh = i.guessThreshold / 100
+        local guess = i.d.guess
+        local flagRange = i.d.flagRange  -- Ambil flag range
         
         local function mkRotCtl(opt)
             local th = {}
@@ -391,57 +479,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             end
             return { add = add, stop = stop }
         end
+        
         local RotCtl = mkRotCtl(rot)
         
-        -- AUTO FLAG SYSTEM - Always active when Run is on (combined)
-        if ac.on then
-            task.spawn(function()
-                local l = game:GetService("Players")
-                while state and state.b and state.c == q and ac.on do
-                    local lp = l.LocalPlayer
-                    local char = lp and lp.Character
-                    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-                    local cg = game.CoreGui
-                    pcall(function()
-                        cg = game:FindFirstChildOfClass("CoreGui") or game:GetService("CoreGui")
-                    end)
-                    local overlays = cg and cg:FindFirstChild(B)
-                    if root and overlays then
-                        for _, sg2 in ipairs(overlays:GetChildren()) do
-                            if sg2:IsA("SurfaceGui") and sg2.Adornee and sg2.Adornee:IsA("BasePart") then
-                                local lbl = sg2:FindFirstChild("ValueText")
-                                if lbl and lbl:IsA("TextLabel") and lbl.Text == utf8.char(0x1F4A5) then
-                                    local part = sg2.Adornee
-                                    if (part.Position - root.Position).Magnitude <= ac.rad then
-                                        local isFlagged = false
-                                        for _, child in ipairs(part:GetChildren()) do
-                                            if child.Name:lower():find("flag") or child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
-                                                isFlagged = true
-                                                break
-                                            end
-                                        end
-                                        if not isFlagged then
-                                            local cd = part:FindFirstChildOfClass("ClickDetector", true)
-                                            if cd then
-                                                local alreadyClicked = part:GetAttribute("AutoClicked")
-                                                if not alreadyClicked then
-                                                    pcall(function()
-                                                        fireclickdetector(cd)
-                                                        part:SetAttribute("AutoClicked", true)
-                                                    end)
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    task.wait(ac.intv)
-                end
-            end)
-        end
-        
+        -- Auto Solver utama
         local z = 1e-4
         local A2 = 1e-6
         local A3 = { a = 0, b = nil, c = nil, d = 1, e = nil, f = nil, g = nil, h = 0, i = 0, j = nil, k = 0.5 }
@@ -465,16 +506,47 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             end
             return p2
         end
+        
         local function T1(sv)
             if type(sv) ~= "string" then return nil end
             local d = sv:match("(%d)")
             return d and tonumber(d) or nil
         end
-        local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
-        local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
-        local function A9(a2) if a2 >= 0 then return math.floor(a2 + 0.5 + z) else return math.ceil(a2 - 0.5 - z) end end
-        local function B0(r0, c0) return tostring(r0) .. ":" .. tostring(c0) end
-        local function B1(gx, gy) return tostring(gx) .. ":" .. tostring(gy) end
+        
+        local function A7(a2) 
+            a2 = tonumber(a2) or 0 
+            if a2 < 0 then return 0 
+            elseif a2 > 1 then return 1 
+            else return a2 end 
+        end
+        
+        local function A8(pv) 
+            pv = A7(pv) 
+            if pv <= 0.5 then 
+                local q0 = pv / 0.5 
+                return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) 
+            else 
+                local q0 = (pv - 0.5) / 0.5 
+                return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) 
+            end 
+        end
+        
+        local function A9(a2) 
+            if a2 >= 0 then 
+                return math.floor(a2 + 0.5 + z) 
+            else 
+                return math.ceil(a2 - 0.5 - z) 
+            end 
+        end
+        
+        local function B0(r0, c0) 
+            return tostring(r0) .. ":" .. tostring(c0) 
+        end
+        
+        local function B1(gx, gy) 
+            return tostring(gx) .. ":" .. tostring(gy) 
+        end
+        
         local function B3(r0, c0, Hn, Wn)
             local o0, i1 = {}, 1
             for dr = -1, 1 do
@@ -490,7 +562,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             end
             return o0
         end
-        local function B4(p0) return tostring(p0:GetDebugId()) end
+        
+        local function B4(p0) 
+            return tostring(p0:GetDebugId()) 
+        end
+        
         local function B5(Fo, part, G)
             if not (part and part:IsA("BasePart")) then return nil end
             local H = B4(part)
@@ -542,6 +618,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             end
             return I, J
         end
+        
         local function GridIndex(vDelta, cell, tol)
             tol = math.clamp(tol or .25, 0, .49)
             local raw = vDelta / cell
@@ -551,6 +628,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             end
             return idx
         end
+        
         local function fd()
             local w=game:GetService("Workspace")
             local d=w:FindFirstChild("Flag")
@@ -573,48 +651,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             return b
         end
         
-        -- Safe teleport function
-        local function safeTeleport(safeTiles, playerRoot)
-            if not safeTiles or #safeTiles == 0 or not playerRoot then return false end
-            
-            table.sort(safeTiles, function(a, b)
-                local distA = (a.Position - playerRoot.Position).Magnitude
-                local distB = (b.Position - playerRoot.Position).Magnitude
-                return distA < distB
-            end)
-            
-            for _, tile in ipairs(safeTiles) do
-                if tile.Prob <= 0.01 then
-                    pcall(function()
-                        playerRoot.CFrame = CFrame.new(tile.Position + Vector3.new(0, 3.5, 0))
-                    end)
-                    return true, tile
-                end
-            end
-            return false, nil
-        end
-        
-        -- Auto click function
-        local function autoClick(tile)
-            if not tile or not tile.Part then return end
-            local part = tile.Part
-            if not part.Parent then return end
-            
-            local cd = part:FindFirstChildOfClass("ClickDetector", true)
-            if not cd then return end
-            
-            local alreadyClicked = part:GetAttribute("AutoClicked")
-            if alreadyClicked then return end
-            
-            pcall(function()
-                fireclickdetector(cd)
-                part:SetAttribute("AutoClicked", true)
-            end)
-        end
-        
-        local lastTeleportTime = 0
-        local TELEPORT_COOLDOWN = 0.5
-        
         local function B6()
             if not (state and state.b and state.c) then return end
             local currentTime = tick()
@@ -625,16 +661,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
             
             local L = fd()
             if not L then return end
-            
-            -- Get player root for teleport
-            local lp = l.LocalPlayer
-            local char = lp and lp.Character
-            local playerRoot = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-            
             local o0 = l.LocalPlayer
             local M = nil
+            local playerChar = nil
             if o0 and o0.Character then
-                M = o0.Character:FindFirstChild("HumanoidRootPart") or o0.Character:FindFirstChild("Torso")
+                playerChar = o0.Character
+                M = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
             end
             if vb and u2 and u2 > 0 and not M then return end
             local N = vb and (u2 and u2 > 0 and M ~= nil)
@@ -797,6 +829,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     end
                 end
             end
+            
             local function B3n(E0, Wn, Hn, total, cfg)
                 cfg = cfg or {}
                 local x0 = cfg.maxClusterSize or w2.x
@@ -928,6 +961,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                 local pr = {}
                 for r0 = 1, Hn do pr[r0] = {} end
                 local totalVisited = 0
+                
                 local function topo(vars, cons, map, out)
                     for _, con in ipairs(cons) do
                         if not con.vars or #con.vars ~= 2 or con.need ~= 1 then return false end
@@ -985,6 +1019,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     end
                     return true
                 end
+                
                 local function back(vars, cons)
                     local V = #vars
                     local cnt, sols = {}, 0
@@ -1043,6 +1078,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     rec(1)
                     return cnt, sols
                 end
+                
                 local function soft(vars, cons)
                     local sum, ct, totNeed, totUndec = {}, {}, 0, 0
                     for _, con in ipairs(cons) do
@@ -1069,6 +1105,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     end
                     return out, avg
                 end
+                
                 local gP_acc, gP_den = 0, 0
                 for gi = 1, #cm do
                     local vars, cons = cm[gi], gC[gi] or {}
@@ -1115,136 +1152,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                 end
                 return { a = pr, b = gP, c = Wn, d = Hn }
             end
+            
             local d9 = B3n(b0, Wc, Hc, nil, { maxClusterSize = w2.x, hardCapNodes = w2.y })
             local pr = d9.a or {}
             local gP = d9.b
-            
-            -- Collect tiles for actions
-            local safeTiles = {}
-            local bombTiles = {}
-            local riskyTiles = {}
-            
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    if b0[r0][c0].a == "covered" then
-                        local cellData = b0[r0][c0]
-                        local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                        
-                        if v0raw then
-                            local v0 = A7(v0raw)
-                            if tonumber(v0) then
-                                if v0 >= 0.99 then
-                                    table.insert(bombTiles, {
-                                        Part = cellData.c.a,
-                                        Position = cellData.c.b,
-                                        Row = r0,
-                                        Col = c0,
-                                        Prob = v0
-                                    })
-                                elseif v0 <= 0.01 then
-                                    table.insert(safeTiles, {
-                                        Part = cellData.c.a,
-                                        Position = cellData.c.b,
-                                        Row = r0,
-                                        Col = c0,
-                                        Prob = v0
-                                    })
-                                else
-                                    table.insert(riskyTiles, {
-                                        Part = cellData.c.a,
-                                        Position = cellData.c.b,
-                                        Row = r0,
-                                        Col = c0,
-                                        Prob = v0
-                                    })
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- Auto Flag Bombs
-            for _, bomb in ipairs(bombTiles) do
-                local part = bomb.Part
-                if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                    if not part:GetAttribute("Flagged") then
-                        task.spawn(function()
-                            pcall(function()
-                                local args = {part}
-                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-                                part:SetAttribute("Flagged", true)
-                            end)
-                        end)
-                    end
-                end
-            end
-            
-            -- Auto Teleport and Click Safe Tiles
-            if #safeTiles > 0 and playerRoot then
-                local canTeleport = (tick() - lastTeleportTime) > TELEPORT_COOLDOWN
-                if canTeleport then
-                    local teleported, target = safeTeleport(safeTiles, playerRoot)
-                    if teleported then
-                        lastTeleportTime = tick()
-                        
-                        -- Click the tile we teleported to
-                        task.delay(0.2, function()
-                            autoClick(target)
-                        end)
-                        
-                        -- Click other safe tiles
-                        task.delay(0.4, function()
-                            for _, t in ipairs(safeTiles) do
-                                if t.Part ~= target.Part then
-                                    autoClick(t)
-                                end
-                            end
-                        end)
-                    end
-                end
-            end
-            
-            -- Guess Mode: If no safe tiles and guess enabled, pick lowest risk
-            if #safeTiles == 0 and guessMode and #riskyTiles > 0 and playerRoot then
-                table.sort(riskyTiles, function(a, b) return a.Prob < b.Prob end)
-                local bestGuess = riskyTiles[1]
-                
-                if bestGuess.Prob <= guessThresh then
-                    local canTeleport = (tick() - lastTeleportTime) > TELEPORT_COOLDOWN
-                    if canTeleport then
-                        pcall(function()
-                            playerRoot.CFrame = CFrame.new(bestGuess.Position + Vector3.new(0, 3.5, 0))
-                        end)
-                        lastTeleportTime = tick()
-                        
-                        task.delay(0.3, function()
-                            autoClick(bestGuess)
-                        end)
-                    end
-                end
-            end
-            
-            -- Update status text
-            pcall(function()
-                if statusLabel then
-                    if #safeTiles > 0 then
-                        statusLabel.Text = "Safe: " .. #safeTiles .. " | Bombs: " .. #bombTiles
-                        statusLabel.TextColor3 = c(100, 255, 100)
-                    elseif guessMode and #riskyTiles > 0 then
-                        statusLabel.Text = "GUESS MODE - Risky: " .. #riskyTiles
-                        statusLabel.TextColor3 = c(255, 200, 100)
-                    elseif #riskyTiles > 0 then
-                        statusLabel.Text = "No safe tiles - Stuck"
-                        statusLabel.TextColor3 = c(255, 100, 100)
-                    else
-                        statusLabel.Text = "Running - Waiting..."
-                        statusLabel.TextColor3 = c(150, 150, 150)
-                    end
-                end
-            end)
-            
             local da = {}
+            local bombsToFlag = {}
+            local safeTilesToClick = {}
+            
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1252,8 +1167,114 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                                -- Check probability
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) then
+                                        if v0 >= 0.99 then
+                                            -- Definitely a bomb, add to flag list
+                                            local cellData = b0[rr][cc]
+                                            if cellData and cellData.c and cellData.c.a then
+                                                table.insert(bombsToFlag, {
+                                                    part = cellData.c.a,
+                                                    row = rr,
+                                                    col = cc,
+                                                    prob = v0
+                                                })
+                                            end
+                                        elseif v0 <= 0.01 then
+                                            -- Definitely safe, add to click list
+                                            local cellData = b0[rr][cc]
+                                            if cellData and cellData.c and cellData.c.a then
+                                                table.insert(safeTilesToClick, {
+                                                    part = cellData.c.a,
+                                                    row = rr,
+                                                    col = cc,
+                                                    prob = v0
+                                                })
+                                            end
+                                        end
+                                    end
+                                end
                             end
                         end
+                    end
+                end
+            end
+            
+            -- Auto Flag: Place flags on detected bombs dengan mempertimbangkan jarak
+            if #bombsToFlag > 0 then
+                local flagSpeed = ac.fspd or 0.05
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData.part
+                    if part and part.Parent then
+                        -- Place flag dengan mempertimbangkan flag range
+                        local success = placeFlag(part, playerChar, flagRange)
+                        if success then
+                            task.wait(flagSpeed)
+                        end
+                    end
+                end
+            end
+            
+            -- Auto Click: Click on safe tiles dengan mempertimbangkan jarak
+            if #safeTilesToClick > 0 then
+                -- Sort by probability (lowest first - safest)
+                table.sort(safeTilesToClick, function(a, b) return a.prob < b.prob end)
+                
+                for _, safeData in ipairs(safeTilesToClick) do
+                    local part = safeData.part
+                    if part and part.Parent then
+                        local clicked = clickTile(part, playerChar, flagRange)
+                        if clicked then
+                            -- Berhenti setelah mengklik satu tile safe
+                            break
+                        end
+                        task.wait(ac.intv)
+                    end
+                end
+            else
+                -- Tidak ada tile yang pasti safe, cek apakah Auto Guess aktif
+                if guess.on and gP then
+                    -- Cari tile dengan probability terendah yang masih dalam jangkauan
+                    local lowestProb = 1
+                    local bestTile = nil
+                    
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            if b0[r0][c0].a == "covered" then
+                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if v0 < lowestProb then
+                                        local cellData = b0[r0][c0]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            -- Cek jarak sebelum mempertimbangkan
+                                            local part = cellData.c.a
+                                            if playerChar and flagRange and flagRange > 0 then
+                                                local root = playerChar:FindFirstChild("HumanoidRootPart") or playerChar:FindFirstChild("Torso")
+                                                if root then
+                                                    local dist = getDistance(part, root)
+                                                    if dist <= flagRange then
+                                                        lowestProb = v0
+                                                        bestTile = part
+                                                    end
+                                                end
+                                            else
+                                                lowestProb = v0
+                                                bestTile = part
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Jika probability di bawah threshold, klik tile
+                    if bestTile and lowestProb <= guess.threshold then
+                        clickTile(bestTile, playerChar, flagRange)
                     end
                 end
             end
@@ -1298,6 +1319,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     end
                 end
             end
+            
             for _, update in ipairs(guiUpdates) do
                 local I, J = B5(F0, update.part, G)
                 if I and J then
@@ -1309,6 +1331,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     end
                 end
             end
+            
             for _, I in ipairs(F0:GetChildren()) do
                 local K0 = lastSeenRun[I]
                 local alive = I.Adornee and I.Adornee.Parent
@@ -1317,10 +1340,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                     I:Destroy()
                 end
             end
+            
             A3.f, A3.g = d1, b0
             A3.h, A3.i = Wc, Hc
             A3.j, A3.k = pr, gP
         end
+        
         pcall(B6)
         while state and state.b and state.c == q do
             task.wait(r)
@@ -1334,17 +1359,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh)
                 end
             end
         end
+        
         if not state or state.c == q then 
             k()
             for k in pairs(guiCache) do
                 guiCache[k] = nil
             end
-            pcall(function()
-                if statusLabel then
-                    statusLabel.Text = "Stopped"
-                    statusLabel.TextColor3 = c(255, 100, 100)
-                end
-            end)
         end
     end)
 end
@@ -1406,8 +1426,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
--- ALL OFF BY DEFAULT
-local toggles = { btnScript, btnRange, btnRot, btnGuess }
+local toggles = { btnScript, btnRange, btnAutoSolver, btnAutoGuess, btnRot }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1424,20 +1443,21 @@ local function pushState()
     local fe  = boxText and parseFont(boxText.Text) or nil
     local r2  = boxR    and tonum(boxR.Text)    or nil
     local rOn = btnBool(btnRange)
-    -- Auto Flag is ALWAYS ON when Run is ON (combined)
-    local aOn = sOn -- Auto Flag tied to Run
-    local f2  = boxF    and tonum(boxF.Text)    or nil
+    local aOn = btnBool(btnAutoSolver)
+    local guessOn = btnBool(btnAutoGuess)
+    local gt  = boxGuessThreshold and tonum(boxGuessThreshold.Text) or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
+    local fr  = boxFlagRange and tonum(boxFlagRange.Text) or 16  -- Ambil nilai flag range
     local roOn = btnBool(btnRot)
-    local guessOn = btnBool(btnGuess)
-    local guessThresh = boxGuess and tonum(boxGuess.Text) or 50
     
     if sOn == false then
         callS(false)
         return
     end
+    
+    -- Panggil fungsi S dengan parameter flag range
     callS(false)
-    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessOn, guessThresh)
+    callS(sOn, m, us, ps, fe, r2, rOn, aOn, fs, fs, roOn, gt, guessOn, fr)
 end
 
 local function bindToggle(bx)
@@ -1452,8 +1472,9 @@ end
 
 bindToggle(btnScript)
 bindToggle(btnRange)
+bindToggle(btnAutoSolver)
+bindToggle(btnAutoGuess)
 bindToggle(btnRot)
-bindToggle(btnGuess)
 
 local function bindBox(tb)
     if not tb then return end
@@ -1467,10 +1488,10 @@ bindBox(boxMax)
 bindBox(boxUS)
 bindBox(boxPS)
 bindBox(boxR)
-bindBox(boxF)
+bindBox(boxGuessThreshold)
 bindBox(boxFS)
+bindBox(boxFlagRange)  -- Bind box flag range
 bindBox(boxText)
-bindBox(boxGuess)
 
 local dragging = false
 local dragInput, dragStart, startPos
@@ -1494,10 +1515,10 @@ local function updateInputOpen(input)
     if draggingOpen then
         local delta = input.Position - dragStartOpen
         open.Position = UDim2.new(
-                        openStartPos.X.Scale,
-            openStartPos.X.Offset + delta.X,
-            openStartPos.Y.Scale,
-            openStartPos.Y.Offset + delta.Y
+            startPosOpen.X.Scale,
+            startPosOpen.X.Offset + delta.X,
+            startPosOpen.Y.Scale,
+            startPosOpen.Y.Offset + delta.Y
         )
     end
 end
@@ -1524,8 +1545,8 @@ end)
 open.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingOpen = true
-        openDragStart = input.Position
-        openStartPos = open.Position
+        dragStartOpen = input.Position
+        startPosOpen = open.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 draggingOpen = false
