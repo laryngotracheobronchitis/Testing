@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED: Sistem deteksi corner dari Minesweeper.lua, Scroll UI untuk Auto Guess
+-- MODIFIED: UI SAMA PERSIS, hanya menambahkan deteksi corner dari Minesweeper.lua
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -58,55 +58,41 @@ local open = n("TextButton", s, {
 n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
 n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
 
--- PANEL UTAMA DENGAN SCROLLING
+-- PANEL dengan ukuran ORIGINAL (308 height)
 local panel = n("Frame", s, {
     Visible = false,
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 400),  -- Tinggi ditambah untuk scroll
+    Size = u(0, 600, 0, 308),
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
 })
 
 n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
+n("UIAspectRatioConstraint", panel, { AspectRatio = 1.95 })
 
--- SCROLLING FRAME
-local scrollingFrame = n("ScrollingFrame", panel, {
-    Size = u(1, 0, 1, 0),
-    BackgroundColor3 = c(20, 20, 20),
-    BackgroundTransparency = 0,
-    BorderSizePixel = 0,
-    ScrollBarThickness = 8,
-    ScrollBarImageColor3 = c(100, 100, 100),
-    CanvasSize = u(0, 0, 0, 600),  -- Canvas lebih besar
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    ScrollingDirection = Enum.ScrollingDirection.Y
-})
-
-n("UICorner", scrollingFrame, { CornerRadius = UDim.new(.05, 0) })
-
-local a = n("Frame", scrollingFrame, {
+local a = n("Frame", panel, {
     BorderSizePixel = 0,
     BackgroundColor3 = c(20, 20, 20),
-    Size = u(1, -20, 0, 580),  -- Tinggi total konten
-    Position = u(0, 10, 0, 10),
-    BorderColor3 = c(0, 0, 0),
-    AutomaticSize = Enum.AutomaticSize.Y
+    AnchorPoint = v(.5, .5),
+    Size = u(.99, 0, .99, 0),
+    Position = u(.5, 0, .505, 0),
+    BorderColor3 = c(0, 0, 0)
 })
 
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "Fixed with corner detection + Scroll UI",
+    Text = "fixed by n4vq (STILL IN DEVELOPMENT, EXPECT BUGS) and Auto Flag is still beta maybe by yar",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.35, 0, 0.05, 0),
+    Size = u(0.35, 0, 0.08, 0),
     Position = u(0.63, 0, 0.01, 0),
     ZIndex = 10
 })
@@ -119,7 +105,7 @@ local function ico(name, y)
         AnchorPoint = v(.5, .5),
         Image = "rbxassetid://16167594452",
         ImageRectSize = v(90, 90),
-        Size = u(.06363, 0, .07, 0),
+        Size = u(.06363, 0, .12408, 0),
         BorderColor3 = c(0, 0, 0),
         Name = name,
         ImageRectOffset = v(862, 472),
@@ -129,12 +115,11 @@ local function ico(name, y)
     return i
 end
 
--- Urutan tombol dengan jarak yang cukup
-local btnScript = ico("script", .08)      -- Run
-local btnRange  = ico("range", .18)       -- Range
-local btnAuto   = ico("autoclick", .28)   -- Flag
-local btnRot    = ico("rotation", .38)    -- Rotation
-local btnGuess  = ico("guess", .48)       -- Auto Guess
+-- Urutan tombol ORIGINAL (tanpa Auto Guess di UI)
+local btnScript = ico("script", .14419)  -- Run
+local btnRange  = ico("range", .37886)   -- Range
+local btnAuto   = ico("autoclick", .61352) -- Flag
+local btnRot    = ico("rotation", .84818) -- Rotation
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -159,7 +144,7 @@ local function lbl(txt, sx, py, pt, pb)
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         TextColor3 = c(255, 255, 255),
         BackgroundTransparency = 1,
-        Size = u(sx, 0, .07, 0),
+        Size = u(sx, 0, .18773, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txt,
         Position = u(.10693, 0, py, 0)
@@ -169,11 +154,23 @@ local function lbl(txt, sx, py, pt, pb)
     return L
 end
 
-lbl("Run", .2796, .08, .02, .02)
-lbl("Range", .29895, .18, .02, .02)
-lbl("Flag", .2796, .28, .02, .02)
-lbl("Rotation", .2796, .38, .02, .02)
-lbl("Auto Guess", .29895, .48, .02, .02)
+lbl("Auto Solver", .2796, .05033, .06, .15)
+lbl("Range", .29895, .28344, .07, .13)
+lbl("Flag", .2796, .51656, .08, .12)
+lbl("Rotation", .2796, .74967, .06, .09)
+
+local patchedLabel = n("TextLabel", a, {
+    Text = "(Working!)",
+    TextSize = 11,
+    TextColor3 = c(100, 255, 100),
+    BackgroundTransparency = 1,
+    Font = Enum.Font.SourceSansBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    Size = u(0.15, 0, 0.06, 0),
+    Position = u(.10693, 0, .68, 0),
+    ZIndex = 5
+})
 
 local function gradB(p)
     n("UIGradient", p, {
@@ -195,7 +192,7 @@ local function txt(name, ph, sx, px, py, txtv)
         BackgroundColor3 = c(255, 255, 255),
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         PlaceholderText = ph,
-        Size = u(sx, 0, .07, 0),
+        Size = u(sx, 0, .13791, 0),
         Position = u(px, 0, py, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txtv or ""
@@ -205,39 +202,30 @@ local function txt(name, ph, sx, px, py, txtv)
     n("UIPadding", t, {
         PaddingRight = UDim.new(.05, 0),
         PaddingLeft = UDim.new(.05, 0),
-        PaddingBottom = UDim.new(.02, 0)
+        PaddingBottom = UDim.new(.1, 0)
     })
     return t
 end
 
--- Baris 1 (Y=0.58)
-local boxMax  = txt("max", "5000", .16214, .40588, .58, "5000")
-local boxSpeed = txt("speed", "0.01", .16214, .60268, .58, "0.01")
-local boxPS   = txt("pspeed", "1", .16214, .79948, .58, "1")
+local boxMax  = txt("max", "5000", .16214, .40588, .07417, "5000")
+local boxDelay = txt("delay", "0.1", .16214, .60268, .07417, "0.1")
+local boxPS   = txt("pspeed", "1", .16214, .79948, .07417, "1")
+local boxR    = txt("r", "100", .16214, .40403, .30729, "100")
+local boxF    = txt("f", "16", .16398, .40403, .5404, "16")
+local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
+local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
+local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 
--- Baris 2 (Y=0.68)
-local boxR    = txt("r", "100", .16214, .40588, .68, "100")
-local boxGuessThresh = txt("guess", "0.3", .16214, .60268, .68, "0.3")
-
--- Baris 3 (Y=0.78)
-local boxF    = txt("f", "16", .16398, .40588, .78, "16")
-local boxFS   = txt("fspeed", "0.05", .16398, .60268, .78, "0.05")
-
--- Baris 4 (Y=0.88)
-local boxUS   = txt("uspeed", "0.2", .16214, .40588, .88, "0.2")
-local boxText = txt("text", "Arcade", .55574, .60268, .88, "Arcade")
-
--- Baris 5 - Gambar (Y=0.98)
 local img = n("ImageLabel", a, {
     ZIndex = 9,
     BorderSizePixel = 0,
     BackgroundColor3 = c(255, 255, 255),
     ResampleMode = Enum.ResamplerMode.Pixelated,
     Image = "rbxassetid://91463315015793",
-    Size = u(.46942, 0, .1, 0),
+    Size = u(.46942, 0, .90793, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 1,
-    Position = u(.53564, 0, .98, 0)
+    Position = u(.53564, 0, .15447, 0)
 })
 
 n("TextLabel", img, {
@@ -249,11 +237,11 @@ n("TextLabel", img, {
     FontFace = F("rbxasset://fonts/families/SpecialElite.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
     TextColor3 = c(255, 255, 255),
     BackgroundTransparency = 1,
-    Size = u(.41045, 0, .3, 0),
+    Size = u(.41045, 0, .0969, 0),
     BorderColor3 = c(0, 0, 0),
-    Text = "scroll down",
+    Text = "im lazy",
     Rotation = -5,
-    Position = u(.56212, 0, .2, 0)
+    Position = u(.56212, 0, .14326, 0)
 })
 
 local st = n("UIStroke", a, { Color = c(100, 100, 100), Thickness = 2 })
@@ -274,7 +262,6 @@ n("ImageLabel", a, {
     ImageRectOffset = v(0, 902)
 })
 
--- Bagian inti script Minesweeper (S function) dengan sistem deteksi corner dari Minesweeper.lua
 local B = "Flags status"
 local state = { b = false, c = 0, d = nil }
 
@@ -326,7 +313,6 @@ local function isDefinitelySafe(cell, b0, Hc, Wc, knownFlag, knownClear)
         return nil
     end
     
-    -- Cek apakah tile ini di pinggir papan yang sudah terbuka
     for dr = -1, 1 do
         for dc = -1, 1 do
             if not (dr == 0 and dc == 0) then
@@ -338,7 +324,6 @@ local function isDefinitelySafe(cell, b0, Hc, Wc, knownFlag, knownClear)
                     local coveredCount = 0
                     local thisTileCovered = false
                     
-                    -- Hitung flag dan covered di sekitar tile terbuka ini
                     for dr2 = -1, 1 do
                         for dc2 = -1, 1 do
                             if not (dr2 == 0 and dc2 == 0) then
@@ -358,12 +343,10 @@ local function isDefinitelySafe(cell, b0, Hc, Wc, knownFlag, knownClear)
                         end
                     end
                     
-                    -- Jika semua bom sudah terdeteksi, tile ini aman
                     if flaggedAround == num and thisTileCovered then
                         return true
                     end
                     
-                    -- Kasus khusus: tile di pojok dengan angka dan hanya 1 tetangga tertutup
                     if coveredCount == 1 and thisTileCovered and num - flaggedAround == 0 then
                         return true
                     end
@@ -414,7 +397,6 @@ local function isDefinitelyBomb(cell, b0, Hc, Wc, knownFlag, knownClear)
                         end
                     end
                     
-                    -- Jika angka = jumlah flag + 1, dan hanya tile ini yang tersisa, maka ini bom
                     if num == flaggedAround + 1 and coveredCount == 1 and thisTileCovered then
                         return true
                     end
@@ -1268,7 +1250,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- Gunakan logika Minesweeper.lua untuk deteksi corner
+            -- Proses logika deduksi (seperti di Minesweeper.lua)
             local function processLogic()
                 local changed = true
                 local guard = 0
@@ -1603,7 +1585,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
-local toggles = { btnScript, btnRange, btnAuto, btnRot, btnGuess }
+local toggles = { btnScript, btnRange, btnAuto, btnRot }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1624,9 +1606,10 @@ local function pushState()
     local f2  = boxF    and tonum(boxF.Text)    or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
     local roOn = btnBool(btnRot)
-    local guessOn = btnBool(btnGuess)
-    local guessThresh = boxGuessThresh and tonum(boxGuessThresh.Text) or 0.3
-    local speedVal = boxSpeed and tonum(boxSpeed.Text) or 0.01
+    -- Auto Guess tidak ada di UI, jadi default false
+    local guessOn = false
+    local guessThresh = 0.3
+    local speedVal = 0.01
     if sOn == false then
         callS(false)
         return
@@ -1649,7 +1632,6 @@ bindToggle(btnScript)
 bindToggle(btnRange)
 bindToggle(btnAuto)
 bindToggle(btnRot)
-bindToggle(btnGuess)
 
 local function bindBox(tb)
     if not tb then return end
@@ -1666,8 +1648,6 @@ bindBox(boxR)
 bindBox(boxF)
 bindBox(boxFS)
 bindBox(boxText)
-bindBox(boxGuessThresh)
-bindBox(boxSpeed)
 
 local dragging = false
 local dragInput, dragStart, startPos
