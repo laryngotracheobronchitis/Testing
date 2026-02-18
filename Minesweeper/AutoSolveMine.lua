@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED: Deteksi corner akurat, render jauh, scroll panel, Auto Guess
+-- FIXED: Scroll panel berfungsi, deteksi corner akurat, tile jauh dari cache
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -58,13 +58,13 @@ local open = n("TextButton", s, {
 n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
 n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
 
--- PANEL UTAMA DENGAN SCROLLING
+-- PANEL UTAMA DENGAN SCROLLING YANG BENAR
 local panel = n("Frame", s, {
     Visible = false,
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 400),  -- Lebih tinggi untuk scroll
+    Size = u(0, 600, 0, 400),  -- Tinggi tetap 400
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
@@ -72,7 +72,7 @@ local panel = n("Frame", s, {
 
 n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
 
--- SCROLLING FRAME
+-- SCROLLING FRAME (HARUS ADA)
 local scrollingFrame = n("ScrollingFrame", panel, {
     Size = u(1, 0, 1, 0),
     BackgroundColor3 = c(20, 20, 20),
@@ -80,16 +80,17 @@ local scrollingFrame = n("ScrollingFrame", panel, {
     BorderSizePixel = 0,
     ScrollBarThickness = 8,
     ScrollBarImageColor3 = c(100, 100, 100),
-    CanvasSize = u(0, 0, 0, 500),  -- Akan diatur otomatis
-    AutomaticCanvasSize = Enum.AutomaticSize.Y
+    CanvasSize = u(0, 0, 0, 600),  -- Canvas lebih besar dari panel
+    AutomaticCanvasSize = Enum.AutomaticSize.Y  -- Otomatis menyesuaikan
 })
 
 n("UICorner", scrollingFrame, { CornerRadius = UDim.new(.05, 0) })
 
+-- Konten di dalam scrolling frame
 local a = n("Frame", scrollingFrame, {
     BorderSizePixel = 0,
     BackgroundColor3 = c(20, 20, 20),
-    Size = u(1, -20, 0, 380),  -- Dikurangi untuk padding
+    Size = u(1, -20, 0, 580),  -- Tinggi total konten
     Position = u(0, 10, 0, 10),
     BorderColor3 = c(0, 0, 0),
     AutomaticSize = Enum.AutomaticSize.Y
@@ -98,14 +99,14 @@ local a = n("Frame", scrollingFrame, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq | Auto Guess & Scroll added",
+    Text = "fixed by n4vq | Scroll working | Corner detection",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.35, 0, 0.06, 0),
+    Size = u(0.35, 0, 0.05, 0),
     Position = u(0.63, 0, 0.01, 0),
     ZIndex = 10
 })
@@ -118,7 +119,7 @@ local function ico(name, y)
         AnchorPoint = v(.5, .5),
         Image = "rbxassetid://16167594452",
         ImageRectSize = v(90, 90),
-        Size = u(.06363, 0, .08, 0),  -- Proporsional
+        Size = u(.06363, 0, .07, 0),
         BorderColor3 = c(0, 0, 0),
         Name = name,
         ImageRectOffset = v(862, 472),
@@ -128,12 +129,12 @@ local function ico(name, y)
     return i
 end
 
--- Urutan tombol dengan posisi Y yang disesuaikan
-local btnScript = ico("script", .10)      -- Run
-local btnRange  = ico("range", .22)       -- Range
-local btnAuto   = ico("autoclick", .34)   -- Flag
-local btnRot    = ico("rotation", .46)    -- Rotation
-local btnGuess  = ico("guess", .58)       -- Auto Guess
+-- Urutan tombol dengan jarak yang cukup
+local btnScript = ico("script", .08)      -- Run
+local btnRange  = ico("range", .18)       -- Range
+local btnAuto   = ico("autoclick", .28)   -- Flag
+local btnRot    = ico("rotation", .38)    -- Rotation
+local btnGuess  = ico("guess", .48)       -- Auto Guess
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -158,7 +159,7 @@ local function lbl(txt, sx, py, pt, pb)
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         TextColor3 = c(255, 255, 255),
         BackgroundTransparency = 1,
-        Size = u(sx, 0, .08, 0),
+        Size = u(sx, 0, .07, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txt,
         Position = u(.10693, 0, py, 0)
@@ -168,11 +169,11 @@ local function lbl(txt, sx, py, pt, pb)
     return L
 end
 
-lbl("Run", .2796, .10, .02, .02)
-lbl("Range", .29895, .22, .02, .02)
-lbl("Flag", .2796, .34, .02, .02)
-lbl("Rotation", .2796, .46, .02, .02)
-lbl("Auto Guess", .29895, .58, .02, .02)
+lbl("Run", .2796, .08, .02, .02)
+lbl("Range", .29895, .18, .02, .02)
+lbl("Flag", .2796, .28, .02, .02)
+lbl("Rotation", .2796, .38, .02, .02)
+lbl("Auto Guess", .29895, .48, .02, .02)
 
 local function gradB(p)
     n("UIGradient", p, {
@@ -194,7 +195,7 @@ local function txt(name, ph, sx, px, py, txtv)
         BackgroundColor3 = c(255, 255, 255),
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         PlaceholderText = ph,
-        Size = u(sx, 0, .08, 0),
+        Size = u(sx, 0, .07, 0),
         Position = u(px, 0, py, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txtv or ""
@@ -209,36 +210,34 @@ local function txt(name, ph, sx, px, py, txtv)
     return t
 end
 
--- Baris 1
-local boxMax  = txt("max", "5000", .16214, .40588, .10, "5000")
-local boxSpeed = txt("speed", "0.01", .16214, .60268, .10, "0.01")
-local boxPS   = txt("pspeed", "1", .16214, .79948, .10, "1")
+-- Baris 1 (Y=0.58)
+local boxMax  = txt("max", "5000", .16214, .40588, .58, "5000")
+local boxSpeed = txt("speed", "0.01", .16214, .60268, .58, "0.01")
+local boxPS   = txt("pspeed", "1", .16214, .79948, .58, "1")
 
--- Baris 2
-local boxR    = txt("r", "100", .16214, .40588, .22, "100")
-local boxGuessThresh = txt("guess", "0.3", .16214, .60268, .22, "0.3")
+-- Baris 2 (Y=0.68)
+local boxR    = txt("r", "100", .16214, .40588, .68, "100")
+local boxGuessThresh = txt("guess", "0.3", .16214, .60268, .68, "0.3")
 
--- Baris 3
-local boxF    = txt("f", "16", .16398, .40588, .34, "16")
-local boxFS   = txt("fspeed", "0.05", .16398, .60268, .34, "0.05")
+-- Baris 3 (Y=0.78)
+local boxF    = txt("f", "16", .16398, .40588, .78, "16")
+local boxFS   = txt("fspeed", "0.05", .16398, .60268, .78, "0.05")
 
--- Baris 4
-local boxUS   = txt("uspeed", "0.2", .16214, .40588, .46, "0.2")
-local boxText = txt("text", "Arcade", .55574, .60268, .46, "Arcade")
+-- Baris 4 (Y=0.88)
+local boxUS   = txt("uspeed", "0.2", .16214, .40588, .88, "0.2")
+local boxText = txt("text", "Arcade", .55574, .60268, .88, "Arcade")
 
--- Baris 5 (kosong untuk spacing)
-
--- Gambar di bawah
+-- Baris 5 - Gambar (Y=0.98)
 local img = n("ImageLabel", a, {
     ZIndex = 9,
     BorderSizePixel = 0,
     BackgroundColor3 = c(255, 255, 255),
     ResampleMode = Enum.ResamplerMode.Pixelated,
     Image = "rbxassetid://91463315015793",
-    Size = u(.46942, 0, .15, 0),
+    Size = u(.46942, 0, .1, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 1,
-    Position = u(.53564, 0, .70, 0)
+    Position = u(.53564, 0, .98, 0)
 })
 
 n("TextLabel", img, {
@@ -275,7 +274,7 @@ n("ImageLabel", a, {
     ImageRectOffset = v(0, 902)
 })
 
--- Bagian inti script Minesweeper (S function) - sama seperti sebelumnya
+-- Bagian inti script Minesweeper
 local B = "Flags status"
 local state = { b = false, c = 0, d = nil }
 
@@ -286,6 +285,40 @@ local function e(vv)
         return (s0 == "enable" or s0 == "on" or s0 == "true" or s0 == "start")
     end
     return vv and true or false
+end
+
+-- Cache untuk menyimpan part yang jauh (tidak dirender)
+local farPartCache = {}
+local function updateFarPartCache()
+    -- Ambil semua part dari folder Parts
+    local partsFolder = nil
+    local w = game:GetService("Workspace")
+    local d = w:FindFirstChild("Flag")
+    if d then
+        partsFolder = d:FindFirstChild("Parts")
+    end
+    if not partsFolder then
+        partsFolder = w:FindFirstChild("Parts", true)
+    end
+    
+    if partsFolder and partsFolder:IsA("Folder") then
+        for _, part in ipairs(partsFolder:GetChildren()) do
+            if part:IsA("BasePart") then
+                local id = tostring(part:GetDebugId())
+                if not farPartCache[id] then
+                    farPartCache[id] = {
+                        part = part,
+                        pos = part.Position,
+                        size = part.Size,
+                        lastSeen = tick()
+                    }
+                else
+                    farPartCache[id].pos = part.Position
+                    farPartCache[id].lastSeen = tick()
+                end
+            end
+        end
+    end
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, speedVal)
@@ -337,6 +370,15 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
     i.c = i.c + 1
     local q = i.c
     i.b = true
+    
+    -- Update cache secara berkala
+    task.spawn(function()
+        while state and state.b and state.c == q do
+            updateFarPartCache()
+            task.wait(1)
+        end
+    end)
+    
     task.spawn(function()
         local r = i.d.r
         local s2 = i.d.s
@@ -649,6 +691,37 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                     end
                 end
             end
+            
+            -- Tambahkan part dari cache (yang tidak dirender)
+            for id, cacheData in pairs(farPartCache) do
+                if not A4[id] and cacheData.part and cacheData.part.Parent then
+                    local R = cacheData.part
+                    local W
+                    local X = R:FindFirstChild("NumberGui", true)
+                    if X then
+                        if X.FindFirstChildWhichIsA then
+                            W = X:FindFirstChildWhichIsA("TextLabel")
+                        end
+                        if not W then W = X:FindFirstChild("TextLabel") end
+                    end
+                    local Y = false
+                    if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
+                    local Z = nil
+                    if R.GetAttribute then Z = R:GetAttribute("Flagged") end
+                    if Z then Y = true end
+                    
+                    A4[id] = { 
+                        a = R, 
+                        b = cacheData.pos, 
+                        c = cacheData.size, 
+                        d = (W and W:IsA("TextLabel")) and W or nil, 
+                        e = Y, 
+                        f = tick() 
+                    }
+                    P[#P + 1] = A4[id]
+                end
+            end
+            
             if #P == 0 then return end
             local a0 = {}
             local a1, a2, a3 = nil, nil, math.huge
@@ -1075,9 +1148,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
             local da = {}
             local bombsToFlag = {}
             
-            -- DETEKSI CORNER/BORDER YANG SUPER AKURAT
+            -- DETEKSI CORNER/BORDER YANG SANGAT AKURAT
             local function isDefinitelySafe(r, c)
-                -- Cek apakah tile ini berada di pinggir papan yang sudah terbuka
+                -- Cek tile di pinggir yang pasti aman
                 local neighbors = B3(r, c, Hc, Wc)
                 
                 for _, rc in ipairs(neighbors) do
@@ -1088,7 +1161,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         local coveredCount = 0
                         local thisTileCovered = false
                         
-                        -- Hitung flag dan covered di sekitar tile terbuka ini
+                        -- Hitung flag dan covered di sekitar tile terbuka
                         for _, rc2 in ipairs(B3(nr, nc, Hc, Wc)) do
                             local nnr, nnc = rc2[1], rc2[2]
                             if b0[nnr] and b0[nnr][nnc] then
@@ -1103,22 +1176,20 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                             end
                         end
                         
-                        -- KASUS 1: Semua bom sudah terdeteksi, tile ini aman
+                        -- Jika jumlah flag sudah sama dengan angka, tile ini aman
                         if flaggedAround == num and thisTileCovered then
                             return true
                         end
                         
-                        -- KASUS 2: Tile di pojok dengan angka 1 dan hanya 1 tetangga tertutup (tile ini)
+                        -- Kasus khusus: tile di pojok dengan angka 1 dan hanya 1 tetangga tertutup
                         if coveredCount == 1 and thisTileCovered and num - flaggedAround == 0 then
                             return true
                         end
                     end
                 end
-                
                 return false
             end
             
-            -- DETEKSI BOM YANG PASTI (untuk Auto Flag)
             local function isDefinitelyBomb(r, c)
                 local neighbors = B3(r, c, Hc, Wc)
                 
@@ -1150,7 +1221,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         end
                     end
                 end
-                
                 return false
             end
             
@@ -1162,7 +1232,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
                                 
-                                -- Auto Flag: Cek bom pasti
+                                -- Auto Flag prioritas: bomb pasti
                                 if isDefinitelyBomb(rr, cc) then
                                     local cellData = b0[rr][cc]
                                     if cellData and cellData.c and cellData.c.a then
@@ -1170,7 +1240,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                                             part = cellData.c.a,
                                             row = rr,
                                             col = cc,
-                                            prob = 1.0
+                                            prob = 1.0,
+                                            priority = 1
                                         })
                                     end
                                 else
@@ -1185,7 +1256,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                                                     part = cellData.c.a,
                                                     row = rr,
                                                     col = cc,
-                                                    prob = v0
+                                                    prob = v0,
+                                                    priority = 2
                                                 })
                                             end
                                         end
@@ -1197,8 +1269,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- Auto Flag: Pasang bendera pada bom yang terdeteksi
+            -- Auto Flag dengan prioritas
             if ac and ac.on and #bombsToFlag > 0 then
+                table.sort(bombsToFlag, function(a, b) return a.priority < b.priority end)
                 local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
@@ -1218,7 +1291,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- AUTO SOLVER: Dengan prioritas dan support tile jauh
+            -- AUTO SOLVER dengan prioritas dan tile jauh
             if state and state.b then
                 task.spawn(function()
                     pcall(function()
@@ -1231,7 +1304,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         local safeTiles = {}
                         local guessTiles = {}
                         
-                        -- Kumpulkan SEMUA tile yang ada di memori (termasuk yang tidak dirender)
+                        -- Kumpulkan SEMUA tile dari grid (termasuk yang dari cache)
                         for r0 = 1, Hc do
                             for c0 = 1, Wc do
                                 local cell = b0[r0][c0]
@@ -1263,7 +1336,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                                                         prob = v0,
                                                         priority = 2
                                                     })
-                                                -- PRIORITAS 3: Tile untuk Auto Guess (jika diaktifkan)
+                                                -- PRIORITAS 3: Tile untuk Auto Guess
                                                 elseif ac.guess and tonumber(v0) and v0 <= ac.guessThresh then
                                                     table.insert(guessTiles, {
                                                         part = part,
@@ -1301,7 +1374,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                             target = guessTiles[1]
                         end
                         
-                        -- TELEPORT KE ATAS TILE (TANPA KLIK!)
+                        -- TELEPORT KE ATAS TILE
                         if target and target.part then
                             pcall(function()
                                 root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
@@ -1313,7 +1386,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end)
             end
             
-            -- VISUAL: Tampilkan probabilitas di tile
+            -- VISUAL
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
