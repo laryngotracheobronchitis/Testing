@@ -1,4 +1,4 @@
--- Auto Solve Minesweeper Script
+-- Auto Solve Minesweeper (Using Sweep UI)
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     return
 end
@@ -10,11 +10,16 @@ v1:SetAttribute("AutoSolveMine", true)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
+-- Helper functions
+local P = v1
 local c = Color3.fromRGB
 local v = Vector2.new
 local u = UDim2.new
+local N = NumberSequence.new
+local K = NumberSequenceKeypoint.new
+local F = Font.new
 
 local function n(t, p, x)
     local o = Instance.new(t, p)
@@ -26,200 +31,232 @@ local function n(t, p, x)
     return o
 end
 
--- UI Setup
-local sg = n("ScreenGui", v1, {
+-- UI Setup (Same as Sweep)
+local s = n("ScreenGui", P, {
     DisplayOrder = 2147483647,
     Name = "AutoSolveMinesweeper",
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     ResetOnSpawn = false
 })
 
--- Show/Hide button (Flag emoji)
-local showHideBtn = n("TextButton", sg, {
-    Size = u(0, 60, 0, 60),
-    Position = u(1, -70, 1, -70),
-    BackgroundColor3 = c(40, 40, 40),
+local open = n("TextButton", s, {
     BorderSizePixel = 2,
+    TextSize = 16,
+    TextColor3 = c(255, 255, 255),
+    BackgroundColor3 = c(40, 40, 40),
+    FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+    AnchorPoint = v(1, 1),
+    BackgroundTransparency = 0.6,
+    Size = u(0, 60, 0, 60),
     BorderColor3 = c(100, 100, 100),
-    Text = "ðŸš©",
-    TextSize = 30,
+    Text = "🚩",
     TextScaled = true,
-    Font = Enum.Font.SourceSansBold,
-    BackgroundTransparency = 0.6
-})
-n("UICorner", showHideBtn, { CornerRadius = UDim.new(0.15, 0) })
-n("UIPadding", showHideBtn, { 
-    PaddingTop = UDim.new(0.1, 0), 
-    PaddingBottom = UDim.new(0.1, 0), 
-    PaddingLeft = UDim.new(0.1, 0), 
-    PaddingRight = UDim.new(0.1, 0) 
+    Name = "open",
+    Position = u(1, -10, 1, -10)
 })
 
-local main = n("Frame", sg, {
+n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
+n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
+
+local panel = n("Frame", s, {
     Visible = false,
-    Size = u(0, 300, 0, 240),
-    Position = u(0.5, -150, 0.5, -120),
-    BackgroundColor3 = c(0, 0, 0),
     BorderSizePixel = 0,
+    BackgroundColor3 = c(0, 0, 0),
+    AnchorPoint = v(.5, .5),
+    Size = u(0, 600, 0, 308),
+    Position = u(.5, 0, .5, 0),
+    BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
 })
-n("UICorner", main, { CornerRadius = UDim.new(0.05, 0) })
-n("UIAspectRatioConstraint", main, { AspectRatio = 1.25 })
 
-local innerFrame = n("Frame", main, {
-    Size = u(0.99, 0, 0.99, 0),
-    Position = u(0.5, 0, 0.505, 0),
-    AnchorPoint = v(0.5, 0.5),
+n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
+n("UIAspectRatioConstraint", panel, { AspectRatio = 1.95 })
+
+local a = n("Frame", panel, {
+    BorderSizePixel = 0,
     BackgroundColor3 = c(20, 20, 20),
-    BorderSizePixel = 0
+    AnchorPoint = v(.5, .5),
+    Size = u(.99, 0, .99, 0),
+    Position = u(.5, 0, .505, 0),
+    BorderColor3 = c(0, 0, 0)
 })
-n("UICorner", innerFrame, { CornerRadius = UDim.new(0.05, 0) })
 
-local title = n("TextLabel", innerFrame, {
-    Size = u(0.8, 0, 0, 30),
-    Position = u(0.1, 0, 0, 10),
+n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
+
+local creditLabel = n("TextLabel", a, {
+    Text = "Auto Solve Minesweeper - v2.0",
+    TextSize = 18,
+    TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
-    Text = "Auto Solve Minesweeper",
-    TextColor3 = c(255, 255, 255),
-    TextSize = 16,
     Font = Enum.Font.SourceSansBold,
-    TextXAlignment = Enum.TextXAlignment.Left
-})
-
-local credit = n("TextLabel", innerFrame, {
-    Size = u(0.5, 0, 0, 20),
-    Position = u(0.5, 0, 0, 12),
-    BackgroundTransparency = 1,
-    Text = "v1.0",
-    TextColor3 = c(150, 150, 150),
-    TextSize = 11,
-    Font = Enum.Font.SourceSans,
-    TextXAlignment = Enum.TextXAlignment.Right
-})
-
--- Toggle Auto Solve
-local toggleSolve = n("TextButton", innerFrame, {
-    Size = u(0, 270, 0, 35),
-    Position = u(0, 15, 0, 50),
-    BackgroundColor3 = c(60, 60, 60),
-    Text = "Auto Solve: OFF",
-    TextColor3 = c(255, 255, 255),
-    TextSize = 14,
-    Font = Enum.Font.SourceSansBold,
-    BorderSizePixel = 0
-})
-n("UICorner", toggleSolve, { CornerRadius = UDim.new(0.12, 0) })
-n("UIGradient", toggleSolve, {
-    Rotation = 90,
-    Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.684, 0),
-        NumberSequenceKeypoint.new(0.9, 0.3),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-})
-
--- Toggle Range
-local toggleRange = n("TextButton", innerFrame, {
-    Size = u(0, 130, 0, 32),
-    Position = u(0, 15, 0, 95),
-    BackgroundColor3 = c(60, 60, 60),
-    Text = "Range: OFF",
-    TextColor3 = c(255, 255, 255),
-    TextSize = 13,
-    Font = Enum.Font.SourceSansBold,
-    BorderSizePixel = 0
-})
-n("UICorner", toggleRange, { CornerRadius = UDim.new(0.15, 0) })
-n("UIGradient", toggleRange, {
-    Rotation = 90,
-    Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.684, 0),
-        NumberSequenceKeypoint.new(0.9, 0.3),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-})
-
--- Range TextBox
-local rangeInput = n("TextBox", innerFrame, {
-    Size = u(0, 125, 0, 32),
-    Position = u(0, 155, 0, 95),
-    BackgroundColor3 = c(255, 255, 255),
-    Text = "100",
-    TextColor3 = c(0, 0, 0),
-    TextSize = 13,
-    Font = Enum.Font.SourceSansBold,
-    PlaceholderText = "Range",
-    PlaceholderColor3 = c(150, 150, 150),
-    ClearTextOnFocus = false,
-    BorderSizePixel = 0
-})
-n("UICorner", rangeInput, { CornerRadius = UDim.new(0.15, 0) })
-n("UIGradient", rangeInput, {
-    Rotation = 90,
-    Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.684, 0),
-        NumberSequenceKeypoint.new(0.9, 0.3),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-})
-n("UIPadding", rangeInput, {
-    PaddingLeft = UDim.new(0, 8),
-    PaddingRight = UDim.new(0, 8)
-})
-
--- Toggle Freeze
-local toggleFreeze = n("TextButton", innerFrame, {
-    Size = u(0, 270, 0, 32),
-    Position = u(0, 15, 0, 137),
-    BackgroundColor3 = c(60, 60, 60),
-    Text = "Freeze: OFF (Enable Auto Solve first)",
-    TextColor3 = c(150, 150, 150),
-    TextSize = 13,
-    Font = Enum.Font.SourceSansBold,
-    Active = false,
-    BorderSizePixel = 0
-})
-n("UICorner", toggleFreeze, { CornerRadius = UDim.new(0.15, 0) })
-n("UIGradient", toggleFreeze, {
-    Rotation = 90,
-    Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.684, 0),
-        NumberSequenceKeypoint.new(0.9, 0.3),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-})
-
--- Status
-local status = n("TextLabel", innerFrame, {
-    Size = u(1, -30, 0, 35),
-    Position = u(0, 15, 1, -50),
-    BackgroundTransparency = 1,
-    Text = "Status: Idle",
-    TextColor3 = c(150, 150, 150),
-    TextSize = 11,
-    Font = Enum.Font.SourceSans,
-    TextXAlignment = Enum.TextXAlignment.Left,
+    TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    TextWrapped = true
-})
-n("UIGradient", status, {
-    Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(1, 0.33)
-    })
+    Size = u(0.35, 0, 0.08, 0),
+    Position = u(0.63, 0, 0.01, 0),
+    ZIndex = 10
 })
 
--- Make main panel draggable
-local dragging, dragInput, dragStart, startPos
-innerFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+local function ico(name, y)
+    local i = n("ImageButton", a, {
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        BackgroundColor3 = c(0, 0, 0),
+        AnchorPoint = v(.5, .5),
+        Image = "rbxassetid://16167594452",
+        ImageRectSize = v(90, 90),
+        Size = u(.06363, 0, .12408, 0),
+        BorderColor3 = c(0, 0, 0),
+        Name = name,
+        ImageRectOffset = v(862, 472),
+        Position = u(.06254, 0, y, 0)
+    })
+    n("UIAspectRatioConstraint", i)
+    return i
+end
+
+local btnAutoSolve = ico("autosolve", .14419)
+local btnRange = ico("range", .37886)
+local btnFreeze = ico("freeze", .61352)
+
+local function gradL(p)
+    n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
+end
+
+local function pad(p, t, l, bm)
+    n("UIPadding", p, {
+        PaddingTop = UDim.new(t, 0),
+        PaddingLeft = UDim.new(l, 0),
+        PaddingBottom = UDim.new(bm, 0)
+    })
+end
+
+local function lbl(txt, sx, py, pt, pb)
+    local L = n("TextLabel", a, {
+        TextWrapped = true,
+        BorderSizePixel = 0,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextScaled = true,
+        BackgroundColor3 = c(0, 0, 0),
+        FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+        TextColor3 = c(255, 255, 255),
+        BackgroundTransparency = 1,
+        Size = u(sx, 0, .18773, 0),
+        BorderColor3 = c(0, 0, 0),
+        Text = txt,
+        Position = u(.10693, 0, py, 0)
+    })
+    pad(L, pt, .05, pb)
+    gradL(L)
+    return L
+end
+
+lbl("Auto Solve", .2796, .05033, .06, .15)
+lbl("Range", .29895, .28344, .07, .13)
+lbl("Freeze", .2796, .51656, .08, .12)
+
+local function gradB(p)
+    n("UIGradient", p, {
+        Rotation = 90,
+        Transparency = N { K(0, 0), K(.684, 0), K(.9, .3), K(1, 1) }
+    })
+end
+
+local function txt(name, ph, sx, px, py, txtv)
+    local t = n("TextBox", a, {
+        CursorPosition = -1,
+        Name = name,
+        PlaceholderColor3 = c(190, 190, 190),
+        BorderSizePixel = 0,
+        TextWrapped = true,
+        TextSize = 14,
+        TextColor3 = c(0, 0, 0),
+        TextScaled = true,
+        BackgroundColor3 = c(255, 255, 255),
+        FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+        PlaceholderText = ph,
+        Size = u(sx, 0, .13791, 0),
+        Position = u(px, 0, py, 0),
+        BorderColor3 = c(0, 0, 0),
+        Text = txtv or ""
+    })
+    gradB(t)
+    n("UICorner", t, { CornerRadius = UDim.new(.157, 0) })
+    n("UIPadding", t, {
+        PaddingRight = UDim.new(.05, 0),
+        PaddingLeft = UDim.new(.05, 0),
+        PaddingBottom = UDim.new(.1, 0)
+    })
+    return t
+end
+
+local boxMax = txt("max", "5000", .16214, .40588, .07417, "5000")
+local boxR = txt("r", "100", .16214, .40403, .30729, "100")
+
+local img = n("ImageLabel", a, {
+    ZIndex = 9,
+    BorderSizePixel = 0,
+    BackgroundColor3 = c(255, 255, 255),
+    ResampleMode = Enum.ResamplerMode.Pixelated,
+    Image = "rbxassetid://91463315015793",
+    Size = u(.46942, 0, .90793, 0),
+    BorderColor3 = c(0, 0, 0),
+    BackgroundTransparency = 1,
+    Position = u(.53564, 0, .15447, 0)
+})
+
+local statusText = n("TextLabel", img, {
+    TextWrapped = true,
+    BorderSizePixel = 0,
+    TextSize = 14,
+    TextScaled = true,
+    BackgroundColor3 = c(255, 255, 255),
+    FontFace = F("rbxasset://fonts/families/SpecialElite.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+    TextColor3 = c(255, 255, 255),
+    BackgroundTransparency = 1,
+    Size = u(.9, 0, .15, 0),
+    BorderColor3 = c(0, 0, 0),
+    Text = "Ready to solve",
+    Rotation = -5,
+    Position = u(.05, 0, .14, 0)
+})
+
+-- Drag functionality
+local dragging = false
+local dragInput, dragStart, startPos
+
+local draggingOpen = false
+local dragInputOpen, dragStartOpen, startPosOpen
+
+local function updateInput(input)
+    if dragging and panel.Visible then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+local function updateInputOpen(input)
+    if draggingOpen then
+        local delta = input.Position - dragStartOpen
+        open.Position = UDim2.new(
+            startPosOpen.X.Scale,
+            startPosOpen.X.Offset + delta.X,
+            startPosOpen.Y.Scale,
+            startPosOpen.Y.Offset + delta.Y
+        )
+    end
+end
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
-        startPos = main.Position
+        startPos = panel.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -228,83 +265,121 @@ innerFrame.InputBegan:Connect(function(input)
     end
 end)
 
-innerFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
+panel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        main.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- Make show/hide button draggable
-local draggingBtn, dragInputBtn, dragStartBtn, startPosBtn
-showHideBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingBtn = true
-        dragStartBtn = input.Position
-        startPosBtn = showHideBtn.Position
+open.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingOpen = true
+        dragStartOpen = input.Position
+        startPosOpen = open.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
-                draggingBtn = false
+                draggingOpen = false
             end
         end)
     end
 end)
 
-showHideBtn.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInputBtn = input
+open.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInputOpen = input
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInputBtn and draggingBtn then
-        local delta = input.Position - dragStartBtn
-        showHideBtn.Position = UDim2.new(
-            startPosBtn.X.Scale,
-            startPosBtn.X.Offset + delta.X,
-            startPosBtn.Y.Scale,
-            startPosBtn.Y.Offset + delta.Y
-        )
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput then
+        updateInput(input)
+    elseif input == dragInputOpen then
+        updateInputOpen(input)
     end
 end)
 
--- Show/Hide toggle with click detection
 local clickStart = nil
-showHideBtn.MouseButton1Down:Connect(function()
+open.MouseButton1Down:Connect(function()
     clickStart = tick()
 end)
 
-showHideBtn.MouseButton1Up:Connect(function()
-    if clickStart and (tick() - clickStart) < 0.2 and not draggingBtn then
-        main.Visible = not main.Visible
+open.MouseButton1Up:Connect(function()
+    if clickStart and (tick() - clickStart) < 0.2 and not draggingOpen then
+        panel.Visible = not panel.Visible
     end
     clickStart = nil
 end)
 
--- State
+-- State management
+local ON_IMG = "rbxassetid://16884179507"
+local ON_OFF1 = Vector2.new(578, 50)
+local ON_OFF2 = Vector2.new(48, 48)
+local OFF_IMG = "rbxassetid://16167594452"
+local OFF_OFF1 = Vector2.new(862, 472)
+local OFF_OFF2 = Vector2.new(90, 90)
+
+local btnState = setmetatable({}, { __mode = "k" })
+
+local function setVis(bx, on)
+    if not bx then return end
+    if on then
+        bx.Image = ON_IMG
+        bx.ImageRectOffset = ON_OFF1
+        bx.ImageRectSize = ON_OFF2
+    else
+        bx.Image = OFF_IMG
+        bx.ImageRectOffset = OFF_OFF1
+        bx.ImageRectSize = OFF_OFF2
+    end
+    btnState[bx] = on
+end
+
+local function getState(bx)
+    if not bx then return false end
+    return btnState[bx] or false
+end
+
+local function tonum(sv)
+    if not sv then return nil end
+    sv = sv:match("^%s*(.-)%s*$")
+    return tonumber(sv)
+end
+
+-- Set initial states
+for _, btt in ipairs({btnAutoSolve, btnRange, btnFreeze}) do
+    if btt and btt:IsA("ImageButton") then
+        setVis(btt, false)
+    end
+end
+
+-- Toggle functionality
+local function bindToggle(bx)
+    if not bx then return end
+    bx.MouseButton1Click:Connect(function()
+        local nstate = not getState(bx)
+        setVis(bx, nstate)
+    end)
+end
+
+bindToggle(btnAutoSolve)
+bindToggle(btnRange)
+bindToggle(btnFreeze)
+
+-- Bind textboxes
+for _, tb in ipairs({boxMax, boxR}) do
+    if tb then
+        tb.ClearTextOnFocus = false
+    end
+end
+
+-- Auto Solve State
 local state = {
-    autosolve = false,
-    range = false,
-    rangeValue = 100,
-    freeze = false,
     solving = false,
     flaggedIds = {},
-    scannedTiles = {},
     frozenConnection = nil
 }
 
--- Freeze character function
+-- Freeze character
 local function freezeCharacter(enable)
     local player = Players.LocalPlayer
     if not player or not player.Character then return end
@@ -313,18 +388,13 @@ local function freezeCharacter(enable)
     local root = player.Character:FindFirstChild("HumanoidRootPart")
     
     if enable then
-        -- Freeze
         if root then
             if state.frozenConnection then
                 state.frozenConnection:Disconnect()
             end
-            
-            -- Anchor root
             root.Anchored = true
-            
-            -- Keep anchored even if game tries to unanchor
             state.frozenConnection = root:GetPropertyChangedSignal("Anchored"):Connect(function()
-                if state.freeze then
+                if getState(btnFreeze) then
                     root.Anchored = true
                 end
             end)
@@ -334,7 +404,6 @@ local function freezeCharacter(enable)
             humanoid.JumpPower = 0
         end
     else
-        -- Unfreeze
         if state.frozenConnection then
             state.frozenConnection:Disconnect()
             state.frozenConnection = nil
@@ -349,58 +418,12 @@ local function freezeCharacter(enable)
     end
 end
 
--- Toggles
-toggleSolve.MouseButton1Click:Connect(function()
-    state.autosolve = not state.autosolve
-    toggleSolve.Text = "Auto Solve: " .. (state.autosolve and "ON" or "OFF")
-    toggleSolve.BackgroundColor3 = state.autosolve and c(70, 150, 70) or c(60, 60, 60)
-    
-    -- Enable/disable freeze button
-    if state.autosolve then
-        toggleFreeze.Active = true
-        toggleFreeze.Text = "Freeze: " .. (state.freeze and "ON" or "OFF")
-        toggleFreeze.TextColor3 = c(255, 255, 255)
-    else
-        -- Turn off freeze and disable button
-        if state.freeze then
-            state.freeze = false
-            freezeCharacter(false)
-        end
-        toggleFreeze.Active = false
-        toggleFreeze.Text = "Freeze: OFF (Enable Auto Solve first)"
-        toggleFreeze.TextColor3 = c(150, 150, 150)
-        toggleFreeze.BackgroundColor3 = c(60, 60, 60)
-        status.Text = "Status: Stopped"
-    end
+-- Watch freeze toggle
+btnFreeze.MouseButton1Click:Connect(function()
+    freezeCharacter(getState(btnFreeze))
 end)
 
-toggleRange.MouseButton1Click:Connect(function()
-    state.range = not state.range
-    toggleRange.Text = "Range: " .. (state.range and "ON" or "OFF")
-    toggleRange.BackgroundColor3 = state.range and c(70, 130, 255) or c(60, 60, 60)
-end)
-
-toggleFreeze.MouseButton1Click:Connect(function()
-    if not state.autosolve then return end
-    
-    state.freeze = not state.freeze
-    toggleFreeze.Text = "Freeze: " .. (state.freeze and "ON" or "OFF")
-    toggleFreeze.BackgroundColor3 = state.freeze and c(255, 150, 50) or c(60, 60, 60)
-    
-    freezeCharacter(state.freeze)
-end)
-
--- Range input
-rangeInput.FocusLost:Connect(function()
-    local value = tonumber(rangeInput.Text)
-    if value and value >= 10 and value <= 10000 then
-        state.rangeValue = value
-    else
-        rangeInput.Text = tostring(state.rangeValue)
-    end
-end)
-
--- Helper functions from original script
+-- Find parts folder
 local function findPartsFolder()
     local w = game:GetService("Workspace")
     local d = w:FindFirstChild("Flag")
@@ -423,12 +446,7 @@ local function findPartsFolder()
     return b
 end
 
-local function clamp(val, min, max)
-    if val < min then return min
-    elseif val > max then return max
-    else return val end
-end
-
+-- Grid helper
 local function GridIndex(vDelta, cell, tol)
     tol = math.clamp(tol or 0.25, 0, 0.49)
     local raw = vDelta / cell
@@ -463,16 +481,15 @@ local function getTileNumber(textLabel)
     return d and tonumber(d) or 0
 end
 
--- Teleport function
+-- Teleport
 local function teleportTo(position)
     local player = Players.LocalPlayer
     if not player or not player.Character then return false end
     local root = player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return false end
     
-    -- Temporarily unfreeze for teleport
     local wasAnchored = root.Anchored
-    if state.freeze then
+    if getState(btnFreeze) then
         root.Anchored = false
     end
     
@@ -480,17 +497,16 @@ local function teleportTo(position)
         root.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
     end)
     
-    task.wait(0.1)
+    task.wait(0.15)
     
-    -- Refreeze if needed
-    if state.freeze and not wasAnchored then
+    if getState(btnFreeze) and not wasAnchored then
         root.Anchored = true
     end
     
     return true
 end
 
--- Flag function
+-- Place flag
 local function placeFlag(part)
     if not part then return false end
     local id = part:GetDebugId()
@@ -513,7 +529,7 @@ local function placeFlag(part)
     return false
 end
 
--- Click tile function
+-- Click tile
 local function clickTile(part)
     if not part then return false end
     local cd = part:FindFirstChildOfClass("ClickDetector", true)
@@ -526,14 +542,14 @@ local function clickTile(part)
     return false
 end
 
--- Scan and solve
-local function solveMinesweeper()
-    if state.solving or not state.autosolve then return end
+-- Main solve function
+local function autoSolve()
+    if state.solving or not getState(btnAutoSolve) then return end
     state.solving = true
     
     local folder = findPartsFolder()
     if not folder then
-        status.Text = "Status: Parts folder not found"
+        statusText.Text = "No parts found"
         state.solving = false
         return
     end
@@ -541,6 +557,8 @@ local function solveMinesweeper()
     local player = Players.LocalPlayer
     local character = player and player.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
+    local useRange = getState(btnRange)
+    local rangeValue = tonum(boxR.Text) or 100
     
     -- Build part cache
     local partCache = {}
@@ -548,18 +566,14 @@ local function solveMinesweeper()
     
     for _, part in ipairs(folder:GetChildren()) do
         if part:IsA("BasePart") then
-            -- Check if in range
-            if state.range and root then
+            if useRange and root then
                 local dist = (part.Position - root.Position).Magnitude
-                if dist > state.rangeValue then
-                    continue
-                end
+                if dist > rangeValue then continue end
             end
             
             local gui = part:FindFirstChild("NumberGui", true)
             local textLabel = gui and gui:FindFirstChildWhichIsA("TextLabel")
             
-            -- Check if flagged
             local isFlagged = false
             for _, child in ipairs(part:GetChildren()) do
                 if child.Name:lower():find("flag") or child:IsA("BillboardGui") then
@@ -586,12 +600,12 @@ local function solveMinesweeper()
     end
     
     if #revealedParts == 0 then
-        status.Text = "Status: No revealed tiles found"
+        statusText.Text = "No revealed tiles"
         state.solving = false
         return
     end
     
-    -- Find closest revealed tile as center
+    -- Find center
     local centerPart = revealedParts[1]
     if root then
         local minDist = math.huge
@@ -664,10 +678,10 @@ local function solveMinesweeper()
         end
     end
     
-    -- Solve logic
+    -- Solve: find 100% safe and 100% bomb tiles
     local safeTiles = {}
     local bombTiles = {}
-    local unknownTiles = {}
+    local uncertainTiles = 0
     
     for r = 1, H do
         for c = 1, W do
@@ -687,70 +701,87 @@ local function solveMinesweeper()
                     end
                 end
                 
-                -- All remaining are mines
+                -- All remaining are mines (100% certainty)
                 if #coveredNeighbors > 0 and (num - flaggedCount) == #coveredNeighbors then
                     for _, rc in ipairs(coveredNeighbors) do
-                        table.insert(bombTiles, {r = rc[1], c = rc[2]})
+                        local alreadyAdded = false
+                        for _, t in ipairs(bombTiles) do
+                            if t.r == rc[1] and t.c == rc[2] then
+                                alreadyAdded = true
+                                break
+                            end
+                        end
+                        if not alreadyAdded then
+                            table.insert(bombTiles, {r = rc[1], c = rc[2]})
+                        end
                     end
                 end
                 
-                -- All mines found, rest are safe
+                -- All mines found, rest are safe (100% certainty)
                 if #coveredNeighbors > 0 and flaggedCount == num then
                     for _, rc in ipairs(coveredNeighbors) do
-                        table.insert(safeTiles, {r = rc[1], c = rc[2]})
+                        local alreadyAdded = false
+                        for _, t in ipairs(safeTiles) do
+                            if t.r == rc[1] and t.c == rc[2] then
+                                alreadyAdded = true
+                                break
+                            end
+                        end
+                        if not alreadyAdded then
+                            table.insert(safeTiles, {r = rc[1], c = rc[2]})
+                        end
                     end
                 end
-            elseif b0[r][c].state == "covered" then
-                table.insert(unknownTiles, {r = r, c = c})
+                
+                -- Count uncertain (probability-based) tiles
+                if #coveredNeighbors > 0 and flaggedCount < num and (num - flaggedCount) < #coveredNeighbors then
+                    uncertainTiles = uncertainTiles + #coveredNeighbors
+                end
             end
         end
     end
     
-    -- Execute actions
-    local actionCount = 0
-    
-    -- Place flags on bombs
+    -- Execute: Flag bombs first
+    local flaggedCount = 0
     for _, tile in ipairs(bombTiles) do
         local data = b0[tile.r][tile.c].data
         if data and not data.flagged then
             if placeFlag(data.part) then
-                actionCount = actionCount + 1
-                status.Text = string.format("Status: Flagging bomb (%d,%d)", tile.r, tile.c)
+                flaggedCount = flaggedCount + 1
+                statusText.Text = string.format("Flagged: %d bombs", flaggedCount)
                 task.wait(0.05)
             end
         end
     end
     
-    -- Click safe tiles
+    -- Execute: Teleport + Click safe tiles
+    local clickedCount = 0
     for _, tile in ipairs(safeTiles) do
         local data = b0[tile.r][tile.c].data
         if data then
-            if root and state.range then
-                local dist = (data.part.Position - root.Position).Magnitude
-                if dist > state.rangeValue then
-                    teleportTo(data.part.Position)
-                    task.wait(0.3)
-                end
-            end
+            -- Teleport to tile
+            teleportTo(data.part.Position)
+            task.wait(0.2)
             
+            -- Click tile
             if clickTile(data.part) then
-                actionCount = actionCount + 1
-                status.Text = string.format("Status: Clicking safe tile (%d,%d)", tile.r, tile.c)
-                task.wait(0.1)
+                clickedCount = clickedCount + 1
+                statusText.Text = string.format("Clicked: %d safe", clickedCount)
+                task.wait(0.15)
             end
         end
     end
     
-    -- Status update
-    if actionCount == 0 then
-        if #unknownTiles > 0 then
-            status.Text = string.format("Status: %d unknown tiles, waiting...", #unknownTiles)
+    -- Status
+    if flaggedCount == 0 and clickedCount == 0 then
+        if uncertainTiles > 0 then
+            statusText.Text = string.format("Skipped %d uncertain", uncertainTiles)
         else
-            status.Text = "Status: Puzzle complete!"
-            state.autosolve = false
-            toggleSolve.Text = "Auto Solve: OFF"
-            toggleSolve.BackgroundColor3 = c(60, 60, 60)
+            statusText.Text = "Puzzle complete!"
+            setVis(btnAutoSolve, false)
         end
+    else
+        statusText.Text = string.format("F:%d C:%d", flaggedCount, clickedCount)
     end
     
     state.solving = false
@@ -758,10 +789,8 @@ end
 
 -- Main loop
 RunService.Heartbeat:Connect(function()
-    if state.autosolve and not state.solving then
-        task.spawn(solveMinesweeper)
+    if getState(btnAutoSolve) and not state.solving then
+        task.spawn(autoSolve)
         task.wait(0.5)
     end
 end)
-
-status.Text = "Status: Ready"
