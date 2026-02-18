@@ -371,6 +371,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             return { add = add, stop = stop }
         end
         local RotCtl = mkRotCtl(rot)
+        
+        -- AUTO CLICKER (untuk membuka tile di sekitar) - TETAP PAKAI CLICK DETECTOR
         if ac.on then
             task.spawn(function()
                 local l = game:GetService("Players")
@@ -717,7 +719,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     if V then
                         local r0 = gy - offGY
                         local c0 = gx - offGX
-                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
+                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wn then
                             b0[r0][c0].c = V
                             if b0[r0][c0].a ~= "revealed" then
                                 if V.e then b0[r0][c0].a = "flagged" end
@@ -1048,6 +1050,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
+            local bombsToFlag = {}
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1055,14 +1058,52 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                                -- AUTO FLAG: Kumpulkan bom (probabilitas >= 0.99)
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) and v0 >= 0.99 then
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(bombsToFlag, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
                 end
             end
             
-            -- AUTO SOLVER: ONLY teleport + click safe tiles (v0 <= 0.01)
-            -- Runs independently - NO FLAGGING CODE AT ALL!
+            -- AUTO FLAG: Tandai bom (TETAP MENGGUNAKAN CLICK DETECTOR UNTUK FLAG)
+            if ac and ac.on and #bombsToFlag > 0 then
+                local flagSpeed = ac.fspd or 0.05
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData.part
+                    if bombData.prob and bombData.prob >= 0.99 then
+                        if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                            local flagged = part:GetAttribute("Flagged")
+                            if not flagged then
+                                task.spawn(function()
+                                    pcall(function()
+                                        local args = {part}
+                                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+                                        part:SetAttribute("Flagged", true)
+                                    end)
+                                end)
+                                task.wait(flagSpeed)
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- AUTO SOLVER: HANYA TELEPORT (TANPA KLIK!)
             if state and state.b then
                 task.spawn(function()
                     pcall(function()
@@ -1073,10 +1114,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         
                         local teleportDelay = ac.delay or 0.1
                         local safeTiles = {}
-                        local probTiles = {}
                         
-                        -- Collect ONLY safe (v0 <= 0.01) and probability tiles
-                        -- NEVER touch bombs (v0 >= 0.99)
+                        -- Kumpulkan tile aman (probabilitas <= 0.1) - HANYA UNTUK TELEPORT
                         for r0 = 1, Hc do
                             for c0 = 1, Wc do
                                 local cell = b0[r0][c0]
@@ -1088,57 +1127,48 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                                         local part = cellData and cellData.a
                                         
                                         if part and part:IsA("BasePart") and not part:GetAttribute("SolverDone") then
-                                            -- ONLY collect safe tiles (NOT bombs!)
-                                            if tonumber(v0) and v0 <= 0.01 then
+                                            -- Hanya tile dengan probabilitas rendah (aman)
+                                            if tonumber(v0) and v0 <= 0.1 then
                                                 table.insert(safeTiles, {
                                                     part = part,
                                                     pos = part.Position,
-                                                    dist = (part.Position - root.Position).Magnitude
-                                                })
-                                            elseif tonumber(v0) and v0 > 0.01 and v0 < 0.99 then
-                                                table.insert(probTiles, {
-                                                    part = part,
-                                                    pos = part.Position,
+                                                    dist = (part.Position - root.Position).Magnitude,
                                                     prob = v0
                                                 })
                                             end
-                                            -- SKIP bombs (v0 >= 0.99) entirely - NO ACTION
                                         end
                                     end
                                 end
                             end
                         end
                         
-                        local target = nil
-                        
-                        -- Try safe tiles first
+                        -- Pilih tile dengan probabilitas terendah dan terdekat
                         if #safeTiles > 0 then
-                            table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
-                            target = safeTiles[1]
-                        -- Auto Guess: try lowest probability
-                        elseif ac.guess and #probTiles > 0 then
-                            table.sort(probTiles, function(a, b) return a.prob < b.prob end)
-                            target = probTiles[1]
-                        end
-                        
-                        -- Execute: ONLY teleport + click, ABSOLUTELY NO FLAGGING!
-                        if target and target.part then
-                            pcall(function()
-                                root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
+                            table.sort(safeTiles, function(a, b) 
+                                if math.abs(a.prob - b.prob) < 0.01 then
+                                    return a.dist < b.dist
+                                else
+                                    return a.prob < b.prob
+                                end
                             end)
-                            task.wait(teleportDelay)
                             
-                            local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
-                            if cd then
+                            local target = safeTiles[1]
+                            
+                            -- TELEPORT KE ATAS TILE (TANPA KLIK!)
+                            if target and target.part then
                                 pcall(function()
-                                    fireclickdetector(cd)
+                                    root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
                                     target.part:SetAttribute("SolverDone", true)
                                 end)
+                                task.wait(teleportDelay)
+                                -- TIDAK ADA fireclickdetector!
                             end
                         end
                     end)
                 end)
             end
+            
+            -- VISUAL: Tampilkan probabilitas di tile
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1160,7 +1190,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             else
                                 local v0 = A7(v0raw)
                                 if tonumber(v0) and v0 >= 0.99 then
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                                    -- Tampilkan bom dengan persentase, BUKAN bendera
+                                    local pct = v0 * 100
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = string.format("%.0f%%", pct), color = A8(v0)}
                                 elseif tonumber(v0) and v0 <= 0.01 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                                 else
