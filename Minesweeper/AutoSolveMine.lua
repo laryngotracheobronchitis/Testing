@@ -1048,7 +1048,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
-            local bombsToFlag = {}
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1056,47 +1055,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
-                                -- Auto Flag: Check if this is a bomb
-                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        -- This is definitely a bomb, add to flag list
-                                        local cellData = b0[rr][cc]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            table.insert(bombsToFlag, {
-                                                part = cellData.c.a,
-                                                row = rr,
-                                                col = cc,
-                                                prob = v0
-                                            })
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- Auto Flag: ONLY flag bombs (v0 >= 0.99), NOT safe tiles!
-            if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.05
-                for _, bombData in ipairs(bombsToFlag) do
-                    local part = bombData.part
-                    -- Double check: ONLY flag if probability >= 0.99 (bomb)
-                    if bombData.prob and bombData.prob >= 0.99 then
-                        if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                            local flagged = part:GetAttribute("Flagged")
-                            if not flagged then
-                                task.spawn(function()
-                                    pcall(function()
-                                        local args = {part}
-                                        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-                                        part:SetAttribute("Flagged", true)
-                                    end)
-                                end)
-                                task.wait(flagSpeed)
                             end
                         end
                     end
