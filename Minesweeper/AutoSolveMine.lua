@@ -205,12 +205,12 @@ local function txt(name, ph, sx, px, py, txtv)
 end
 
 local boxMax  = txt("max", "5000", .16214, .40588, .07417, "5000")
+local boxDelay = txt("delay", "0.1", .16214, .60268, .07417, "0.1")
 local boxPS   = txt("pspeed", "1", .16214, .79948, .07417, "1")
 local boxR    = txt("r", "100", .16214, .40403, .30729, "100")
 local boxF    = txt("f", "16", .16398, .40403, .5404, "16")
 local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
 local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
-local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
 
 local img = n("ImageLabel", a, {
     ZIndex = 9,
@@ -270,7 +270,7 @@ local function e(vv)
     return vv and true or false
 end
 
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
     local i = state
     local j = e(t)
     local function k()
@@ -294,7 +294,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn)
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.05, fspd = 0.05, guess = e(guessOn) },
+        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.05, fspd = 0.05, guess = e(guessOn), delay = tonumber(delayVal) or 0.1 },
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
@@ -1100,104 +1100,90 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn)
                 end
             end
             
-            -- AUTO SOLVER: Teleport to safe tiles (independent from Auto Flag)
-            -- This runs when btnScript (Auto Solver) is ON
-            if state and state.b then
-                task.spawn(function()
-                    pcall(function()
-                        local player = game:GetService("Players").LocalPlayer
-                        if not player or not player.Character then return end
-                        local root = player.Character:FindFirstChild("HumanoidRootPart")
-                        if not root then return end
-                        
-                        -- Collect tiles from overlays
-                        local safeTiles = {}
-                        local probTiles = {}
-                        
-                        for r0 = 1, Hc do
-                            for c0 = 1, Wc do
-                                local cell = b0[r0][c0]
-                                if cell.a == "covered" and da[B0(r0, c0)] then
-                                    local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                    if v0raw then
-                                        local v0 = A7(v0raw)
-                                        local cellData = cell.c
-                                        local part = cellData and cellData.a
-                                        
-                                        if part and part:IsA("BasePart") then
-                                            -- Safe tile (probability <= 1%)
-                                            if tonumber(v0) and v0 <= 0.01 then
-                                                table.insert(safeTiles, {
-                                                    part = part,
-                                                    pos = part.Position,
-                                                    prob = v0,
-                                                    dist = (part.Position - root.Position).Magnitude
-                                                })
-                                            -- Probability tile (1% < prob < 99%)
-                                            elseif tonumber(v0) and v0 > 0.01 and v0 < 0.99 then
-                                                table.insert(probTiles, {
-                                                    part = part,
-                                                    pos = part.Position,
-                                                    prob = v0
-                                                })
-                                            end
-                                            -- Skip bombs (v0 >= 0.99) entirely
+            -- AUTO SOLVER: Only teleport + click (NO FLAGGING!)
+            task.spawn(function()
+                pcall(function()
+                    if not (state and state.b) then return end
+                    
+                    local player = game:GetService("Players").LocalPlayer
+                    if not player or not player.Character then return end
+                    local root = player.Character:FindFirstChild("HumanoidRootPart")
+                    if not root then return end
+                    
+                    local teleportDelay = ac.delay or 0.1
+                    local safeTiles = {}
+                    local probTiles = {}
+                    
+                    -- Collect safe and probability tiles from overlays
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            local cell = b0[r0][c0]
+                            if cell.a == "covered" and da[B0(r0, c0)] then
+                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    local cellData = cell.c
+                                    local part = cellData and cellData.a
+                                    
+                                    if part and part:IsA("BasePart") and not part:GetAttribute("SolverProcessed") then
+                                        if tonumber(v0) and v0 <= 0.01 then
+                                            -- Safe tile (✅)
+                                            table.insert(safeTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0,
+                                                dist = (part.Position - root.Position).Magnitude
+                                            })
+                                        elseif tonumber(v0) and v0 > 0.01 and v0 < 0.99 then
+                                            -- Probability tile (XX%)
+                                            table.insert(probTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0
+                                            })
                                         end
+                                        -- Skip bombs (v0 >= 0.99) - NO ACTION
                                     end
                                 end
                             end
                         end
+                    end
+                    
+                    local target = nil
+                    
+                    -- Priority 1: Safe tiles
+                    if #safeTiles > 0 then
+                        table.sort(safeTiles, function(a, b)
+                            return a.dist < b.dist
+                        end)
+                        target = safeTiles[1]
+                    -- Priority 2: Auto Guess enabled, try lowest probability
+                    elseif ac.guess and #probTiles > 0 then
+                        table.sort(probTiles, function(a, b)
+                            return a.prob < b.prob
+                        end)
+                        target = probTiles[1]
+                    end
+                    
+                    -- Execute teleport + click (NO FLAGGING!)
+                    if target and target.part then
+                        -- Teleport
+                        pcall(function()
+                            root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
+                        end)
+                        task.wait(teleportDelay)
                         
-                        -- Try safe tiles first (sorted by distance)
-                        if #safeTiles > 0 then
-                            table.sort(safeTiles, function(a, b)
-                                return a.dist < b.dist
+                        -- Click ONLY
+                        local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
+                        if cd then
+                            pcall(function()
+                                fireclickdetector(cd)
+                                target.part:SetAttribute("SolverProcessed", true)
                             end)
-                            
-                            local target = safeTiles[1]
-                            if target and target.part and not target.part:GetAttribute("AutoSolverClicked") then
-                                -- Teleport
-                                pcall(function()
-                                    root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
-                                end)
-                                task.wait(0.1)
-                                
-                                -- Click
-                                local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
-                                if cd then
-                                    pcall(function()
-                                        fireclickdetector(cd)
-                                        target.part:SetAttribute("AutoSolverClicked", true)
-                                    end)
-                                end
-                            end
-                        -- If no safe tiles and Auto Guess ON, try lowest probability
-                        elseif ac.guess and #probTiles > 0 then
-                            table.sort(probTiles, function(a, b)
-                                return a.prob < b.prob
-                            end)
-                            
-                            local target = probTiles[1]
-                            if target and target.part and not target.part:GetAttribute("AutoSolverClicked") then
-                                -- Teleport
-                                pcall(function()
-                                    root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
-                                end)
-                                task.wait(0.1)
-                                
-                                -- Click
-                                local cd = target.part:FindFirstChildOfClass("ClickDetector", true)
-                                if cd then
-                                    pcall(function()
-                                        fireclickdetector(cd)
-                                        target.part:SetAttribute("AutoSolverClicked", true)
-                                    end)
-                                end
-                            end
                         end
-                    end)
+                    end
                 end)
-            end
+            end)
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1352,11 +1338,11 @@ local function btnBool(b) return (b and getState(b)) or false end
 local function pushState()
     local sOn = btnScript and getState(btnScript) or nil
     local m   = boxMax  and tonum(boxMax.Text)  or nil
-    local us  = boxUS   and tonum(boxUS.Text)   or nil
+    local delayVal = boxDelay and tonum(boxDelay.Text) or nil
     local ps  = boxPS   and tonum(boxPS.Text)   or nil
     local fe  = boxText and parseFont(boxText.Text) or nil
     local r2  = boxR    and tonum(boxR.Text)    or nil
-    local rOn = true  -- Range always enabled
+    local rOn = true  -- Always enabled
     local aOn = btnBool(btnAuto)
     local f2  = boxF    and tonum(boxF.Text)    or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
@@ -1367,7 +1353,7 @@ local function pushState()
         return
     end
     callS(false)
-    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessOn)
+    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessOn, delayVal)
 end
 
 local function bindToggle(bx)
@@ -1394,7 +1380,7 @@ local function bindBox(tb)
 end
 
 bindBox(boxMax)
-bindBox(boxUS)
+bindBox(boxDelay)
 bindBox(boxPS)
 bindBox(boxR)
 bindBox(boxF)
