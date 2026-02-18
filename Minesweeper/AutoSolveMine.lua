@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED: Scroll panel berfungsi, deteksi corner akurat, tile jauh dari cache
+-- FIXED: Sistem deteksi corner dari Minesweeper.lua, Scroll UI untuk Auto Guess
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -58,13 +58,13 @@ local open = n("TextButton", s, {
 n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
 n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
 
--- PANEL UTAMA DENGAN SCROLLING YANG BENAR
+-- PANEL UTAMA DENGAN SCROLLING
 local panel = n("Frame", s, {
     Visible = false,
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 400),  -- Tinggi tetap 400
+    Size = u(0, 600, 0, 400),  -- Tinggi ditambah untuk scroll
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
@@ -72,7 +72,7 @@ local panel = n("Frame", s, {
 
 n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
 
--- SCROLLING FRAME (HARUS ADA)
+-- SCROLLING FRAME
 local scrollingFrame = n("ScrollingFrame", panel, {
     Size = u(1, 0, 1, 0),
     BackgroundColor3 = c(20, 20, 20),
@@ -80,13 +80,13 @@ local scrollingFrame = n("ScrollingFrame", panel, {
     BorderSizePixel = 0,
     ScrollBarThickness = 8,
     ScrollBarImageColor3 = c(100, 100, 100),
-    CanvasSize = u(0, 0, 0, 600),  -- Canvas lebih besar dari panel
-    AutomaticCanvasSize = Enum.AutomaticSize.Y  -- Otomatis menyesuaikan
+    CanvasSize = u(0, 0, 0, 600),  -- Canvas lebih besar
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    ScrollingDirection = Enum.ScrollingDirection.Y
 })
 
 n("UICorner", scrollingFrame, { CornerRadius = UDim.new(.05, 0) })
 
--- Konten di dalam scrolling frame
 local a = n("Frame", scrollingFrame, {
     BorderSizePixel = 0,
     BackgroundColor3 = c(20, 20, 20),
@@ -99,7 +99,7 @@ local a = n("Frame", scrollingFrame, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq | Scroll working | Corner detection",
+    Text = "Fixed with corner detection + Scroll UI",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
@@ -274,7 +274,7 @@ n("ImageLabel", a, {
     ImageRectOffset = v(0, 902)
 })
 
--- Bagian inti script Minesweeper
+-- Bagian inti script Minesweeper (S function) dengan sistem deteksi corner dari Minesweeper.lua
 local B = "Flags status"
 local state = { b = false, c = 0, d = nil }
 
@@ -287,38 +287,142 @@ local function e(vv)
     return vv and true or false
 end
 
--- Cache untuk menyimpan part yang jauh (tidak dirender)
+-- Cache untuk menyimpan part yang jauh
 local farPartCache = {}
 local function updateFarPartCache()
-    -- Ambil semua part dari folder Parts
-    local partsFolder = nil
     local w = game:GetService("Workspace")
     local d = w:FindFirstChild("Flag")
     if d then
-        partsFolder = d:FindFirstChild("Parts")
-    end
-    if not partsFolder then
-        partsFolder = w:FindFirstChild("Parts", true)
-    end
-    
-    if partsFolder and partsFolder:IsA("Folder") then
-        for _, part in ipairs(partsFolder:GetChildren()) do
-            if part:IsA("BasePart") then
-                local id = tostring(part:GetDebugId())
-                if not farPartCache[id] then
-                    farPartCache[id] = {
-                        part = part,
-                        pos = part.Position,
-                        size = part.Size,
-                        lastSeen = tick()
-                    }
-                else
-                    farPartCache[id].pos = part.Position
-                    farPartCache[id].lastSeen = tick()
+        local partsFolder = d:FindFirstChild("Parts")
+        if partsFolder and partsFolder:IsA("Folder") then
+            for _, part in ipairs(partsFolder:GetChildren()) do
+                if part:IsA("BasePart") then
+                    local id = tostring(part:GetDebugId())
+                    if not farPartCache[id] then
+                        farPartCache[id] = {
+                            part = part,
+                            pos = part.Position,
+                            size = part.Size,
+                            lastSeen = tick()
+                        }
+                    else
+                        farPartCache[id].pos = part.Position
+                        farPartCache[id].lastSeen = tick()
+                    end
                 end
             end
         end
     end
+end
+
+-- Fungsi deteksi corner dari Minesweeper.lua
+local function isDefinitelySafe(cell, b0, Hc, Wc, knownFlag, knownClear)
+    if not cell then return false end
+    
+    local function getCellAt(r, c)
+        if r >= 1 and r <= Hc and c >= 1 and c <= Wc then
+            return b0[r][c]
+        end
+        return nil
+    end
+    
+    -- Cek apakah tile ini di pinggir papan yang sudah terbuka
+    for dr = -1, 1 do
+        for dc = -1, 1 do
+            if not (dr == 0 and dc == 0) then
+                local nr, nc = cell.row + dr, cell.col + dc
+                local neighborCell = getCellAt(nr, nc)
+                if neighborCell and neighborCell.a == "revealed" then
+                    local num = neighborCell.b or 0
+                    local flaggedAround = 0
+                    local coveredCount = 0
+                    local thisTileCovered = false
+                    
+                    -- Hitung flag dan covered di sekitar tile terbuka ini
+                    for dr2 = -1, 1 do
+                        for dc2 = -1, 1 do
+                            if not (dr2 == 0 and dc2 == 0) then
+                                local nnr, nnc = nr + dr2, nc + dc2
+                                local nnCell = getCellAt(nnr, nnc)
+                                if nnCell then
+                                    if nnCell.a == "flagged" or (knownFlag and knownFlag[nnCell]) then
+                                        flaggedAround = flaggedAround + 1
+                                    elseif nnCell.a == "covered" then
+                                        coveredCount = coveredCount + 1
+                                        if nnr == cell.row and nnc == cell.col then
+                                            thisTileCovered = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Jika semua bom sudah terdeteksi, tile ini aman
+                    if flaggedAround == num and thisTileCovered then
+                        return true
+                    end
+                    
+                    -- Kasus khusus: tile di pojok dengan angka dan hanya 1 tetangga tertutup
+                    if coveredCount == 1 and thisTileCovered and num - flaggedAround == 0 then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function isDefinitelyBomb(cell, b0, Hc, Wc, knownFlag, knownClear)
+    if not cell then return false end
+    
+    local function getCellAt(r, c)
+        if r >= 1 and r <= Hc and c >= 1 and c <= Wc then
+            return b0[r][c]
+        end
+        return nil
+    end
+    
+    for dr = -1, 1 do
+        for dc = -1, 1 do
+            if not (dr == 0 and dc == 0) then
+                local nr, nc = cell.row + dr, cell.col + dc
+                local neighborCell = getCellAt(nr, nc)
+                if neighborCell and neighborCell.a == "revealed" then
+                    local num = neighborCell.b or 0
+                    local flaggedAround = 0
+                    local coveredCount = 0
+                    local thisTileCovered = false
+                    
+                    for dr2 = -1, 1 do
+                        for dc2 = -1, 1 do
+                            if not (dr2 == 0 and dc2 == 0) then
+                                local nnr, nnc = nr + dr2, nc + dc2
+                                local nnCell = getCellAt(nnr, nnc)
+                                if nnCell then
+                                    if nnCell.a == "flagged" or (knownFlag and knownFlag[nnCell]) then
+                                        flaggedAround = flaggedAround + 1
+                                    elseif nnCell.a == "covered" then
+                                        coveredCount = coveredCount + 1
+                                        if nnr == cell.row and nnc == cell.col then
+                                            thisTileCovered = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Jika angka = jumlah flag + 1, dan hanya tile ini yang tersisa, maka ini bom
+                    if num == flaggedAround + 1 and coveredCount == 1 and thisTileCovered then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, speedVal)
@@ -1147,83 +1251,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
             local gP = d9.b
             local da = {}
             local bombsToFlag = {}
+            local knownFlag = {}
+            local knownClear = {}
             
-            -- DETEKSI CORNER/BORDER YANG SANGAT AKURAT
-            local function isDefinitelySafe(r, c)
-                -- Cek tile di pinggir yang pasti aman
-                local neighbors = B3(r, c, Hc, Wc)
-                
-                for _, rc in ipairs(neighbors) do
-                    local nr, nc = rc[1], rc[2]
-                    if b0[nr] and b0[nr][nc] and b0[nr][nc].a == "revealed" then
-                        local num = b0[nr][nc].b or 0
-                        local flaggedAround = 0
-                        local coveredCount = 0
-                        local thisTileCovered = false
-                        
-                        -- Hitung flag dan covered di sekitar tile terbuka
-                        for _, rc2 in ipairs(B3(nr, nc, Hc, Wc)) do
-                            local nnr, nnc = rc2[1], rc2[2]
-                            if b0[nnr] and b0[nnr][nnc] then
-                                if b0[nnr][nnc].a == "flagged" then
-                                    flaggedAround = flaggedAround + 1
-                                elseif b0[nnr][nnc].a == "covered" then
-                                    coveredCount = coveredCount + 1
-                                    if nnr == r and nnc == c then
-                                        thisTileCovered = true
-                                    end
-                                end
-                            end
-                        end
-                        
-                        -- Jika jumlah flag sudah sama dengan angka, tile ini aman
-                        if flaggedAround == num and thisTileCovered then
-                            return true
-                        end
-                        
-                        -- Kasus khusus: tile di pojok dengan angka 1 dan hanya 1 tetangga tertutup
-                        if coveredCount == 1 and thisTileCovered and num - flaggedAround == 0 then
-                            return true
-                        end
-                    end
-                end
-                return false
-            end
-            
-            local function isDefinitelyBomb(r, c)
-                local neighbors = B3(r, c, Hc, Wc)
-                
-                for _, rc in ipairs(neighbors) do
-                    local nr, nc = rc[1], rc[2]
-                    if b0[nr] and b0[nr][nc] and b0[nr][nc].a == "revealed" then
-                        local num = b0[nr][nc].b or 0
-                        local flaggedAround = 0
-                        local coveredCount = 0
-                        local thisTileCovered = false
-                        
-                        for _, rc2 in ipairs(B3(nr, nc, Hc, Wc)) do
-                            local nnr, nnc = rc2[1], rc2[2]
-                            if b0[nnr] and b0[nnr][nnc] then
-                                if b0[nnr][nnc].a == "flagged" then
-                                    flaggedAround = flaggedAround + 1
-                                elseif b0[nnr][nnc].a == "covered" then
-                                    coveredCount = coveredCount + 1
-                                    if nnr == r and nnc == c then
-                                        thisTileCovered = true
-                                    end
-                                end
-                            end
-                        end
-                        
-                        -- Jika angka = jumlah flag + 1, dan hanya tile ini yang tersisa, maka ini bom
-                        if num == flaggedAround + 1 and coveredCount == 1 and thisTileCovered then
-                            return true
-                        end
-                    end
-                end
-                return false
-            end
-            
+            -- Kumpulkan tile yang perlu dipertimbangkan
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1231,35 +1262,69 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- Gunakan logika Minesweeper.lua untuk deteksi corner
+            local function processLogic()
+                local changed = true
+                local guard = 0
+                
+                while changed and guard < 64 do
+                    changed = false
+                    guard = guard + 1
+                    
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            if b0[r0][c0].a == "revealed" then
+                                local num = b0[r0][c0].b or 0
+                                local unknowns = {}
+                                local flaggedCount = 0
                                 
-                                -- Auto Flag prioritas: bomb pasti
-                                if isDefinitelyBomb(rr, cc) then
-                                    local cellData = b0[rr][cc]
-                                    if cellData and cellData.c and cellData.c.a then
-                                        table.insert(bombsToFlag, {
-                                            part = cellData.c.a,
-                                            row = rr,
-                                            col = cc,
-                                            prob = 1.0,
-                                            priority = 1
-                                        })
+                                -- Kumpulkan tetangga
+                                for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                                    local rr, cc = rc[1], rc[2]
+                                    if b0[rr][cc].a == "flagged" or knownFlag[B0(rr, cc)] then
+                                        flaggedCount = flaggedCount + 1
+                                    elseif b0[rr][cc].a == "covered" and not knownClear[B0(rr, cc)] then
+                                        table.insert(unknowns, {rr, cc})
                                     end
-                                else
-                                    -- Fallback ke probability
-                                    local v0raw = (pr[rr] and pr[rr][cc]) or gP
-                                    if v0raw then
-                                        local v0 = A7(v0raw)
-                                        if tonumber(v0) and v0 >= 0.99 then
+                                end
+                                
+                                local remaining = num - flaggedCount
+                                
+                                -- Semua tile yang tidak diketahui adalah bom
+                                if remaining > 0 and remaining == #unknowns then
+                                    for _, rc in ipairs(unknowns) do
+                                        local rr, cc = rc[1], rc[2]
+                                        local key = B0(rr, cc)
+                                        if not knownFlag[key] then
+                                            knownFlag[key] = true
+                                            changed = true
+                                            
                                             local cellData = b0[rr][cc]
                                             if cellData and cellData.c and cellData.c.a then
                                                 table.insert(bombsToFlag, {
                                                     part = cellData.c.a,
                                                     row = rr,
                                                     col = cc,
-                                                    prob = v0,
-                                                    priority = 2
+                                                    prob = 1.0,
+                                                    priority = 1
                                                 })
                                             end
+                                        end
+                                    end
+                                -- Semua tile yang tidak diketahui aman
+                                elseif remaining == 0 and #unknowns > 0 then
+                                    for _, rc in ipairs(unknowns) do
+                                        local rr, cc = rc[1], rc[2]
+                                        local key = B0(rr, cc)
+                                        if not knownClear[key] then
+                                            knownClear[key] = true
+                                            changed = true
                                         end
                                     end
                                 end
@@ -1269,9 +1334,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- Auto Flag dengan prioritas
+            processLogic()
+            
+            -- Auto Flag: Pasang bendera pada bom yang terdeteksi
             if ac and ac.on and #bombsToFlag > 0 then
-                table.sort(bombsToFlag, function(a, b) return a.priority < b.priority end)
                 local flagSpeed = ac.fspd or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
@@ -1291,7 +1357,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- AUTO SOLVER dengan prioritas dan tile jauh
+            -- AUTO SOLVER dengan prioritas
             if state and state.b then
                 task.spawn(function()
                     pcall(function()
@@ -1304,17 +1370,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         local safeTiles = {}
                         local guessTiles = {}
                         
-                        -- Kumpulkan SEMUA tile dari grid (termasuk yang dari cache)
+                        -- Kumpulkan SEMUA tile dari grid
                         for r0 = 1, Hc do
                             for c0 = 1, Wc do
                                 local cell = b0[r0][c0]
                                 if cell.a == "covered" and da[B0(r0, c0)] then
                                     local cellData = cell.c
                                     local part = cellData and cellData.a
+                                    local key = B0(r0, c0)
                                     
                                     if part and part:IsA("BasePart") and not part:GetAttribute("SolverDone") then
-                                        -- PRIORITAS 1: Tile yang pasti aman (deteksi corner)
-                                        if isDefinitelySafe(r0, c0) then
+                                        -- PRIORITAS 1: Tile yang pasti aman (dari logic)
+                                        if knownClear[key] then
                                             table.insert(safeTiles, {
                                                 part = part,
                                                 pos = part.Position,
@@ -1402,9 +1469,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         if d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                         elseif d8.a == "covered" and draw then
-                            if isDefinitelySafe(r0, c0) then
+                            local key = B0(r0, c0)
+                            if knownClear[key] then
                                 guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                            elseif isDefinitelyBomb(r0, c0) then
+                            elseif knownFlag[key] then
                                 guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                             else
                                 local v0raw = (pr[r0] and pr[r0][c0]) or gP
