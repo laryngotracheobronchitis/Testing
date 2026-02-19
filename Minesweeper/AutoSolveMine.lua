@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- CORNER DETECTION FIX - Memperbaiki deteksi corner
+-- BORDER DETECTION FIX - Memperbaiki deteksi bomb di pinggiran
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -84,15 +84,15 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq - CORNER DETECTION FIX",
+    Text = "BORDER DETECTION FIX - Bomb di pinggiran terdeteksi",
     TextSize = 18,
-    TextColor3 = c(200, 200, 200),
+    TextColor3 = c(255, 255, 0),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.4, 0, 0.08, 0),
-    Position = u(0.58, 0, 0.01, 0),
+    Size = u(0.45, 0, 0.08, 0),
+    Position = u(0.53, 0, 0.01, 0),
     ZIndex = 10
 })
 
@@ -158,9 +158,9 @@ lbl("Flag", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
 
 local patchedLabel = n("TextLabel", a, {
-    Text = "(Corner Fixed!)",
+    Text = "(Border Fixed!)",
     TextSize = 11,
-    TextColor3 = c(255, 255, 100),
+    TextColor3 = c(255, 255, 0),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
@@ -236,7 +236,7 @@ n("TextLabel", img, {
     BackgroundTransparency = 1,
     Size = u(.41045, 0, .0969, 0),
     BorderColor3 = c(0, 0, 0),
-    Text = "corner fix",
+    Text = "border fix",
     Rotation = -5,
     Position = u(.56212, 0, .14326, 0)
 })
@@ -271,7 +271,7 @@ local function e(vv)
     return vv and true or false
 end
 
--- FUNGSI DETEKSI CORNER
+-- FUNGSI DETEKSI POSISI
 local function isCornerCell(row, col, totalRows, totalCols)
     return (row == 1 and col == 1) or 
            (row == 1 and col == totalCols) or 
@@ -284,23 +284,38 @@ local function isBorderCell(row, col, totalRows, totalCols)
            (row == 1 or row == totalRows or col == 1 or col == totalCols)
 end
 
--- FUNGSI MEMBACA ANGKA DENGAN LEBIH BAIK
+-- FUNGSI MEMBACA ANGKA DENGAN LEBIH BAIK UNTUK BORDER
 local function extractNumber(text)
     if not text or text == "" then return nil end
     
-    -- Coba ambil angka langsung
-    local num = tonumber(text)
-    if num then return num end
-    
-    -- Coba ambil semua digit
-    local digits = text:match("%d+")
-    if digits then return tonumber(digits) end
+    -- Hapus karakter non-digit
+    local cleanText = text:gsub("[^%d]", "")
+    if cleanText ~= "" then
+        return tonumber(cleanText)
+    end
     
     -- Coba ambil digit pertama
     local digit = text:match("%d")
     if digit then return tonumber(digit) end
     
     return nil
+end
+
+-- FUNGSI CEK WARNA UNTUK DETEKSI BOMB
+local function checkColorForBomb(part)
+    if not part or not part.Color then return false end
+    
+    local color = part.Color
+    local r = math.floor(color.R * 255)
+    local g = math.floor(color.G * 255)
+    local b = math.floor(color.B * 255)
+    
+    -- Warna bomb biasanya kuning (255,255,125) atau variasi
+    if r > 200 and g > 200 and b < 150 then
+        return true
+    end
+    
+    return false
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
@@ -321,13 +336,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         rotOn = e(y1)
     end
     i.d = {
-        r = tonumber(c1) or 0.01,  -- Ubah ke 0.01 untuk kecepatan
+        r = tonumber(c1) or 0.01,
         s = tonumber(d1) or 3,
         t = f1 or Enum.Font.Arcade,
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },  -- Ubah ke 0.01
+        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
@@ -463,7 +478,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local guiCache = {}
         local partCache = {}
         local updateThrottle = 0
-        local THROTTLE_INTERVAL = 0.01  -- Ubah ke 0.01
+        local THROTTLE_INTERVAL = 0.01
         
         local function A6()
             local parent = cg or A5
@@ -476,7 +491,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return p2
         end
         local function T1(sv)
-            return extractNumber(sv)  -- Gunakan fungsi extractNumber
+            return extractNumber(sv)
         end
         local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
         local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
@@ -1095,7 +1110,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local da = {}
             local bombsToFlag = {}
             
-            -- DETEKSI CORNER
+            -- DETEKSI BOMB DI PINGGIRAN
             local rows = Hc
             local cols = Wc
             
@@ -1106,35 +1121,40 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                                
+                                -- Ambil part untuk cek warna
+                                local cellData = b0[rr][cc]
+                                local part = cellData and cellData.c and cellData.c.a
+                                
+                                -- CEK POSISI
+                                local isCorner = isCornerCell(rr, cc, rows, cols)
+                                local isBorder = isBorderCell(rr, cc, rows, cols)
+                                
+                                -- CEK WARNA (untuk deteksi bomb)
+                                local isYellow = part and checkColorForBomb(part)
+                                
+                                -- Hitung probabilitas
                                 local v0raw = (pr[rr] and pr[rr][cc]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    
-                                    -- CEK APAKAH INI CORNER
-                                    local isCorner = isCornerCell(rr, cc, rows, cols)
-                                    local isBorder = isBorderCell(rr, cc, rows, cols)
-                                    
-                                    -- KOREKSI UNTUK CORNER
-                                    if isCorner then
-                                        -- Corner hampir pasti bomb
-                                        v0 = 1.0
-                                    elseif isBorder then
-                                        -- Border lebih berisiko
-                                        v0 = math.min(v0 + 0.2, 1.0)
-                                    end
-                                    
-                                    if tonumber(v0) and v0 >= 0.85 then  -- Threshold lebih rendah untuk bomb
-                                        local cellData = b0[rr][cc]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            table.insert(bombsToFlag, {
-                                                part = cellData.c.a,
-                                                row = rr,
-                                                col = cc,
-                                                prob = v0,
-                                                isCorner = isCorner,
-                                                isBorder = isBorder
-                                            })
-                                        end
+                                local v0 = A7(v0raw or 0.5)
+                                
+                                -- KOREKSI UNTUK PINGGIRAN
+                                if isCorner or isBorder or isYellow then
+                                    -- Jika di pinggir atau warna kuning, kemungkinan besar bomb
+                                    v0 = 0.95
+                                end
+                                
+                                -- TAMBAHKAN KE DAFTAR BOMB
+                                if tonumber(v0) and v0 >= 0.7 then  -- Threshold diturunkan jadi 0.7
+                                    if cellData and cellData.c and cellData.c.a then
+                                        table.insert(bombsToFlag, {
+                                            part = cellData.c.a,
+                                            row = rr,
+                                            col = cc,
+                                            prob = v0,
+                                            isCorner = isCorner,
+                                            isBorder = isBorder,
+                                            isYellow = isYellow
+                                        })
                                     end
                                 end
                             end
@@ -1143,7 +1163,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
             
-            -- Auto Flag bombs (termasuk corner)
+            -- Auto Flag bombs (termasuk yang di pinggir)
             if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = tonumber(boxFS and boxFS.Text) or 0.01
                 for _, bombData in ipairs(bombsToFlag) do
@@ -1185,17 +1205,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             else
                                 local v0 = A7(v0raw)
                                 
-                                -- CEK CORNER UNTUK VISUAL
+                                -- CEK POSISI UNTUK VISUAL
                                 local isCorner = isCornerCell(r0, c0, rows, cols)
                                 local isBorder = isBorderCell(r0, c0, rows, cols)
+                                local isYellow = p3 and checkColorForBomb(p3)
                                 
-                                if isCorner then
-                                    -- Corner ditandai merah
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = "C", color = Color3.fromRGB(255, 0, 0)}
-                                elseif isBorder then
-                                    -- Border ditandai oranye
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = "B", color = Color3.fromRGB(255, 165, 0)}
-                                elseif tonumber(v0) and v0 >= 0.85 then
+                                if isCorner or (isBorder and v0 >= 0.5) or isYellow then
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = "💣", color = Color3.fromRGB(255, 0, 0)}
+                                elseif tonumber(v0) and v0 >= 0.7 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                                 elseif tonumber(v0) and v0 <= 0.01 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
