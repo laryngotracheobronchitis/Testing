@@ -114,12 +114,13 @@ local function ico(name, y)
     return i
 end
 
--- 5 tombol
-local btnScript = ico("script", .10419)    -- Auto Solver
-local btnInstant = ico("instant", .27886)  -- Instant TP
-local btnRange = ico("range", .45352)      -- Range
-local btnAuto = ico("autoclick", .62818)   -- Flag  
-local btnGuess = ico("guess", .80284)      -- Auto Guess
+-- 6 tombol
+local btnScript = ico("script", .08419)    -- Auto Solver
+local btnInstant = ico("instant", .22886)  -- Instant TP
+local btnShowAll = ico("showall", .37352)  -- Show All
+local btnRange = ico("range", .51818)      -- Range
+local btnAuto = ico("autoclick", .66284)   -- Flag  
+local btnGuess = ico("guess", .80750)      -- Auto Guess
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -156,9 +157,10 @@ end
 
 lbl("Auto Solver", .2796, .04033, .06, .15)
 lbl("Instant TP", .29895, .22344, .07, .13)
-lbl("Range", .2796, .40656, .08, .12)
-lbl("Flag", .29895, .58967, .06, .09)
-lbl("Auto Guess", .2796, .77278, .06, .09)
+lbl("Show All", .2796, .40656, .08, .12)
+lbl("Range", .29895, .58967, .06, .09)
+lbl("Flag", .2796, .77278, .06, .09)
+lbl("Auto Guess", .2796, .95589, .06, .09)
 
 local statusLabel = n("TextLabel", a, {
     Text = "Status: Ready",
@@ -285,15 +287,8 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Teleport dengan small offset untuk avoid collision
-    -- Gunakan CFrame.new yang proper dengan orientation
-    local currentOrientation = root.CFrame - root.CFrame.Position
-    local newCFrame = CFrame.new(position) * currentOrientation
-    
-    root.CFrame = newCFrame + Vector3.new(0, 2.5, 0)
-    
-    -- Force physics update
-    task.wait()
+    -- Direct teleport ke position part (NO offset, NO manipulation)
+    root.CFrame = CFrame.new(position)
 end
 
 -- Fungsi flag bomb
@@ -337,7 +332,7 @@ local function extractNumber(text)
 end
 
 -- FUNGSI UTAMA SOLVER
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instantOn)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instantOn, showAll)
     local i = state
     local j = e(t)
     local function k()
@@ -368,7 +363,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             fspd = 0.05,  -- Sweep's default
             guess = e(guessOn), 
             delay = tonumber(delayVal) or 0.01,
-            instant = e(instantOn)  -- Instant TP mode
+            instant = e(instantOn),  -- Instant TP mode
+            showAll = e(showAll)  -- Show All mode
         },
         rot = {
             on = rotOn == nil and false or rotOn,
@@ -717,12 +713,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             end
             
             
-            -- ========== UNIFIED DETECTION SYSTEM ==========
-            -- Kombinasi Corner + Minesweeper untuk hasil optimal
+            -- ========== UNIFIED DETECTION SYSTEM (IMPROVED) ==========
+            -- Kombinasi Corner + Minesweeper dengan iterasi maksimal
             local allMines = {}
             local allSafes = {}
             
-            -- PHASE 1: Corner Detection (Quick pass)
+            -- PHASE 1: Corner Detection (Quick scan)
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     local cell = b0[r0][c0]
@@ -745,12 +741,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         
                         local remaining = cell.b - flagged
                         
+                        -- All covered are bombs
                         if remaining == #covered and #covered > 0 then
                             for _, bombCell in ipairs(covered) do
                                 allMines[bombCell] = true
                             end
                         end
                         
+                        -- All covered are safe
                         if remaining == 0 and #covered > 0 then
                             for _, safeCell in ipairs(covered) do
                                 allSafes[safeCell] = true
@@ -760,11 +758,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 end
             end
             
-            -- PHASE 2: Minesweeper Iterative Detection (💣)
-            -- Lanjutkan dari hasil Corner detection untuk solve lebih dalam
+            -- PHASE 2: Minesweeper Iterative Detection (up to 100 passes!)
+            -- Increased from 64 to 100 untuk catch semua tiles
             local changed = true
             local guard = 0
-            while changed and guard < 64 do
+            local maxIterations = 100
+            
+            while changed and guard < maxIterations do
                 changed = false
                 guard = guard + 1
                 
@@ -820,8 +820,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             for _ in pairs(allMines) do mineCount = mineCount + 1 end
             for _ in pairs(allSafes) do safeCount = safeCount + 1 end
             
-            local modeText = guard > 1 and "💣" or ""
-            statusLabel.Text = modeText .. " Found: " .. safeCount .. " safe, " .. mineCount .. " mines"
+            -- Status with iteration count
+            local modeText = guard > 1 and ("💣 Pass:" .. guard .. " ") or ""
+            statusLabel.Text = modeText .. safeCount .. " safe, " .. mineCount .. " mines"
             
             -- AUTO FLAG: Flag detected bombs
             if ac and ac.on then
@@ -856,11 +857,12 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         local instantMode = ac.instant or false
                         local safeTiles = {}
                         
-                        -- Collect safe tiles with distance sorting
+                        -- Collect ALL safe tiles tanpa skip
                         for cell, _ in pairs(allSafes) do
                             if cell.c and cell.c.a then
                                 local part = cell.c.a
-                                if part and part:IsA("BasePart") and not part:GetAttribute("Visited") then
+                                if part and part:IsA("BasePart") then
+                                    -- NO Visited check - process semua tiles
                                     local dist = (part.Position - root.Position).Magnitude
                                     table.insert(safeTiles, {
                                         part = part,
@@ -872,33 +874,28 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         end
                         
                         if #safeTiles > 0 then
+                            -- Sort by distance (closest first)
+                            table.sort(safeTiles, function(a, b) 
+                                return a.dist < b.dist 
+                            end)
+                            
                             if instantMode then
-                                -- INSTANT: Process ALL tiles rapidly
-                                -- Sort by distance for efficient pathing
-                                table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
-                                
+                                -- INSTANT MODE: Process ALL tiles sekaligus
                                 for i, tile in ipairs(safeTiles) do
                                     teleportTo(tile.pos)
-                                    tile.part:SetAttribute("Visited", true)
-                                    
-                                    -- Micro delay untuk server processing
-                                    if i % 3 == 0 then
-                                        task.wait(0.01)
-                                    end
+                                    -- No wait between tiles! Truly instant!
                                 end
-                                
-                                statusLabel.Text = "Instant: " .. #safeTiles .. " cleared"
+                                statusLabel.Text = "⚡ Instant: " .. #safeTiles .. " done"
+                                task.wait(teleportDelay)  -- Wait once at end
                             else
-                                -- SEQUENTIAL: One at a time, closest first
-                                table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
+                                -- SEQUENTIAL MODE: One tile per cycle
                                 local target = safeTiles[1]
-                                
                                 teleportTo(target.pos)
-                                target.part:SetAttribute("Visited", true)
-                                
-                                statusLabel.Text = "Sequential: " .. (#safeTiles - 1) .. " remaining"
+                                statusLabel.Text = "→ Next: " .. (#safeTiles - 1) .. " left"
                                 task.wait(teleportDelay)
                             end
+                        else
+                            statusLabel.Text = "✓ All safe tiles cleared"
                         end
                     end)
                 end)
@@ -1323,7 +1320,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 end)
             end
             
-            -- GUI Updates
+            -- GUI Updates (with Show All support)
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1336,12 +1333,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     if p3 and p3:IsA("BasePart") then
                         local draw
                         if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
-                        if d8.a == "flagged" then
+                        
+                        -- Show All mode: Always show mines and safes
+                        if ac.showAll and allMines[d8] then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "💣", color = nil}
+                        elseif ac.showAll and allSafes[d8] then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "✅", color = nil}
+                        elseif d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif mines[d8] then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif safes[d8] then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                         elseif d8.a == "covered" and draw then
                             local v0raw = (pr[r0] and pr[r0][c0]) or gP
                             if v0raw == nil then
@@ -1464,7 +1463,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
-local toggles = { btnScript, btnInstant, btnRange, btnAuto, btnGuess }
+local toggles = { btnScript, btnInstant, btnShowAll, btnRange, btnAuto, btnGuess }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1482,6 +1481,7 @@ local function pushState()
     local r2 = boxR and tonum(boxR.Text) or 100
     local rOn = btnBool(btnRange)
     local instantOn = btnBool(btnInstant)  -- Instant TP
+    local showAll = btnBool(btnShowAll)  -- Show All
     local aOn = btnBool(btnAuto)
     local f2 = boxF and tonum(boxF.Text) or 16
     local fs = boxFS and tonum(boxFS.Text) or 0.05
@@ -1494,10 +1494,11 @@ local function pushState()
     end
     
     callS(false)
-    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal, instantOn)
+    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal, instantOn, showAll)
     
-    local mode = instantOn and "Instant" or "Sequential"
-    statusLabel.Text = "Status: Running (" .. mode .. ")"
+    local mode = instantOn and "⚡Instant" or "→Sequential"
+    local show = showAll and " 👁️" or ""
+    statusLabel.Text = "Running: " .. mode .. show
 end
 
 local function bindToggle(bx)
@@ -1512,6 +1513,7 @@ end
 
 bindToggle(btnScript)
 bindToggle(btnInstant)
+bindToggle(btnShowAll)
 bindToggle(btnRange)
 bindToggle(btnAuto)
 bindToggle(btnGuess)
