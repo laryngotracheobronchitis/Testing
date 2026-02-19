@@ -285,9 +285,8 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Teleport dengan offset ke atas agar character di atas tile, bukan di dalam
-    -- Tambah offset Y sesuai character height (biasanya ~3 studs)
-    root.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+    -- Direct teleport tanpa offset - biarkan game yang atur posisi character
+    root.CFrame = CFrame.new(position)
 end
 
 -- Fungsi flag bomb
@@ -710,10 +709,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 end
             end
             
-            -- ========== SISTEM DETEKSI CORNER (8 Arah) ==========
-            local mines = {}
-            local safes = {}
             
+            -- ========== UNIFIED DETECTION SYSTEM ==========
+            -- Kombinasi Corner + Minesweeper untuk hasil optimal
+            local allMines = {}
+            local allSafes = {}
+            
+            -- PHASE 1: Corner Detection (Quick pass)
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     local cell = b0[r0][c0]
@@ -726,9 +728,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             local rr, cc = rc[1], rc[2]
                             local nb = b0[rr][cc]
                             if nb then
-                                if nb.a == "flagged" then
+                                if nb.a == "flagged" or allMines[nb] then
                                     flagged = flagged + 1
-                                elseif nb.a == "covered" then
+                                elseif nb.a == "covered" and not allSafes[nb] then
                                     table.insert(covered, nb)
                                 end
                             end
@@ -736,52 +738,107 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         
                         local remaining = cell.b - flagged
                         
-                        -- Jika sisa ubin tertutup == sisa bom → semua BOM
                         if remaining == #covered and #covered > 0 then
                             for _, bombCell in ipairs(covered) do
-                                mines[bombCell] = true
+                                allMines[bombCell] = true
                             end
                         end
                         
-                        -- Jika tidak ada sisa bom → semua AMAN
                         if remaining == 0 and #covered > 0 then
                             for _, safeCell in ipairs(covered) do
-                                safes[safeCell] = true
+                                allSafes[safeCell] = true
                             end
                         end
                     end
                 end
             end
             
-            -- AUTO FLAG: Flag bombs (prioritas utama)
-            local bombsToFlag = {}
-            for cell, _ in pairs(mines) do
-                if cell.c and cell.c.a then
-                    table.insert(bombsToFlag, {
-                        part = cell.c.a
-                    })
+            -- PHASE 2: Minesweeper Iterative Detection (💣)
+            -- Lanjutkan dari hasil Corner detection untuk solve lebih dalam
+            local changed = true
+            local guard = 0
+            while changed and guard < 64 do
+                changed = false
+                guard = guard + 1
+                
+                for r0 = 1, Hc do
+                    for c0 = 1, Wc do
+                        local cell = b0[r0][c0]
+                        if cell.a == "revealed" and cell.b and cell.b > 0 then
+                            local neighbors = B3(r0, c0, Hc, Wc)
+                            local unknowns = {}
+                            local flaggedCount = 0
+                            
+                            for _, rc in ipairs(neighbors) do
+                                local rr, cc = rc[1], rc[2]
+                                local nb = b0[rr][cc]
+                                if nb then
+                                    if nb.a == "flagged" or allMines[nb] then
+                                        flaggedCount = flaggedCount + 1
+                                    elseif nb.a == "covered" and not allSafes[nb] then
+                                        table.insert(unknowns, nb)
+                                    end
+                                end
+                            end
+                            
+                            local remaining = cell.b - flaggedCount
+                            
+                            -- All unknowns are mines
+                            if remaining > 0 and remaining == #unknowns then
+                                for _, u in ipairs(unknowns) do
+                                    if not allMines[u] then
+                                        allMines[u] = true
+                                        changed = true
+                                    end
+                                end
+                            end
+                            
+                            -- All unknowns are safe
+                            if remaining == 0 and #unknowns > 0 then
+                                for _, u in ipairs(unknowns) do
+                                    if not allSafes[u] then
+                                        allSafes[u] = true
+                                        changed = true
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
             end
             
-            if ac and ac.on and #bombsToFlag > 0 then
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
-                
-                for _, bombData in ipairs(bombsToFlag) do
-                    local part = bombData.part
-                    if part and part.Parent and not part:GetAttribute("Flagged") then
-                        task.spawn(function()
-                            local success = flagBomb(part)
-                            if success then
-                                task.wait(0.05)  -- Sweep's default
-                            end
-                        end)
+            -- Count results
+            local mineCount = 0
+            local safeCount = 0
+            for _ in pairs(allMines) do mineCount = mineCount + 1 end
+            for _ in pairs(allSafes) do safeCount = safeCount + 1 end
+            
+            local modeText = guard > 1 and "💣" or ""
+            statusLabel.Text = modeText .. " Found: " .. safeCount .. " safe, " .. mineCount .. " mines"
+            
+            -- AUTO FLAG: Flag detected bombs
+            if ac and ac.on then
+                local bombsToFlag = {}
+                for cell, _ in pairs(allMines) do
+                    if cell.c and cell.c.a then
+                        bombsToFlag[#bombsToFlag + 1] = cell.c.a
                     end
                 end
                 
-                task.wait(0.1)  -- Wait for all flags to process
+                if #bombsToFlag > 0 then
+                    for _, part in ipairs(bombsToFlag) do
+                        if part and part.Parent and not part:GetAttribute("Flagged") then
+                            task.spawn(function()
+                                flagBomb(part)
+                                task.wait(0.05)
+                            end)
+                        end
+                    end
+                    task.wait(0.1)
+                end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman
+            -- AUTO SOLVER: Teleport ke safe tiles
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
@@ -791,7 +848,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     local instantMode = ac.instant or false
                     local safeTiles = {}
                     
-                    for cell, _ in pairs(safes) do
+                    for cell, _ in pairs(allSafes) do
                         if cell.c and cell.c.a then
                             local part = cell.c.a
                             if part and part:IsA("BasePart") then
@@ -805,17 +862,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     
                     if #safeTiles > 0 then
                         if instantMode then
-                            -- INSTANT: Process all tiles
-                            for _, tile in ipairs(safeTiles) do
+                            -- INSTANT: All tiles rapidly
+                            for i, tile in ipairs(safeTiles) do
                                 teleportTo(tile.pos)
-                                task.wait(0.01)
+                                if i < #safeTiles then
+                                    task.wait(0.001)
+                                end
                             end
-                            statusLabel.Text = "Instant: " .. #safeTiles .. " processed"
+                            task.wait(teleportDelay)
                         else
-                            -- NORMAL: One tile
+                            -- SEQUENTIAL: One at a time
                             local target = safeTiles[1]
                             teleportTo(target.pos)
-                            statusLabel.Text = "Sequential: " .. #safeTiles .. " left"
                             task.wait(teleportDelay)
                         end
                     end
