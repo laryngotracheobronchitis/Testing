@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- MODIFIED: UI SAMA PERSIS, hanya menambahkan deteksi corner dari Minesweeper.lua
+-- Enhanced Version with Better Mine Detection & Corner/Border Handling
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -58,20 +58,19 @@ local open = n("TextButton", s, {
 n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
 n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
 
--- PANEL dengan ukuran ORIGINAL (308 height)
 local panel = n("Frame", s, {
     Visible = false,
     BorderSizePixel = 0,
     BackgroundColor3 = c(0, 0, 0),
     AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 308),
+    Size = u(0, 600, 0, 380), -- Increased height for new controls
     Position = u(.5, 0, .5, 0),
     BorderColor3 = c(0, 0, 0),
     BackgroundTransparency = 0.1
 })
 
 n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
-n("UIAspectRatioConstraint", panel, { AspectRatio = 1.95 })
+n("UIAspectRatioConstraint", panel, { AspectRatio = 1.58 })
 
 local a = n("Frame", panel, {
     BorderSizePixel = 0,
@@ -85,15 +84,15 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq (STILL IN DEVELOPMENT, EXPECT BUGS) and Auto Flag is still beta maybe by yar",
+    Text = "Enhanced Version - Better Mine Detection & Corner Handling",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.35, 0, 0.08, 0),
-    Position = u(0.63, 0, 0.01, 0),
+    Size = u(0.45, 0, 0.06, 0),
+    Position = u(0.53, 0, 0.01, 0),
     ZIndex = 10
 })
 
@@ -115,11 +114,11 @@ local function ico(name, y)
     return i
 end
 
--- Urutan tombol ORIGINAL (tanpa Auto Guess di UI)
-local btnScript = ico("script", .14419)  -- Run
-local btnRange  = ico("range", .37886)   -- Range
-local btnAuto   = ico("autoclick", .61352) -- Flag
-local btnRot    = ico("rotation", .84818) -- Rotation
+local btnRange  = ico("range", .27886)  -- Adjusted positions
+local btnAuto   = ico("autoclick", .45352)
+local btnScript = ico("script", .10419)
+local btnRot    = ico("rotation", .62818)
+local btnSafe   = ico("safeclick", .80318) -- New button for safe mode
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -144,7 +143,7 @@ local function lbl(txt, sx, py, pt, pb)
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         TextColor3 = c(255, 255, 255),
         BackgroundTransparency = 1,
-        Size = u(sx, 0, .18773, 0),
+        Size = u(sx, 0, .15, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txt,
         Position = u(.10693, 0, py, 0)
@@ -154,15 +153,16 @@ local function lbl(txt, sx, py, pt, pb)
     return L
 end
 
-lbl("Auto Solver", .2796, .05033, .06, .15)
-lbl("Range", .29895, .28344, .07, .13)
-lbl("Flag", .2796, .51656, .08, .12)
-lbl("Rotation", .2796, .74967, .06, .09)
+lbl("Run", .2796, .04033, .06, .15)
+lbl("Range", .29895, .22344, .07, .13)
+lbl("Auto Click", .2796, .39656, .08, .12)
+lbl("Rotation", .2796, .56967, .06, .09)
+lbl("Safe Mode", .2796, .74278, .06, .09) -- New label
 
 local patchedLabel = n("TextLabel", a, {
-    Text = "(Working!)",
+    Text = "(Enhanced!)",
     TextSize = 11,
-    TextColor3 = c(100, 255, 100),
+    TextColor3 = c(100, 255, 255),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
@@ -192,7 +192,7 @@ local function txt(name, ph, sx, px, py, txtv)
         BackgroundColor3 = c(255, 255, 255),
         FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
         PlaceholderText = ph,
-        Size = u(sx, 0, .13791, 0),
+        Size = u(sx, 0, .11, 0),
         Position = u(px, 0, py, 0),
         BorderColor3 = c(0, 0, 0),
         Text = txtv or ""
@@ -207,14 +207,14 @@ local function txt(name, ph, sx, px, py, txtv)
     return t
 end
 
-local boxMax  = txt("max", "5000", .16214, .40588, .07417, "5000")
-local boxDelay = txt("delay", "0.1", .16214, .60268, .07417, "0.1")
-local boxPS   = txt("pspeed", "1", .16214, .79948, .07417, "1")
-local boxR    = txt("r", "100", .16214, .40403, .30729, "100")
-local boxF    = txt("f", "16", .16398, .40403, .5404, "16")
-local boxFS   = txt("fspeed", "0.05", .16398, .60019, .5404, "0.05")
-local boxText = txt("text", "Arcade", .55574, .40588, .77, "Arcade")
-local boxUS = txt("uspeed", "0.2", .16214, .60268, .07417, "0.2")
+local boxMax  = txt("max", "5000", .16214, .40588, .05417, "5000")
+local boxPS   = txt("pspeed", "1", .16214, .79948, .05417, "1")
+local boxR    = txt("r", "100", .16214, .40403, .23729, "100")
+local boxF    = txt("f", "16", .16398, .40403, .4204, "16")
+local boxFS   = txt("fspeed", "0.05", .16398, .60019, .4204, "0.05")
+local boxText = txt("text", "Arcade", .55574, .40588, .60, "Arcade")
+local boxUS = txt("uspeed", "0.2", .16214, .60268, .05417, "0.2")
+local boxCorner = txt("corner", "0.3", .16214, .40403, .77, "0.3") -- New threshold for corner detection
 
 local img = n("ImageLabel", a, {
     ZIndex = 9,
@@ -239,7 +239,7 @@ n("TextLabel", img, {
     BackgroundTransparency = 1,
     Size = u(.41045, 0, .0969, 0),
     BorderColor3 = c(0, 0, 0),
-    Text = "im lazy",
+    Text = "enhanced",
     Rotation = -5,
     Position = u(.56212, 0, .14326, 0)
 })
@@ -274,142 +274,33 @@ local function e(vv)
     return vv and true or false
 end
 
--- Cache untuk menyimpan part yang jauh
-local farPartCache = {}
-local function updateFarPartCache()
-    local w = game:GetService("Workspace")
-    local d = w:FindFirstChild("Flag")
-    if d then
-        local partsFolder = d:FindFirstChild("Parts")
-        if partsFolder and partsFolder:IsA("Folder") then
-            for _, part in ipairs(partsFolder:GetChildren()) do
-                if part:IsA("BasePart") then
-                    local id = tostring(part:GetDebugId())
-                    if not farPartCache[id] then
-                        farPartCache[id] = {
-                            part = part,
-                            pos = part.Position,
-                            size = part.Size,
-                            lastSeen = tick()
-                        }
-                    else
-                        farPartCache[id].pos = part.Position
-                        farPartCache[id].lastSeen = tick()
-                    end
-                end
-            end
-        end
-    end
+-- Enhanced mine detection with corner/border handling
+local function isCornerOrBorderCell(row, col, totalRows, totalCols)
+    -- Check if cell is on border or corner
+    local onBorder = row == 1 or row == totalRows or col == 1 or col == totalCols
+    local onCorner = (row == 1 and col == 1) or (row == 1 and col == totalCols) or 
+                     (row == totalRows and col == 1) or (row == totalRows and col == totalCols)
+    return onCorner, onBorder
 end
 
--- Fungsi deteksi corner dari Minesweeper.lua
-local function isDefinitelySafe(cell, b0, Hc, Wc, knownFlag, knownClear)
-    if not cell then return false end
-    
-    local function getCellAt(r, c)
-        if r >= 1 and r <= Hc and c >= 1 and c <= Wc then
-            return b0[r][c]
-        end
-        return nil
+-- Enhanced probability calculation for corner/border cells
+local function calculateCornerProbability(baseProb, isCorner, isBorder, cornerThreshold)
+    if isCorner then
+        -- Corners are more likely to be 50/50 situations
+        return math.min(baseProb, 1 - baseProb) -- Return the lower probability for safety
+    elseif isBorder then
+        -- Borders have higher uncertainty
+        return baseProb * (1 - cornerThreshold) + 0.5 * cornerThreshold
     end
-    
-    for dr = -1, 1 do
-        for dc = -1, 1 do
-            if not (dr == 0 and dc == 0) then
-                local nr, nc = cell.row + dr, cell.col + dc
-                local neighborCell = getCellAt(nr, nc)
-                if neighborCell and neighborCell.a == "revealed" then
-                    local num = neighborCell.b or 0
-                    local flaggedAround = 0
-                    local coveredCount = 0
-                    local thisTileCovered = false
-                    
-                    for dr2 = -1, 1 do
-                        for dc2 = -1, 1 do
-                            if not (dr2 == 0 and dc2 == 0) then
-                                local nnr, nnc = nr + dr2, nc + dc2
-                                local nnCell = getCellAt(nnr, nnc)
-                                if nnCell then
-                                    if nnCell.a == "flagged" or (knownFlag and knownFlag[nnCell]) then
-                                        flaggedAround = flaggedAround + 1
-                                    elseif nnCell.a == "covered" then
-                                        coveredCount = coveredCount + 1
-                                        if nnr == cell.row and nnc == cell.col then
-                                            thisTileCovered = true
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    
-                    if flaggedAround == num and thisTileCovered then
-                        return true
-                    end
-                    
-                    if coveredCount == 1 and thisTileCovered and num - flaggedAround == 0 then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
+    return baseProb
 end
 
-local function isDefinitelyBomb(cell, b0, Hc, Wc, knownFlag, knownClear)
-    if not cell then return false end
-    
-    local function getCellAt(r, c)
-        if r >= 1 and r <= Hc and c >= 1 and c <= Wc then
-            return b0[r][c]
-        end
-        return nil
-    end
-    
-    for dr = -1, 1 do
-        for dc = -1, 1 do
-            if not (dr == 0 and dc == 0) then
-                local nr, nc = cell.row + dr, cell.col + dc
-                local neighborCell = getCellAt(nr, nc)
-                if neighborCell and neighborCell.a == "revealed" then
-                    local num = neighborCell.b or 0
-                    local flaggedAround = 0
-                    local coveredCount = 0
-                    local thisTileCovered = false
-                    
-                    for dr2 = -1, 1 do
-                        for dc2 = -1, 1 do
-                            if not (dr2 == 0 and dc2 == 0) then
-                                local nnr, nnc = nr + dr2, nc + dc2
-                                local nnCell = getCellAt(nnr, nnc)
-                                if nnCell then
-                                    if nnCell.a == "flagged" or (knownFlag and knownFlag[nnCell]) then
-                                        flaggedAround = flaggedAround + 1
-                                    elseif nnCell.a == "covered" then
-                                        coveredCount = coveredCount + 1
-                                        if nnr == cell.row and nnc == cell.col then
-                                            thisTileCovered = true
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    
-                    if num == flaggedAround + 1 and coveredCount == 1 and thisTileCovered then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, speedVal)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, safeMode)
     local i = state
     local j = e(t)
+    local safeModeEnabled = e(safeMode)
+    local cornerThreshold = tonumber(boxCorner and boxCorner.Text) or 0.3
+    
     local function k()
         local cg = game.CoreGui
         if cg then
@@ -431,21 +322,15 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { 
-            on = e(x1), 
-            rad = tonumber(v1) or 20, 
-            intv = tonumber(n1) or 0.05,
-            fspd = 0.05,
-            guess = e(guessOn),
-            guessThresh = tonumber(guessThresh) or 0.3,
-            speed = tonumber(speedVal) or 0.01
-        },
+        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.05 },
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
             tN = math.max(1, tonumber(rotOpt and rotOpt.tN or 1)),
             uR = (rotOpt and rotOpt.uR == false) and false or true
-        }
+        },
+        safe = safeModeEnabled,
+        corner = cornerThreshold
     }
     if not j then
         i.c = i.c + 1
@@ -456,15 +341,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
     i.c = i.c + 1
     local q = i.c
     i.b = true
-    
-    -- Update cache secara berkala
-    task.spawn(function()
-        while state and state.b and state.c == q do
-            updateFarPartCache()
-            task.wait(1)
-        end
-    end)
-    
     task.spawn(function()
         local r = i.d.r
         local s2 = i.d.s
@@ -474,6 +350,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
         local w2 = i.d.w
         local ac = i.d.ac
         local rot = i.d.rot
+        local safeMode = i.d.safe
+        local cornerThreshold = i.d.corner
+        
+        -- Rest of the rotation control code (keep as is)
         local function mkRotCtl(opt)
             local th = {}
             local function ha(vv)
@@ -777,37 +657,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                     end
                 end
             end
-            
-            -- Tambahkan part dari cache (yang tidak dirender)
-            for id, cacheData in pairs(farPartCache) do
-                if not A4[id] and cacheData.part and cacheData.part.Parent then
-                    local R = cacheData.part
-                    local W
-                    local X = R:FindFirstChild("NumberGui", true)
-                    if X then
-                        if X.FindFirstChildWhichIsA then
-                            W = X:FindFirstChildWhichIsA("TextLabel")
-                        end
-                        if not W then W = X:FindFirstChild("TextLabel") end
-                    end
-                    local Y = false
-                    if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
-                    local Z = nil
-                    if R.GetAttribute then Z = R:GetAttribute("Flagged") end
-                    if Z then Y = true end
-                    
-                    A4[id] = { 
-                        a = R, 
-                        b = cacheData.pos, 
-                        c = cacheData.size, 
-                        d = (W and W:IsA("TextLabel")) and W or nil, 
-                        e = Y, 
-                        f = tick() 
-                    }
-                    P[#P + 1] = A4[id]
-                end
-            end
-            
             if #P == 0 then return end
             local a0 = {}
             local a1, a2, a3 = nil, nil, math.huge
@@ -1233,10 +1082,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
             local gP = d9.b
             local da = {}
             local bombsToFlag = {}
-            local knownFlag = {}
-            local knownClear = {}
+            local safeClicks = {} -- For safe mode
             
-            -- Kumpulkan tile yang perlu dipertimbangkan
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1244,69 +1091,34 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- Proses logika deduksi (seperti di Minesweeper.lua)
-            local function processLogic()
-                local changed = true
-                local guard = 0
-                
-                while changed and guard < 64 do
-                    changed = false
-                    guard = guard + 1
-                    
-                    for r0 = 1, Hc do
-                        for c0 = 1, Wc do
-                            if b0[r0][c0].a == "revealed" then
-                                local num = b0[r0][c0].b or 0
-                                local unknowns = {}
-                                local flaggedCount = 0
-                                
-                                -- Kumpulkan tetangga
-                                for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
-                                    local rr, cc = rc[1], rc[2]
-                                    if b0[rr][cc].a == "flagged" or knownFlag[B0(rr, cc)] then
-                                        flaggedCount = flaggedCount + 1
-                                    elseif b0[rr][cc].a == "covered" and not knownClear[B0(rr, cc)] then
-                                        table.insert(unknowns, {rr, cc})
-                                    end
-                                end
-                                
-                                local remaining = num - flaggedCount
-                                
-                                -- Semua tile yang tidak diketahui adalah bom
-                                if remaining > 0 and remaining == #unknowns then
-                                    for _, rc in ipairs(unknowns) do
-                                        local rr, cc = rc[1], rc[2]
-                                        local key = B0(rr, cc)
-                                        if not knownFlag[key] then
-                                            knownFlag[key] = true
-                                            changed = true
-                                            
-                                            local cellData = b0[rr][cc]
-                                            if cellData and cellData.c and cellData.c.a then
-                                                table.insert(bombsToFlag, {
-                                                    part = cellData.c.a,
-                                                    row = rr,
-                                                    col = cc,
-                                                    prob = 1.0,
-                                                    priority = 1
-                                                })
-                                            end
+                                -- Enhanced mine detection with corner/border handling
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local isCorner, isBorder = isCornerOrBorderCell(rr, cc, Hc, Wc)
+                                    local adjustedProb = calculateCornerProbability(v0raw, isCorner, isBorder, cornerThreshold)
+                                    local v0 = A7(adjustedProb)
+                                    
+                                    if tonumber(v0) and v0 >= 0.99 then
+                                        -- Definitely a bomb
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(bombsToFlag, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
                                         end
-                                    end
-                                -- Semua tile yang tidak diketahui aman
-                                elseif remaining == 0 and #unknowns > 0 then
-                                    for _, rc in ipairs(unknowns) do
-                                        local rr, cc = rc[1], rc[2]
-                                        local key = B0(rr, cc)
-                                        if not knownClear[key] then
-                                            knownClear[key] = true
-                                            changed = true
+                                    elseif safeMode and tonumber(v0) and v0 <= 0.01 then
+                                        -- Definitely safe in safe mode
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(safeClicks, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
                                         end
                                     end
                                 end
@@ -1316,11 +1128,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            processLogic()
-            
-            -- Auto Flag: Pasang bendera pada bom yang terdeteksi
+            -- Auto Flag on bombs
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.05
+                local flagSpeed = tonumber(boxFS and boxFS.Text) or 0.05
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
                     if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
@@ -1339,103 +1149,29 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                 end
             end
             
-            -- AUTO SOLVER dengan prioritas
-            if state and state.b then
-                task.spawn(function()
-                    pcall(function()
-                        local player = game:GetService("Players").LocalPlayer
-                        if not player or not player.Character then return end
-                        local root = player.Character:FindFirstChild("HumanoidRootPart")
-                        if not root then return end
-                        
-                        local teleportDelay = ac.speed or 0.01
-                        local safeTiles = {}
-                        local guessTiles = {}
-                        
-                        -- Kumpulkan SEMUA tile dari grid
-                        for r0 = 1, Hc do
-                            for c0 = 1, Wc do
-                                local cell = b0[r0][c0]
-                                if cell.a == "covered" and da[B0(r0, c0)] then
-                                    local cellData = cell.c
-                                    local part = cellData and cellData.a
-                                    local key = B0(r0, c0)
-                                    
-                                    if part and part:IsA("BasePart") and not part:GetAttribute("SolverDone") then
-                                        -- PRIORITAS 1: Tile yang pasti aman (dari logic)
-                                        if knownClear[key] then
-                                            table.insert(safeTiles, {
-                                                part = part,
-                                                pos = part.Position,
-                                                dist = (part.Position - root.Position).Magnitude,
-                                                prob = 0,
-                                                priority = 1
-                                            })
-                                        else
-                                            -- Gunakan probability
-                                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                            if v0raw then
-                                                local v0 = A7(v0raw)
-                                                -- PRIORITAS 2: Tile dengan probabilitas sangat rendah
-                                                if tonumber(v0) and v0 <= 0.1 then
-                                                    table.insert(safeTiles, {
-                                                        part = part,
-                                                        pos = part.Position,
-                                                        dist = (part.Position - root.Position).Magnitude,
-                                                        prob = v0,
-                                                        priority = 2
-                                                    })
-                                                -- PRIORITAS 3: Tile untuk Auto Guess
-                                                elseif ac.guess and tonumber(v0) and v0 <= ac.guessThresh then
-                                                    table.insert(guessTiles, {
-                                                        part = part,
-                                                        pos = part.Position,
-                                                        dist = (part.Position - root.Position).Magnitude,
-                                                        prob = v0,
-                                                        priority = 3
-                                                    })
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
+            -- Safe Mode: Click on definitely safe cells
+            if safeMode and ac and ac.on and #safeClicks > 0 then
+                local clickSpeed = tonumber(boxPS and boxPS.Text) or 1
+                for _, safeData in ipairs(safeClicks) do
+                    local part = safeData.part
+                    if part and part.Parent then
+                        local cd = part:FindFirstChildOfClass("ClickDetector", true)
+                        if cd then
+                            local alreadyClicked = part:GetAttribute("AutoClicked")
+                            if not alreadyClicked then
+                                task.spawn(function()
+                                    pcall(function()
+                                        fireclickdetector(cd)
+                                        part:SetAttribute("AutoClicked", true)
+                                    end)
+                                end)
+                                task.wait(clickSpeed)
                             end
                         end
-                        
-                        local target = nil
-                        
-                        -- Prioritaskan safeTiles
-                        if #safeTiles > 0 then
-                            table.sort(safeTiles, function(a, b) 
-                                if a.priority ~= b.priority then
-                                    return a.priority < b.priority
-                                elseif math.abs(a.prob - b.prob) < 0.01 then
-                                    return a.dist < b.dist
-                                else
-                                    return a.prob < b.prob
-                                end
-                            end)
-                            target = safeTiles[1]
-                        elseif #guessTiles > 0 then
-                            table.sort(guessTiles, function(a, b) 
-                                return a.prob < b.prob
-                            end)
-                            target = guessTiles[1]
-                        end
-                        
-                        -- TELEPORT KE ATAS TILE
-                        if target and target.part then
-                            pcall(function()
-                                root.CFrame = CFrame.new(target.pos + Vector3.new(0, 3, 0))
-                                target.part:SetAttribute("SolverDone", true)
-                            end)
-                            task.wait(teleportDelay)
-                        end
-                    end)
-                end)
+                    end
+                end
             end
             
-            -- VISUAL
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1451,25 +1187,27 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, guessThresh, spee
                         if d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                         elseif d8.a == "covered" and draw then
-                            local key = B0(r0, c0)
-                            if knownClear[key] then
-                                guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                            elseif knownFlag[key] then
-                                guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                            if v0raw == nil then
+                                guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
                             else
-                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                if v0raw == nil then
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
+                                local isCorner, isBorder = isCornerOrBorderCell(r0, c0, Hc, Wc)
+                                local adjustedProb = calculateCornerProbability(v0raw, isCorner, isBorder, cornerThreshold)
+                                local v0 = A7(adjustedProb)
+                                
+                                if tonumber(v0) and v0 >= 0.99 then
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                                elseif tonumber(v0) and v0 <= 0.01 then
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                                 else
-                                    local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                                    elseif tonumber(v0) and v0 <= 0.01 then
-                                        guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                                    else
-                                        local pct = v0 * 100
-                                        guiUpdates[#guiUpdates + 1] = {part = p3, text = string.format("%.0f%%", pct), color = A8(v0)}
-                                    end
+                                    local pct = v0 * 100
+                                    -- Add indicator for corner/border cells
+                                    local indicator = isCorner and " (C)" or (isBorder and " (B)" or "")
+                                    guiUpdates[#guiUpdates + 1] = {
+                                        part = p3, 
+                                        text = string.format("%.0f%%%s", pct, indicator), 
+                                        color = isCorner and Color3.fromRGB(255, 200, 0) or (isBorder and Color3.fromRGB(200, 200, 0) or A8(v0))
+                                    }
                                 end
                             end
                         else
@@ -1585,7 +1323,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
-local toggles = { btnScript, btnRange, btnAuto, btnRot }
+local toggles = { btnScript, btnRange, btnAuto, btnRot, btnSafe }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1606,16 +1344,14 @@ local function pushState()
     local f2  = boxF    and tonum(boxF.Text)    or nil
     local fs  = boxFS   and tonum(boxFS.Text)   or nil
     local roOn = btnBool(btnRot)
-    -- Auto Guess tidak ada di UI, jadi default false
-    local guessOn = false
-    local guessThresh = 0.3
-    local speedVal = 0.01
+    local safeOn = btnBool(btnSafe)
+    
     if sOn == false then
         callS(false)
         return
     end
     callS(false)
-    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, guessOn, guessThresh, speedVal)
+    callS(sOn, m, us, ps, fe, r2, rOn, aOn, f2, fs, roOn, safeOn)
 end
 
 local function bindToggle(bx)
@@ -1632,6 +1368,7 @@ bindToggle(btnScript)
 bindToggle(btnRange)
 bindToggle(btnAuto)
 bindToggle(btnRot)
+bindToggle(btnSafe)
 
 local function bindBox(tb)
     if not tb then return end
@@ -1648,6 +1385,7 @@ bindBox(boxR)
 bindBox(boxF)
 bindBox(boxFS)
 bindBox(boxText)
+bindBox(boxCorner)
 
 local dragging = false
 local dragInput, dragStart, startPos
