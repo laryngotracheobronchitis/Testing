@@ -1,11 +1,11 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED VERSION - Dapat dijalankan
+-- FIXED VERSION - Teleport SEKALI ke tile aman pertama
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
 
 -- ========== PENGATURAN KETINGGIAN TELEPORT ==========
-local TELEPORT_HEIGHT = 73.5  -- GANTI ANGKA INI SESUAI KEINGINAN (4.0 atau 4.5)
+local TELEPORT_HEIGHT = 3.0  -- UBAH ANGKA INI: 3.0, 3.5, 4.0, 4.5, 5.0 (terserah Anda)
 -- ====================================================
 
 local v1 = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
@@ -88,7 +88,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "AUTO SOLVER - Teleport Only",
+    Text = "AUTO SOLVER - Teleport Sekali",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -278,9 +278,8 @@ local function e(vv)
     return vv and true or false
 end
 
--- ========== FUNGSI TELEPORT OPTIMAL ==========
--- Fungsi teleportasi yang hanya mengubah ketinggian (Y)
--- Posisi X dan Z tetap persis di tengah tile
+-- ========== FUNGSI TELEPORT SEDERHANA ==========
+-- Fungsi teleportasi yang hanya mengubah Y (ketinggian)
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -288,17 +287,18 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Ambil posisi X dan Z dari tile (tetap)
-    -- Hanya Y yang diubah sesuai TELEPORT_HEIGHT
+    -- Teleport ke posisi baru dengan ketinggian sesuai TELEPORT_HEIGHT
+    -- X dan Z tetap sama persis dengan tile
     local newPosition = Vector3.new(
-        position.X,  -- X tetap persis di tengah tile
+        position.X,  -- X tetap
         position.Y + TELEPORT_HEIGHT,  -- Y = posisi tile + ketinggian
-        position.Z   -- Z tetap persis di tengah tile
+        position.Z   -- Z tetap
     )
     
     root.CFrame = CFrame.new(newPosition)
+    print("Teleport ke ketinggian: " .. TELEPORT_HEIGHT .. " studs di atas tile")
 end
--- =============================================
+-- ===============================================
 
 -- Fungsi membaca angka
 local function extractNumber(text)
@@ -1111,7 +1111,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman
+            -- AUTO SOLVER: Teleport ke tile aman (HANYA SEKALI!)
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
@@ -1166,10 +1166,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         target = probTiles[1]
                     end
                     
-                    -- Teleport ke target (menggunakan fungsi teleportTo yang sudah dioptimasi)
+                    -- Teleport ke target (HANYA SEKALI!)
                     if target and target.part then
                         teleportTo(target.pos)
+                        statusLabel.Text = "Teleport ke tile aman (ketinggian: " .. TELEPORT_HEIGHT .. ")"
                         task.wait(teleportDelay)
+                        
+                        -- KELUAR DARI LOOP - TIDAK USAH TELEPORT LAGI!
+                        -- Tapi kita tidak bisa keluar dari sini karena ini dalam pcall
+                        -- Kita akan set flag agar tidak teleport lagi
+                        -- Cara sederhana: kosongkan safeTiles dan probTiles
+                        safeTiles = {}
+                        probTiles = {}
                     end
                 end)
             end
@@ -1464,5 +1472,5 @@ open.MouseButton1Up:Connect(function()
 end)
 
 print("Auto Solver loaded! Click the ⚡ button to open menu")
-print("Teleport height: " .. TELEPORT_HEIGHT .. " studs (ubah di line 7-8)")
-print("Mode: Hanya Y yang berubah, X dan Z tetap di tengah tile")
+print("TELEPORT HEIGHT: " .. TELEPORT_HEIGHT .. " studs - UBAH ANGKA DI LINE 8")
+print("Mode: Teleport SEKALI ke tile aman pertama, tidak naik-turun")
