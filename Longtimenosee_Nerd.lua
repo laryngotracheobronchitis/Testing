@@ -1,5 +1,6 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
 -- FIXED VERSION - Auto Flag berfungsi & posisi teleport lebih baik
+-- MODIFIED: Menambahkan sistem deteksi corner dari Minesweeper.lua (8 arah)
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -84,7 +85,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "AUTO SOLVER - Fixed Teleport & Flag",
+    Text = "AUTO SOLVER - Fixed Teleport & Corner Detection",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -753,17 +754,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- ==================== CORNER DETECTION (8 ARAH) ====================
-            -- MODIFIKASI: Menambahkan deteksi corner 8 arah tanpa mengubah struktur asli
+            -- ========== SISTEM DETEKSI CORNER DARI Minesweeper.lua ==========
+            -- Menggunakan logika deterministik 8 arah yang lebih optimal
             
-            local mines = {}
-            local safes = {}
+            local mines = {}  -- Bom pasti
+            local safes = {}  -- Aman pasti
             
+            -- Loop melalui semua sel yang terbuka (angka)
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     local cell = b0[r0][c0]
                     if cell.a == "revealed" and cell.b and cell.b > 0 then
-                        -- Gunakan fungsi B3 yang sudah ada untuk mendapatkan 8 arah
+                        -- Ambil semua tetangga 8 arah (termasuk diagonal) menggunakan B3
                         local neighbors = B3(r0, c0, Hc, Wc)
                         local covered = {}
                         local flagged = 0
@@ -782,31 +784,29 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         
                         local remaining = cell.b - flagged
                         
-                        -- LOGIKA CORNER: Jika sisa ubin tertutup == sisa bom
+                        -- LOGIKA 1: Jika sisa ubin tertutup == sisa bom, maka semua ubin itu BOM
                         if remaining == #covered and #covered > 0 then
-                            for _, bomb in ipairs(covered) do
-                                mines[bomb] = true
+                            for _, bombCell in ipairs(covered) do
+                                mines[bombCell] = true
                             end
                         end
                         
-                        -- LOGIKA AMAN: Jika bendera sudah cukup, ubin lain aman
+                        -- LOGIKA 2: Jika tidak ada sisa bom, maka semua ubin tertutup AMAN
                         if remaining == 0 and #covered > 0 then
-                            for _, safe in ipairs(covered) do
-                                safes[safe] = true
+                            for _, safeCell in ipairs(covered) do
+                                safes[safeCell] = true
                             end
                         end
                     end
                 end
             end
             
-            -- AUTO FLAG: Flag bombs (menggunakan logika corner)
+            -- AUTO FLAG: Flag bombs (prioritas utama)
             local bombsToFlag = {}
             for cell, _ in pairs(mines) do
                 if cell.c and cell.c.a then
                     table.insert(bombsToFlag, {
-                        part = cell.c.a,
-                        row = r0,
-                        col = c0
+                        part = cell.c.a
                     })
                 end
             end
@@ -850,15 +850,458 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     if #safeTiles > 0 then
                         local target = safeTiles[1]
                         teleportTo(target.pos)
-                        statusLabel.Text = string.format("Teleport to safe tile (Y=3.85)")
+                        statusLabel.Text = string.format("Teleport to safe tile (corner detection)")
                         task.wait(teleportDelay)
                     else
-                        statusLabel.Text = "No safe tiles from corner detection"
+                        -- Fallback ke sistem lama jika tidak ada tile aman dari corner detection
+                        -- (mempertahankan kompatibilitas dengan sistem probabilitas asli)
                     end
                 end)
             end
             
-            -- GUI Updates (menampilkan mines dan safes)
+            -- ========== SISTEM LAMA (PROBABILITAS) UNTUK FALLBACK ==========
+            -- (Tetap dipertahankan untuk kompatibilitas dengan Auto Guess)
+            local function B3n(E0, Wn, Hn, total, cfg)
+                cfg = cfg or {}
+                local x0 = cfg.maxClusterSize or w2.x
+                local x1 = cfg.hardCapNodes or w2.y
+                local c1, c2 = 0, 0
+                for r0 = 1, Hn do
+                    for c0 = 1, Wn do
+                        local s0 = E0[r0][c0].a
+                        if s0 == "covered" then
+                            c1 = c1 + 1
+                        elseif s0 == "flagged" then
+                            c2 = c2 + 1
+                        end
+                    end
+                end
+                local ch = true
+                local maxIterations = 50
+                local iteration = 0
+                while ch and iteration < maxIterations do
+                    ch = false
+                    iteration = iteration + 1
+                    local f0, f1 = {}, {}
+                    for r0 = 1, Hn do
+                        for c0 = 1, Wn do
+                            local d8 = E0[r0][c0]
+                            if d8.a == "revealed" then
+                                local n0 = B3(r0, c0, Hn, Wn)
+                                local u0 = {}
+                                local f2 = 0
+                                local num = d8.b or 0
+                                for _, rc in ipairs(n0) do
+                                    local rr, cc = rc[1], rc[2]
+                                    local s1 = E0[rr][cc].a
+                                    if s1 == "flagged" then
+                                        f2 = f2 + 1
+                                    elseif s1 == "covered" then
+                                        u0[#u0 + 1] = { rr, cc }
+                                    end
+                                end
+                                if #u0 > 0 then
+                                    if num - f2 == #u0 then
+                                        for _, rc2 in ipairs(u0) do
+                                            f0[#f0 + 1] = rc2
+                                        end
+                                    end
+                                    if num == f2 then
+                                        for _, rc2 in ipairs(u0) do
+                                            f1[#f1 + 1] = rc2
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    for _, rc in ipairs(f0) do
+                        local rr, cc = rc[1], rc[2]
+                        if E0[rr][cc].a == "covered" then
+                            E0[rr][cc].a = "flagged"
+                            c2 = c2 + 1
+                            c1 = c1 - 1
+                            ch = true
+                        end
+                    end
+                end
+                local knownTotal = (total ~= nil)
+                local rem = nil
+                if knownTotal then
+                    rem = math.max((total or 0) - c2, 0)
+                end
+                local vI, iV, cs = {}, {}, {}
+                local function K2(r1, c1x) return tostring(r1) .. ":" .. tostring(c1x) end
+                for r0 = 1, Hn do
+                    for c0 = 1, Wn do
+                        if E0[r0][c0].a == "revealed" then
+                            local u0 = {}
+                            local need = E0[r0][c0].b or 0
+                            for _, rc in ipairs(B3(r0, c0, Hn, Wn)) do
+                                local rr, cc = rc[1], rc[2]
+                                local s1 = E0[rr][cc].a
+                                if s1 == "flagged" then
+                                    need = need - 1
+                                elseif s1 == "covered" then
+                                    local k2 = K2(rr, cc)
+                                    if not vI[k2] then
+                                        vI[k2] = #iV + 1
+                                        iV[#iV + 1] = { rr, cc }
+                                    end
+                                    u0[#u0 + 1] = vI[k2]
+                                end
+                            end
+                            if #u0 > 0 then
+                                cs[#cs + 1] = { vars = u0, need = need }
+                            end
+                        end
+                    end
+                end
+                local ad = {}
+                for i1 = 1, #iV do ad[i1] = {} end
+                for _, con in ipairs(cs) do
+                    for _, a2 in ipairs(con.vars) do
+                        for _, b2 in ipairs(con.vars) do
+                            if a2 ~= b2 then ad[a2][b2] = true end
+                        end
+                    end
+                end
+                local cId, cm = {}, {}
+                local function dfs(vd, id)
+                    cId[vd] = id
+                    cm[id] = cm[id] or {}
+                    cm[id][#cm[id] + 1] = vd
+                    for nbv, _ in pairs(ad[vd]) do
+                        if not cId[nbv] then dfs(nbv, id) end
+                    end
+                end
+                local gid = 0
+                for v2 = 1, #iV do
+                    if not cId[v2] then
+                        gid = gid + 1
+                        dfs(v2, gid)
+                    end
+                end
+                local gC = {}
+                for i1 = 1, gid do gC[i1] = {} end
+                for _, con in ipairs(cs) do
+                    local g = cId[con.vars[1]]
+                    local ok = true
+                    for idx = 2, #con.vars do
+                        if cId[con.vars[idx]] ~= g then ok = false; break end
+                    end
+                    if ok then gC[g][#gC[g] + 1] = con end
+                end
+                local pr = {}
+                for r0 = 1, Hn do pr[r0] = {} end
+                local totalVisited = 0
+                local function topo(vars, cons, map, out)
+                    for _, con in ipairs(cons) do
+                        if not con.vars or #con.vars ~= 2 or con.need ~= 1 then return false end
+                    end
+                    if #vars < 2 then return false end
+                    local deg, adj = {}, {}
+                    for _, v3 in ipairs(vars) do
+                        deg[v3] = 0
+                        adj[v3] = {}
+                    end
+                    for _, con in ipairs(cons) do
+                        local a3, b3 = con.vars[1], con.vars[2]
+                        if not adj[a3][b3] then
+                            adj[a3][b3] = true
+                            adj[b3][a3] = true
+                            deg[a3] = deg[a3] + 1
+                            deg[b3] = deg[b3] + 1
+                        end
+                    end
+                    local ends = {}
+                    for _, v3 in ipairs(vars) do
+                        if deg[v3] == 1 then
+                            ends[#ends + 1] = v3
+                        elseif deg[v3] ~= 2 then
+                            return false
+                        end
+                    end
+                    if #ends ~= 2 then return false end
+                    local seq, seen = {}, {}
+                    local function push(v3) seq[#seq + 1] = v3; seen[v3] = true end
+                    local cur = ends[1]
+                    push(cur)
+                    while true do
+                        local nxt = nil
+                        for nbv, _ in pairs(adj[cur]) do
+                            if not seen[nbv] then nxt = nbv; break end
+                        end
+                        if not nxt then break end
+                        cur = nxt
+                        push(cur)
+                    end
+                    if #seq ~= #vars then return false end
+                    local cnt, sols = {}, 0
+                    for _, v3 in ipairs(vars) do cnt[v3] = 0 end
+                    for sb = 0, 1 do
+                        sols = sols + 1
+                        for i1, v3 in ipairs(seq) do
+                            local bit = (sb + (i1 - 1)) % 2
+                            cnt[v3] = cnt[v3] + bit
+                        end
+                    end
+                    for _, v3 in ipairs(vars) do
+                        local rc = iV[v3]
+                        out[rc[1]][rc[2]] = cnt[v3] / sols
+                    end
+                    return true
+                end
+                local function back(vars, cons)
+                    local V = #vars
+                    local cnt, sols = {}, 0
+                    for i1 = 1, V do cnt[vars[i1]] = 0 end
+                    local st = {}
+                    for ci, con in ipairs(cons) do
+                        st[ci] = { need = math.max(0, math.min(con.need, #con.vars)), undecided = #con.vars }
+                    end
+                    local v2c = {}
+                    for ci, con in ipairs(cons) do
+                        for _, v3 in ipairs(con.vars) do
+                            v2c[v3] = v2c[v3] or {}
+                            v2c[v3][#v2c[v3] + 1] = ci
+                        end
+                    end
+                    local asg = {}
+                    local function apply(ci, isMine)
+                        local s2 = st[ci]
+                        if isMine then s2.need = s2.need - 1 end
+                        s2.undecided = s2.undecided - 1
+                        return not (s2.need < 0 or s2.need > s2.undecided)
+                    end
+                    local function rec(idx)
+                        if totalVisited > x1 then return end
+                        totalVisited = totalVisited + 1
+                        if idx > V then
+                            sols = sols + 1
+                            for i1 = 1, V do
+                                local vid = vars[i1]
+                                if asg[vid] == 1 then cnt[vid] = cnt[vid] + 1 end
+                            end
+                            return
+                        end
+                        local vid = vars[idx]
+                        for _, m0 in ipairs({ 0, 1 }) do
+                            local snaps = {}
+                            local ok = true
+                            for _, ci in ipairs(v2c[vid] or {}) do
+                                local s2 = st[ci]
+                                snaps[#snaps + 1] = { ci = ci, need = s2.need, undecided = s2.undecided }
+                                if not apply(ci, m0 == 1) then ok = false; break end
+                            end
+                            if ok then
+                                asg[vid] = m0
+                                rec(idx + 1)
+                                asg[vid] = nil
+                            end
+                            for i1 = #snaps, 1, -1 do
+                                local s3 = snaps[i1]
+                                st[s3.ci].need = s3.need
+                                st[s3.ci].undecided = s3.undecided
+                            end
+                            if totalVisited > x1 then break end
+                        end
+                    end
+                    rec(1)
+                    return cnt, sols
+                end
+                local function soft(vars, cons)
+                    local sum, ct, totNeed, totUndec = {}, {}, 0, 0
+                    for _, con in ipairs(cons) do
+                        local undec = #con.vars
+                        local need = math.max(0, math.min(con.need, undec))
+                        if undec > 0 then
+                            local frac = need / undec
+                            for _, vid in ipairs(con.vars) do
+                                sum[vid] = (sum[vid] or 0) + frac
+                                ct[vid] = (ct[vid] or 0) + 1
+                            end
+                            totNeed = totNeed + need
+                            totUndec = totUndec + undec
+                        end
+                    end
+                    local avg = (totUndec > 0) and (totNeed / totUndec) or nil
+                    local out = {}
+                    for _, vid in ipairs(vars) do
+                        if ct[vid] and ct[vid] > 0 then
+                            out[vid] = math.clamp(sum[vid] / ct[vid], 0, 1)
+                        else
+                            out[vid] = avg
+                        end
+                    end
+                    return out, avg
+                end
+                local gP_acc, gP_den = 0, 0
+                for gi = 1, #cm do
+                    local vars, cons = cm[gi], gC[gi] or {}
+                    if vars and #vars > 0 then
+                        local did = false
+                        if #vars <= x0 then
+                            local okTopo = topo(vars, cons, iV, pr)
+                            if not okTopo then
+                                local cnt, sols = back(vars, cons)
+                                if sols and sols > 0 then
+                                    for _, vid in ipairs(vars) do
+                                        local rc = iV[vid]
+                                        pr[rc[1]][rc[2]] = cnt[vid] / sols
+                                    end
+                                    did = true
+                                end
+                            else
+                                did = true
+                            end
+                        end
+                        if not did then
+                            local probMap, avg = soft(vars, cons)
+                            for _, vid in ipairs(vars) do
+                                local rc = iV[vid]
+                                pr[rc[1]][rc[2]] = probMap[vid]
+                            end
+                            if avg then
+                                gP_acc = gP_acc + avg
+                                gP_den = gP_den + 1
+                            end
+                        end
+                    end
+                end
+                local gP = nil
+                if gP_den > 0 then gP = gP_acc / gP_den end
+                if knownTotal and rem then
+                    local tc = 0
+                    for r0 = 1, Hn do
+                        for c0 = 1, Wn do
+                            if E0[r0][c0].a == "covered" then tc = tc + 1 end
+                        end
+                    end
+                    if rem > 0 then gP = rem / math.max(tc, 1) end
+                end
+                return { a = pr, b = gP, c = Wn, d = Hn }
+            end
+            local d9 = B3n(b0, Wc, Hc, nil, { maxClusterSize = w2.x, hardCapNodes = w2.y })
+            local pr = d9.a or {}
+            local gP = d9.b
+            local da = {}
+            
+            -- Kumpulkan bomb untuk di-flag (threshold 0.85 agar lebih banyak terdeteksi)
+            for r0 = 1, Hc do
+                for c0 = 1, Wc do
+                    if b0[r0][c0].a == "revealed" then
+                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                            local rr, cc = rc[1], rc[2]
+                            if b0[rr][cc].a == "covered" then
+                                da[B0(rr, cc)] = true
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) and v0 >= 0.85 then  -- Threshold 0.85
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(bombsToFlag, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- AUTO FLAG: Flag bombs (sistem probabilitas)
+            if ac and ac.on and #bombsToFlag > 0 then
+                local flagSpeed = ac.fspd or 0.01
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
+                
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData.part
+                    if part and part.Parent then
+                        local success = flagBomb(part)
+                        if success then
+                            task.wait(flagSpeed)
+                        end
+                    end
+                end
+            end
+            
+            -- AUTO SOLVER: Teleport ke tile aman (posisi lebih tinggi)
+            if state and state.b and state.c == q then
+                pcall(function()
+                    local root = M
+                    if not root then return end
+                    
+                    local teleportDelay = ac.delay or 0.01
+                    local safeTiles = {}
+                    local probTiles = {}
+                    
+                    -- Kumpulkan tile untuk teleport
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            local cell = b0[r0][c0]
+                            if cell.a == "covered" and da[B0(r0, c0)] then
+                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    local cellData = cell.c
+                                    local part = cellData and cellData.a
+                                    
+                                    if part and part:IsA("BasePart") then
+                                        -- Safe tile (prob <= 1%)
+                                        if tonumber(v0) and v0 <= 0.01 then
+                                            table.insert(safeTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0
+                                            })
+                                        -- Probability tile (for Auto Guess)
+                                        elseif ac.guess and tonumber(v0) and v0 > 0.01 and v0 < 0.85 then
+                                            table.insert(probTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    local target = nil
+                    local targetType = ""
+                    
+                    -- Priority 1: Safe tiles dari corner detection
+                    if #safeTiles > 0 then
+                        table.sort(safeTiles, function(a, b) return a.prob < b.prob end)
+                        target = safeTiles[1]
+                        targetType = "safe (corner)"
+                    -- Priority 2: Auto Guess
+                    elseif ac.guess and #probTiles > 0 then
+                        table.sort(probTiles, function(a, b) return a.prob < b.prob end)
+                        target = probTiles[1]
+                        targetType = "guess"
+                    end
+                    
+                    -- Teleport ke target
+                    if target and target.part then
+                        teleportTo(target.pos)
+                        statusLabel.Text = string.format("Teleport to %s tile", targetType)
+                        task.wait(teleportDelay)
+                    else
+                        statusLabel.Text = "No tiles to teleport"
+                    end
+                end)
+            end
+            
+            -- GUI Updates
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -869,14 +1312,29 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     local V = d8.c
                     local p3 = V and V.a
                     if p3 and p3:IsA("BasePart") then
-                        if mines[d8] then
+                        local draw
+                        if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
+                        if d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif safes[d8] then
+                        elseif mines[d8] then  -- Prioritas: Tampilkan bom dari corner detection
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                        elseif safes[d8] then  -- Prioritas: Tampilkan aman dari corner detection
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                        elseif d8.a == "flagged" then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif d8.a == "covered" then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(200, 200, 200)}
+                        elseif d8.a == "covered" and draw then
+                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                            if v0raw == nil then
+                                guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
+                            else
+                                local v0 = A7(v0raw)
+                                if tonumber(v0) and v0 >= 0.85 then
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                                elseif tonumber(v0) and v0 <= 0.01 then
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
+                                else
+                                    local pct = v0 * 100
+                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = string.format("%.0f%%", pct), color = A8(v0)}
+                                end
+                            end
                         else
                             local H2 = B4(p3)
                             local I = F0:FindFirstChild(H2)
@@ -909,7 +1367,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             end
             A3.f, A3.g = d1, b0
             A3.h, A3.i = Wc, Hc
-            A3.j, A3.k = mines, safes
+            A3.j, A3.k = pr, gP
         end
         
         -- Loop utama
@@ -1138,4 +1596,4 @@ open.MouseButton1Up:Connect(function()
 end)
 
 print("Auto Solver v3 loaded! Click the ⚡ button to open menu")
-print("Fixes: Corner detection 8 arah, Teleport height 3.85 studs")
+print("Fixes: Corner detection 8 arah (dari Minesweeper.lua), Teleport height 3.85 studs")
