@@ -1,5 +1,7 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
 -- LUAU VERSION - Dengan sistem deteksi corner dari Minesweeper.lua (8 arah)
+-- FIX: Teleportasi normal (ke atas part, bukan ke bawah)
+
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -279,16 +281,25 @@ local function e(vv)
     return vv and true or false
 end
 
--- Fungsi teleportasi dengan posisi 3.85 studs
-local function teleportTo(position)
+-- ========== FUNGSI TELEPORTASI YANG SUDAH DIPERBAIKI ==========
+-- Teleportasi NORMAL ke ATAS part (bukan ke bawah)
+local function teleportTo(position, part)
     local character = player.Character
     if not character then return end
     
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Direct teleport ke position part (NO offset, NO manipulation)
-    root.CFrame = CFrame.new(position)
+    -- Hitung offset ke ATAS berdasarkan ukuran part
+    local yOffset = 3 -- Default offset
+    
+    if part and part:IsA("BasePart") then
+        -- Offset ke ATAS: setengah tinggi part + 3 studs untuk humanoid
+        yOffset = (part.Size.Y / 2) + 3
+    end
+    
+    -- Teleport ke posisi yang benar (DI ATAS part)
+    root.CFrame = CFrame.new(position.X, position.Y + yOffset, position.Z)
 end
 
 -- Fungsi flag bomb
@@ -702,7 +713,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     if V then
                         local r0 = gy - offGY
                         local c0 = gx - offGX
-                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
+                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wn then
                             b0[r0][c0].c = V
                             if b0[r0][c0].a ~= "revealed" then
                                 if V.e then b0[r0][c0].a = "flagged" end
@@ -711,7 +722,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     end
                 end
             end
-            
             
             -- ========== UNIFIED DETECTION SYSTEM (IMPROVED) ==========
             -- Kombinasi Corner + Minesweeper dengan iterasi maksimal
@@ -825,14 +835,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             statusLabel.Text = modeText .. safeCount .. " safe, " .. mineCount .. " mines"
             
             -- AUTO FLAG: Flag detected bombs
-            if ac and ac.on then
-                local bombsToFlag = {}
-                for cell, _ in pairs(allMines) do
-                    if cell.c and cell.c.a then
-                        bombsToFlag[#bombsToFlag + 1] = cell.c.a
-                    end
+            local bombsToFlag = {}
+            for cell, _ in pairs(allMines) do
+                if cell.c and cell.c.a then
+                    bombsToFlag[#bombsToFlag + 1] = cell.c.a
                 end
-                
+            end
+            
+            if ac and ac.on then
                 if #bombsToFlag > 0 then
                     for _, part in ipairs(bombsToFlag) do
                         if part and part.Parent and not part:GetAttribute("Flagged") then
@@ -846,7 +856,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke safe tiles
+            -- ========== AUTO SOLVER: Teleport ke tile aman ==========
+            -- Dengan teleportasi NORMAL (ke atas part)
             if state and state.b and state.c == q then
                 task.spawn(function()
                     pcall(function()
@@ -857,12 +868,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         local instantMode = ac.instant or false
                         local safeTiles = {}
                         
-                        -- Collect ALL safe tiles tanpa skip
+                        -- Collect ALL safe tiles
                         for cell, _ in pairs(allSafes) do
                             if cell.c and cell.c.a then
                                 local part = cell.c.a
                                 if part and part:IsA("BasePart") then
-                                    -- NO Visited check - process semua tiles
                                     local dist = (part.Position - root.Position).Magnitude
                                     table.insert(safeTiles, {
                                         part = part,
@@ -882,7 +892,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             if instantMode then
                                 -- INSTANT MODE: Process ALL tiles sekaligus
                                 for i, tile in ipairs(safeTiles) do
-                                    teleportTo(tile.pos)
+                                    -- Teleport ke ATAS part (NORMAL)
+                                    teleportTo(tile.pos, tile.part)
                                     -- No wait between tiles! Truly instant!
                                 end
                                 statusLabel.Text = "⚡ Instant: " .. #safeTiles .. " done"
@@ -890,7 +901,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             else
                                 -- SEQUENTIAL MODE: One tile per cycle
                                 local target = safeTiles[1]
-                                teleportTo(target.pos)
+                                -- Teleport ke ATAS part (NORMAL)
+                                teleportTo(target.pos, target.part)
                                 statusLabel.Text = "→ Next: " .. (#safeTiles - 1) .. " left"
                                 task.wait(teleportDelay)
                             end
@@ -898,6 +910,86 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             statusLabel.Text = "✓ All safe tiles cleared"
                         end
                     end)
+                end)
+            end
+            
+            -- AUTO FLAG: Flag bombs (sistem probabilitas)
+            if ac and ac.on and #bombsToFlag > 0 then
+                local flagSpeed = ac.fspd or 0.01
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
+                
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData
+                    if part and part.Parent then
+                        local success = flagBomb(part)
+                        if success then
+                            task.wait(flagSpeed)
+                        end
+                    end
+                end
+            end
+            
+            -- AUTO SOLVER: Teleport ke tile aman (sistem probabilitas) - UNTUK OLD SYSTEM
+            if state and state.b and state.c == q then
+                pcall(function()
+                    local root = M
+                    if not root then return end
+                    
+                    local teleportDelay = ac.delay or 0.01
+                    local safeTiles = {}
+                    local probTiles = {}
+                    
+                    for r0 = 1, Hc do
+                        for c0 = 1, Wc do
+                            local cell = b0[r0][c0]
+                            if cell.a == "covered" and da[B0(r0, c0)] then
+                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    local cellData = cell.c
+                                    local part = cellData and cellData.a
+                                    
+                                    if part and part:IsA("BasePart") then
+                                        if tonumber(v0) and v0 <= 0.01 then
+                                            table.insert(safeTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0
+                                            })
+                                        elseif ac.guess and tonumber(v0) and v0 > 0.01 and v0 < 0.85 then
+                                            table.insert(probTiles, {
+                                                part = part,
+                                                pos = part.Position,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    local target = nil
+                    local targetType = ""
+                    
+                    if #safeTiles > 0 then
+                        table.sort(safeTiles, function(a, b) return a.prob < b.prob end)
+                        target = safeTiles[1]
+                        targetType = "safe"
+                    elseif ac.guess and #probTiles > 0 then
+                        table.sort(probTiles, function(a, b) return a.prob < b.prob end)
+                        target = probTiles[1]
+                        targetType = "guess"
+                    end
+                    
+                    if target and target.part then
+                        -- Teleport ke ATAS part (NORMAL)
+                        teleportTo(target.pos, target.part)
+                        statusLabel.Text = string.format("Teleport to %s tile (%.1f%%)", targetType, target.prob * 100)
+                        task.wait(teleportDelay)
+                    else
+                        statusLabel.Text = "No tiles to teleport"
+                    end
                 end)
             end
             
@@ -1247,7 +1339,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
-                    local part = bombData.part
+                    local part = bombData
                     if part and part.Parent then
                         local success = flagBomb(part)
                         if success then
@@ -1311,7 +1403,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     end
                     
                     if target and target.part then
-                        teleportTo(target.pos)
+                        -- Teleport ke ATAS part (NORMAL)
+                        teleportTo(target.pos, target.part)
                         statusLabel.Text = string.format("Teleport to %s tile (%.1f%%)", targetType, target.prob * 100)
                         task.wait(teleportDelay)
                     else
@@ -1623,4 +1716,4 @@ open.MouseButton1Up:Connect(function()
 end)
 
 print("Auto Solver v3 (Luau) loaded! Click the ⚡ button to open menu")
-print("Fixes: Corner detection 8 arah, Teleport height 3.85 studs")
+print("FIXED: Teleportasi NORMAL (ke ATAS part) untuk Sequential & Instant mode")
