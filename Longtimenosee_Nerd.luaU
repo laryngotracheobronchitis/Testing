@@ -291,7 +291,7 @@ local function teleportTo(position)
     -- - Terlalu rendah (2.5): kaki menembus lantai
     -- - Terlalu tinggi (4.0): susah membuka tile
     -- - 3.2: pas, tidak menembus dan mudah membuka tile
-    local heightOffset = 3.2
+    local heightOffset = 4
     
     -- Tambahkan sedikit random offset agar tidak stuck di tile yang sama
     -- Tapi tetap dalam range aman
