@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED VERSION - Dengan pembacaan angka yang lebih baik
+-- CORNER DETECTION FIX - Memperbaiki deteksi corner
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -84,15 +84,15 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "fixed by n4vq (STILL IN DEVELOPMENT, EXPECT BUGS) and Auto Flag is still beta maybe by yar",
+    Text = "fixed by n4vq - CORNER DETECTION FIX",
     TextSize = 18,
     TextColor3 = c(200, 200, 200),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Right,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.35, 0, 0.08, 0),
-    Position = u(0.63, 0, 0.01, 0),
+    Size = u(0.4, 0, 0.08, 0),
+    Position = u(0.58, 0, 0.01, 0),
     ZIndex = 10
 })
 
@@ -158,14 +158,14 @@ lbl("Flag", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
 
 local patchedLabel = n("TextLabel", a, {
-    Text = "(Working!)",
+    Text = "(Corner Fixed!)",
     TextSize = 11,
-    TextColor3 = c(100, 255, 100),
+    TextColor3 = c(255, 255, 100),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.15, 0, 0.06, 0),
+    Size = u(0.2, 0, 0.06, 0),
     Position = u(.10693, 0, .68, 0),
     ZIndex = 5
 })
@@ -236,7 +236,7 @@ n("TextLabel", img, {
     BackgroundTransparency = 1,
     Size = u(.41045, 0, .0969, 0),
     BorderColor3 = c(0, 0, 0),
-    Text = "im lazy",
+    Text = "corner fix",
     Rotation = -5,
     Position = u(.56212, 0, .14326, 0)
 })
@@ -261,7 +261,6 @@ n("ImageLabel", a, {
 
 local B = "Flags status"
 local state = { b = false, c = 0, d = nil }
-local player = game:GetService("Players").LocalPlayer
 
 local function e(vv)
     if type(vv) == "boolean" then return vv end
@@ -272,38 +271,32 @@ local function e(vv)
     return vv and true or false
 end
 
--- Fungsi teleportasi instant
-local function teleportTo(position)
-    local character = player.Character
-    if not character then return end
-    
-    local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
-    if not root then return end
-    
-    root.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
-end
-
--- Deteksi corner berdasarkan posisi di grid
+-- FUNGSI DETEKSI CORNER
 local function isCornerCell(row, col, totalRows, totalCols)
-    return (row == 1 and col == 1) or (row == 1 and col == totalCols) or 
-           (row == totalRows and col == 1) or (row == totalRows and col == totalCols)
+    return (row == 1 and col == 1) or 
+           (row == 1 and col == totalCols) or 
+           (row == totalRows and col == 1) or 
+           (row == totalRows and col == totalCols)
 end
 
--- Deteksi border (tepi) tapi bukan corner
 local function isBorderCell(row, col, totalRows, totalCols)
     return not isCornerCell(row, col, totalRows, totalCols) and 
            (row == 1 or row == totalRows or col == 1 or col == totalCols)
 end
 
--- Fungsi membaca angka dengan lebih baik
+-- FUNGSI MEMBACA ANGKA DENGAN LEBIH BAIK
 local function extractNumber(text)
     if not text or text == "" then return nil end
     
-    -- Coba ambil angka dari text
+    -- Coba ambil angka langsung
     local num = tonumber(text)
     if num then return num end
     
-    -- Coba ambil digit pertama (untuk kasus "1" atau angka tunggal)
+    -- Coba ambil semua digit
+    local digits = text:match("%d+")
+    if digits then return tonumber(digits) end
+    
+    -- Coba ambil digit pertama
     local digit = text:match("%d")
     if digit then return tonumber(digit) end
     
@@ -328,13 +321,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         rotOn = e(y1)
     end
     i.d = {
-        r = tonumber(c1) or 0.01,
+        r = tonumber(c1) or 0.01,  -- Ubah ke 0.01 untuk kecepatan
         s = tonumber(d1) or 3,
         t = f1 or Enum.Font.Arcade,
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },
+        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },  -- Ubah ke 0.01
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
@@ -411,7 +404,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return { add = add, stop = stop }
         end
         local RotCtl = mkRotCtl(rot)
-        
         if ac.on then
             task.spawn(function()
                 local l = game:GetService("Players")
@@ -471,7 +463,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local guiCache = {}
         local partCache = {}
         local updateThrottle = 0
-        local THROTTLE_INTERVAL = 0.01
+        local THROTTLE_INTERVAL = 0.01  -- Ubah ke 0.01
         
         local function A6()
             local parent = cg or A5
@@ -484,7 +476,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return p2
         end
         local function T1(sv)
-            return extractNumber(sv)  -- Gunakan fungsi extractNumber yang baru
+            return extractNumber(sv)  -- Gunakan fungsi extractNumber
         end
         local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
         local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
@@ -588,7 +580,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             end
             return b
         end
-        
         local function B6()
             if not (state and state.b and state.c) then return end
             local currentTime = tick()
@@ -761,7 +752,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 local c0 = gx - offGX
                 if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
                     b0[r0][c0].a = "revealed"
-                    b0[r0][c0].b = extractNumber(V.d.Text) or 0  -- Gunakan extractNumber
+                    b0[r0][c0].b = (T1(V.d.Text) or tonumber(V.d.Text) or 0)
                     b0[r0][c0].c = V
                 end
             end
@@ -1103,12 +1094,15 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local gP = d9.b
             local da = {}
             local bombsToFlag = {}
-            local cellsToClick = {}
             
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
+            -- DETEKSI CORNER
+            local rows = Hc
+            local cols = Wc
+            
+            for r0 = 1, rows do
+                for c0 = 1, cols do
                     if b0[r0][c0].a == "revealed" then
-                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                        for _, rc in ipairs(B3(r0, c0, rows, cols)) do
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
@@ -1116,37 +1110,29 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                 if v0raw then
                                     local v0 = A7(v0raw)
                                     
-                                    -- Deteksi corner
-                                    local isCorner = isCornerCell(rr, cc, Hc, Wc)
-                                    local isBorder = isBorderCell(rr, cc, Hc, Wc)
+                                    -- CEK APAKAH INI CORNER
+                                    local isCorner = isCornerCell(rr, cc, rows, cols)
+                                    local isBorder = isBorderCell(rr, cc, rows, cols)
                                     
-                                    -- Logika deteksi bomb yang lebih baik
+                                    -- KOREKSI UNTUK CORNER
                                     if isCorner then
                                         -- Corner hampir pasti bomb
-                                        v0 = 0.99
+                                        v0 = 1.0
                                     elseif isBorder then
-                                        -- Border perlu analisis lebih
-                                        v0 = math.min(v0 + 0.1, 1.0)
+                                        -- Border lebih berisiko
+                                        v0 = math.min(v0 + 0.2, 1.0)
                                     end
                                     
-                                    if tonumber(v0) and v0 >= 0.85 then  -- Turunkan threshold untuk bomb
+                                    if tonumber(v0) and v0 >= 0.85 then  -- Threshold lebih rendah untuk bomb
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
                                             table.insert(bombsToFlag, {
                                                 part = cellData.c.a,
                                                 row = rr,
                                                 col = cc,
-                                                prob = v0
-                                            })
-                                        end
-                                    elseif tonumber(v0) and v0 <= 0.3 then  -- Naikkan threshold untuk sel aman
-                                        local cellData = b0[rr][cc]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            table.insert(cellsToClick, {
-                                                part = cellData.c.a,
-                                                row = rr,
-                                                col = cc,
-                                                prob = v0
+                                                prob = v0,
+                                                isCorner = isCorner,
+                                                isBorder = isBorder
                                             })
                                         end
                                     end
@@ -1157,71 +1143,33 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
             
-            -- Eksekusi auto solver
-            if ac and ac.on then
-                -- Flag bomb
-                if #bombsToFlag > 0 then
-                    local flagSpeed = tonumber(boxFS and boxFS.Text) or 0.01
-                    for _, bombData in ipairs(bombsToFlag) do
-                        local part = bombData.part
-                        if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                            local flagged = part:GetAttribute("Flagged")
-                            if not flagged then
+            -- Auto Flag bombs (termasuk corner)
+            if ac and ac.on and #bombsToFlag > 0 then
+                local flagSpeed = tonumber(boxFS and boxFS.Text) or 0.01
+                for _, bombData in ipairs(bombsToFlag) do
+                    local part = bombData.part
+                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                        local flagged = part:GetAttribute("Flagged")
+                        if not flagged then
+                            task.spawn(function()
                                 pcall(function()
                                     local args = {part}
-                                    local flagEvent = game:GetService("ReplicatedStorage"):FindFirstChild("Events")
-                                    if flagEvent then
-                                        local flagEvents = flagEvent:FindFirstChild("FlagEvents")
-                                        if flagEvents then
-                                            local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
-                                            if placeFlag then
-                                                placeFlag:FireServer(unpack(args))
-                                            end
-                                        end
-                                    end
+                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
                                     part:SetAttribute("Flagged", true)
                                 end)
-                                task.wait(flagSpeed)
-                            end
-                        end
-                    end
-                end
-                
-                -- Klik sel aman
-                if #cellsToClick > 0 then
-                    table.sort(cellsToClick, function(a, b) return a.prob < b.prob end)
-                    
-                    local clickSpeed = tonumber(boxPS and boxPS.Text) or 0.01
-                    for _, cellData in ipairs(cellsToClick) do
-                        local part = cellData.part
-                        if part and part.Parent then
-                            -- Teleportasi ke sel
-                            teleportTo(part.Position)
-                            task.wait(0.01)
-                            
-                            local cd = part:FindFirstChildOfClass("ClickDetector", true)
-                            if cd then
-                                local alreadyClicked = part:GetAttribute("AutoClicked")
-                                if not alreadyClicked then
-                                    pcall(function()
-                                        fireclickdetector(cd)
-                                        part:SetAttribute("AutoClicked", true)
-                                    end)
-                                    task.wait(clickSpeed)
-                                end
-                            end
+                            end)
+                            task.wait(flagSpeed)
                         end
                     end
                 end
             end
             
-            -- GUI Updates
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
             
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
+            for r0 = 1, rows do
+                for c0 = 1, cols do
                     local d8 = b0[r0][c0]
                     local V = d8.c
                     local p3 = V and V.a
@@ -1237,16 +1185,19 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             else
                                 local v0 = A7(v0raw)
                                 
-                                local isCorner = isCornerCell(r0, c0, Hc, Wc)
-                                local isBorder = isBorderCell(r0, c0, Hc, Wc)
+                                -- CEK CORNER UNTUK VISUAL
+                                local isCorner = isCornerCell(r0, c0, rows, cols)
+                                local isBorder = isBorderCell(r0, c0, rows, cols)
                                 
                                 if isCorner then
+                                    -- Corner ditandai merah
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = "C", color = Color3.fromRGB(255, 0, 0)}
                                 elseif isBorder then
+                                    -- Border ditandai oranye
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = "B", color = Color3.fromRGB(255, 165, 0)}
                                 elseif tonumber(v0) and v0 >= 0.85 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                                elseif tonumber(v0) and v0 <= 0.3 then
+                                elseif tonumber(v0) and v0 <= 0.01 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                                 else
                                     local pct = v0 * 100
@@ -1287,7 +1238,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             A3.h, A3.i = Wc, Hc
             A3.j, A3.k = pr, gP
         end
-        
         pcall(B6)
         while state and state.b and state.c == q do
             task.wait(r or 0.01)
