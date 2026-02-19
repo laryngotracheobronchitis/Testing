@@ -1,15 +1,11 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED VERSION - Auto Flag berfungsi & posisi teleport lebih baik
+-- OPTIMIZED VERSION: High Precision Corner Detection (Minesweeper Logic) & Ground Teleport
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
 
 local v1 = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
-
-if v1:GetAttribute("gay") then
-    return
-end
-
+if v1:GetAttribute("gay") then return end
 v1:SetAttribute("gay", true)
 
 task.spawn(function() task.wait(0) end)
@@ -84,7 +80,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "AUTO SOLVER - Fixed Teleport & Flag",
+    Text = "OPTIMIZED - Corner Fix & Ground TP",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -114,11 +110,10 @@ local function ico(name, y)
     return i
 end
 
--- 4 tombol
-local btnScript = ico("script", .10419)  -- Auto Solver
-local btnRange = ico("range", .27886)    -- Range
-local btnAuto = ico("autoclick", .45352) -- Flag
-local btnGuess = ico("guess", .62818)    -- Auto Guess
+local btnScript = ico("script", .10419)
+local btnRange = ico("range", .27886)
+local btnAuto = ico("autoclick", .45352)
+local btnGuess = ico("guess", .62818)
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -212,7 +207,7 @@ local boxDelay = txt("delay", "0.01", .16214, .60268, .05417, "0.01")
 local boxPS   = txt("pspeed", "1", .16214, .79948, .05417, "1")
 local boxR    = txt("r", "100", .16214, .40403, .23729, "100")
 local boxF    = txt("f", "16", .16398, .40403, .4204, "16")
-local boxFS   = txt("fspeed", "0.01", .16398, .60019, .4204, "0.01")  -- Flag speed 0.01
+local boxFS   = txt("fspeed", "0.01", .16398, .60019, .4204, "0.01")
 local boxText = txt("text", "Arcade", .55574, .40588, .60351, "Arcade")
 
 local img = n("ImageLabel", a, {
@@ -275,7 +270,9 @@ local function e(vv)
     return vv and true or false
 end
 
--- Fungsi teleportasi dengan posisi lebih tinggi
+-- =====================================================================
+-- [MODIFIED] TELEPORTASI: Posisi kaki menapak tanah (Height: 3.5)
+-- =====================================================================
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -283,32 +280,46 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Teleport 5 studs di atas tile (agar tersentuh)
-    root.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+    -- Menggunakan 3.5 studs agar karakter berdiri di atas kotak, tidak melayang
+    root.CFrame = CFrame.new(position + Vector3.new(0, 3.5, 0))
 end
 
--- Fungsi flag bomb
+-- =====================================================================
+-- [MODIFIED] DETEKSI CORNER: Logika Neighbor 8 Arah (Minesweeper)
+-- =====================================================================
+-- Fungsi ini memastikan 8 kotak (termasuk sudut) selalu terdeteksi
+local function B3(r0, c0, Hn, Wn)
+    local o0, i1 = {}, 1
+    -- Loop dari -1 sampai 1 mencakup semua arah diagonal (Corner Detection)
+    for dr = -1, 1 do
+        for dc = -1, 1 do
+            -- Melewati titik tengah (diri sendiri)
+            if not (dr == 0 and dc == 0) then
+                local rr, cc = r0 + dr, c0 + dc
+                -- Memastikan koordinat tidak keluar batas (Border Check)
+                if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
+                    o0[i1] = { rr, cc }
+                    i1 = i1 + 1
+                end
+            end
+        end
+    end
+    return o0
+end
+
 local function flagBomb(part)
     if not part or not part.Parent then return false end
-    
-    -- Cek apakah sudah ada flag
-    if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
-        return false
-    end
+    if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then return false end
     
     local flagged = part:GetAttribute("Flagged")
     if flagged then return false end
     
-    -- Coba flag via ClickDetector dulu
     local cd = part:FindFirstChildOfClass("ClickDetector", true)
     if cd then
-        pcall(function()
-            fireclickdetector(cd)
-        end)
-        task.wait(0.05)
+        pcall(function() fireclickdetector(cd) end)
+        task.wait(0.01) -- Sedikit delay untuk reliabilitas
     end
     
-    -- Coba flag via RemoteEvent
     local success = pcall(function()
         local events = replicatedStorage:FindFirstChild("Events")
         if events then
@@ -323,20 +334,15 @@ local function flagBomb(part)
             end
         end
     end)
-    
     return success
 end
 
--- Fungsi membaca angka
 local function extractNumber(text)
     if not text or text == "" then return nil end
-    
     local num = tonumber(text)
     if num then return num end
-    
     local digits = text:match("%d+")
     if digits then return tonumber(digits) end
-    
     return nil
 end
 
@@ -479,21 +485,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local function A9(a2) if a2 >= 0 then return math.floor(a2 + 0.5 + z) else return math.ceil(a2 - 0.5 - z) end end
         local function B0(r0, c0) return tostring(r0) .. ":" .. tostring(c0) end
         local function B1(gx, gy) return tostring(gx) .. ":" .. tostring(gy) end
-        local function B3(r0, c0, Hn, Wn)
-            local o0, i1 = {}, 1
-            for dr = -1, 1 do
-                for dc = -1, 1 do
-                    if not (dr == 0 and dc == 0) then
-                        local rr, cc = r0 + dr, c0 + dc
-                        if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
-                            o0[i1] = { rr, cc }
-                            i1 = i1 + 1
-                        end
-                    end
-                end
-            end
-            return o0
-        end
         local function B4(p0) return tostring(p0:GetDebugId()) end
         local function B5(Fo, part, G)
             if not (part and part:IsA("BasePart")) then return nil end
@@ -516,11 +507,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
                 guiCache[H] = I
             end
-            
             if I.Adornee ~= part then I.Adornee = part end
             if I.Face ~= Enum.NormalId.Top then I.Face = Enum.NormalId.Top end
             lastSeenRun[I] = G
-            
             local J = I:FindFirstChild("ValueText")
             if not (J and J:IsA("TextLabel")) then
                 for _, K2 in ipairs(I:GetChildren()) do
@@ -579,9 +568,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local function B6()
             if not (state and state.b and state.c == q) then return end
             local currentTime = tick()
-            if currentTime - updateThrottle < THROTTLE_INTERVAL then
-                return
-            end
+            if currentTime - updateThrottle < THROTTLE_INTERVAL then return end
             updateThrottle = currentTime
             
             local L = fd()
@@ -1079,7 +1066,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             local da = {}
             local bombsToFlag = {}
             
-            -- Kumpulkan bomb untuk di-flag (threshold 0.85 agar lebih banyak terdeteksi)
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     if b0[r0][c0].a == "revealed" then
@@ -1090,7 +1076,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                                 local v0raw = (pr[rr] and pr[rr][cc]) or gP
                                 if v0raw then
                                     local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.85 then  -- Threshold 0.85
+                                    if tonumber(v0) and v0 >= 0.85 then
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
                                             table.insert(bombsToFlag, {
@@ -1108,11 +1094,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO FLAG: Flag bombs
             if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = ac.fspd or 0.01
                 statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
-                
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
                     if part and part.Parent then
@@ -1124,17 +1108,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman (posisi lebih tinggi)
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
                     if not root then return end
-                    
                     local teleportDelay = ac.delay or 0.01
                     local safeTiles = {}
                     local probTiles = {}
-                    
-                    -- Kumpulkan tile untuk teleport
                     for r0 = 1, Hc do
                         for c0 = 1, Wc do
                             local cell = b0[r0][c0]
@@ -1144,16 +1124,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                                     local v0 = A7(v0raw)
                                     local cellData = cell.c
                                     local part = cellData and cellData.a
-                                    
                                     if part and part:IsA("BasePart") then
-                                        -- Safe tile (prob <= 1%)
                                         if tonumber(v0) and v0 <= 0.01 then
                                             table.insert(safeTiles, {
                                                 part = part,
                                                 pos = part.Position,
                                                 prob = v0
                                             })
-                                        -- Probability tile (for Auto Guess)
                                         elseif ac.guess and tonumber(v0) and v0 > 0.01 and v0 < 0.85 then
                                             table.insert(probTiles, {
                                                 part = part,
@@ -1166,23 +1143,17 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             end
                         end
                     end
-                    
                     local target = nil
                     local targetType = ""
-                    
-                    -- Priority 1: Safe tiles
                     if #safeTiles > 0 then
                         table.sort(safeTiles, function(a, b) return a.prob < b.prob end)
                         target = safeTiles[1]
                         targetType = "safe"
-                    -- Priority 2: Auto Guess
                     elseif ac.guess and #probTiles > 0 then
                         table.sort(probTiles, function(a, b) return a.prob < b.prob end)
                         target = probTiles[1]
                         targetType = "guess"
                     end
-                    
-                    -- Teleport ke target (posisi 5 studs di atas)
                     if target and target.part then
                         teleportTo(target.pos)
                         statusLabel.Text = string.format("Teleport to %s tile (%.1f%%)", targetType, target.prob * 100)
@@ -1193,11 +1164,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end)
             end
             
-            -- GUI Updates
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
-            
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     local d8 = b0[r0][c0]
@@ -1257,13 +1226,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             A3.h, A3.i = Wc, Hc
             A3.j, A3.k = pr, gP
         end
-        
-        -- Loop utama
         while state and state.b and state.c == q do
             pcall(B6)
             task.wait(r or 0.01)
         end
-        
         if not state or state.c == q then 
             k()
             for k in pairs(guiCache) do
@@ -1277,7 +1243,6 @@ end
 Scanningmines = S
 
 local UserInputService = game:GetService("UserInputService")
-
 local ON_IMG = "rbxassetid://16884179507"
 local ON_OFF1 = Vector2.new(578, 50)
 local ON_OFF2 = Vector2.new(48, 48)
@@ -1483,5 +1448,4 @@ open.MouseButton1Up:Connect(function()
     clickStart = nil
 end)
 
-print("Auto Solver v3 loaded! Click the ⚡ button to open menu")
-print("Fixes: Teleport height 5 studs, Flag threshold 0.85")
+print("Longtimenosee Optimized: Corner Logic & Ground TP Loaded!")
