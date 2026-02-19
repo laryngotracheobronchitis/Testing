@@ -114,11 +114,12 @@ local function ico(name, y)
     return i
 end
 
--- 4 tombol
-local btnScript = ico("script", .10419)  -- Auto Solver
-local btnRange = ico("range", .27886)    -- Range
-local btnAuto = ico("autoclick", .45352) -- Flag
-local btnGuess = ico("guess", .62818)    -- Auto Guess
+-- 5 tombol
+local btnScript = ico("script", .10419)    -- Auto Solver
+local btnInstant = ico("instant", .27886)  -- Instant TP
+local btnRange = ico("range", .45352)      -- Range
+local btnAuto = ico("autoclick", .62818)   -- Flag
+local btnGuess = ico("guess", .80284)      -- Auto Guess
 
 local function gradL(p)
     n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
@@ -154,9 +155,10 @@ local function lbl(txt, sx, py, pt, pb)
 end
 
 lbl("Auto Solver", .2796, .04033, .06, .15)
-lbl("Range", .29895, .22344, .07, .13)
-lbl("Flag", .2796, .40656, .08, .12)
-lbl("Auto Guess", .2796, .58967, .06, .09)
+lbl("Instant TP", .29895, .22344, .07, .13)
+lbl("Range", .2796, .40656, .08, .12)
+lbl("Flag", .29895, .58967, .06, .09)
+lbl("Auto Guess", .2796, .77278, .06, .09)
 
 local statusLabel = n("TextLabel", a, {
     Text = "Status: Ready",
@@ -283,10 +285,11 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    root.CFrame = CFrame.new(position + Vector3.new(0, 3.85, 0))
+    -- Direct teleport to tile position (no height adjustment)
+    root.CFrame = CFrame.new(position)
 end
 
--- Fungsi flag bomb
+-- Fungsi flag bomb (dari Sweep.lua - CORRECT VERSION)
 local function flagBomb(part)
     if not part or not part.Parent then return false end
     
@@ -298,22 +301,19 @@ local function flagBomb(part)
     local flagged = part:GetAttribute("Flagged")
     if flagged then return false end
     
-    -- REMOVED: fireclickdetector - this OPENS tiles, not flags them!
-    -- Direct PlaceFlag:FireServer is the only correct way
-    
-    local success = pcall(function()
+    -- Sweep's method: Direct FireServer with proper args
+    local success, err = pcall(function()
+        local replicatedStorage = game:GetService("ReplicatedStorage")
         local events = replicatedStorage:FindFirstChild("Events")
         if events then
             local flagEvents = events:FindFirstChild("FlagEvents")
             if flagEvents then
                 local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
                 if placeFlag then
-                    -- Correct arguments: part, id_string, true
-                    local id = part:GetDebugId()
-                    placeFlag:FireServer(part, tostring(id), true)
+                    -- Sweep uses: {part} only
+                    local args = {part}
+                    placeFlag:FireServer(unpack(args))
                     part:SetAttribute("Flagged", true)
-                    task.wait(0.02)  -- Small delay for server response
-                    return true
                 end
             end
         end
@@ -335,7 +335,7 @@ local function extractNumber(text)
 end
 
 -- FUNGSI UTAMA SOLVER
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
+function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instantOn)
     local i = state
     local j = e(t)
     local function k()
@@ -363,9 +363,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             on = e(x1), 
             rad = tonumber(v1) or 20, 
             intv = tonumber(n1) or 0.01, 
-            fspd = tonumber(boxFS and boxFS.Text) or 0.01, 
+            fspd = tonumber(boxFS and boxFS.Text) or 0.05, 
             guess = e(guessOn), 
-            delay = tonumber(delayVal) or 0.01 
+            delay = tonumber(delayVal) or 0.01,
+            instant = e(instantOn)  -- Instant TP mode
         },
         rot = {
             on = rotOn == nil and false or rotOn,
@@ -766,16 +767,20 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
+            -- AUTO FLAG: Sweep's method (NO TELEPORT, just flag)
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs (corner)..."
+                local flagSpeed = 0.05  -- Sweep's default
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent then
-                        local success = flagBomb(part)
-                        if success then
-                            task.wait(flagSpeed)
+                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                        if not part:GetAttribute("Flagged") then
+                            task.spawn(function()
+                                local success = flagBomb(part)
+                                if success then
+                                    task.wait(flagSpeed)
+                                end
+                            end)
                         end
                     end
                 end
@@ -788,6 +793,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     if not root then return end
                     
                     local teleportDelay = ac.delay or 0.01
+                    local instantMode = ac.instant or false  -- Instant TP toggle
                     local safeTiles = {}
                     
                     for cell, _ in pairs(safes) do
@@ -803,10 +809,20 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     end
                     
                     if #safeTiles > 0 then
-                        local target = safeTiles[1]
-                        teleportTo(target.pos)
-                        statusLabel.Text = "Teleport to safe tile (corner)"
-                        task.wait(teleportDelay)
+                        if instantMode then
+                            -- INSTANT MODE: Teleport to random safe tile
+                            local randomIndex = math.random(1, #safeTiles)
+                            local target = safeTiles[randomIndex]
+                            teleportTo(target.pos)
+                            statusLabel.Text = "Instant TP: Random safe"
+                            task.wait(teleportDelay)
+                        else
+                            -- NORMAL MODE: Teleport to first safe tile (one by one)
+                            local target = safeTiles[1]
+                            teleportTo(target.pos)
+                            statusLabel.Text = "Teleport: Sequential"
+                            task.wait(teleportDelay)
+                        end
                     end
                 end)
             end
@@ -1371,7 +1387,7 @@ local function parseFont(sv)
     return Enum.Font.Arcade
 end
 
-local toggles = { btnScript, btnRange, btnAuto, btnGuess }
+local toggles = { btnScript, btnInstant, btnRange, btnAuto, btnGuess }
 for _, btt in ipairs(toggles) do
     if btt and btt:IsA("ImageButton") then
         setVis(btt, false)
@@ -1388,9 +1404,10 @@ local function pushState()
     local fe = boxText and parseFont(boxText.Text) or Enum.Font.Arcade
     local r2 = boxR and tonum(boxR.Text) or 100
     local rOn = btnBool(btnRange)
+    local instantOn = btnBool(btnInstant)  -- Instant TP toggle
     local aOn = btnBool(btnAuto)
     local f2 = boxF and tonum(boxF.Text) or 16
-    local fs = boxFS and tonum(boxFS.Text) or 0.01
+    local fs = boxFS and tonum(boxFS.Text) or 0.05
     local guessOn = btnBool(btnGuess)
     
     if sOn == false then
@@ -1400,8 +1417,10 @@ local function pushState()
     end
     
     callS(false)
-    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal)
-    statusLabel.Text = "Status: Running (Corner Detection)"
+    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal, instantOn)
+    
+    local mode = instantOn and "Instant Random" or "Sequential"
+    statusLabel.Text = "Status: Running (" .. mode .. ")"
 end
 
 local function bindToggle(bx)
@@ -1415,6 +1434,7 @@ local function bindToggle(bx)
 end
 
 bindToggle(btnScript)
+bindToggle(btnInstant)
 bindToggle(btnRange)
 bindToggle(btnAuto)
 bindToggle(btnGuess)
