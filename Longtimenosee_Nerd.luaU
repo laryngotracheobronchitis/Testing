@@ -278,58 +278,134 @@ local function e(vv)
 end
 
 -- Fungsi teleportasi dengan posisi 3.85 studs
+local isAnchored = false
+local anchorConnection = nil
+
+local function maintainAnchor()
+    -- Continuously keep character anchored
+    if anchorConnection then
+        anchorConnection:Disconnect()
+    end
+    
+    anchorConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not isAnchored then return end
+        
+        local character = player.Character
+        if not character then return end
+        
+        local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not root then return end
+        
+        -- Force anchored state every frame
+        if not root.Anchored then
+            root.Anchored = true
+        end
+        
+        if humanoid then
+            if not humanoid.PlatformStand then
+                humanoid.PlatformStand = true
+            end
+            if humanoid.AutoRotate then
+                humanoid.AutoRotate = false
+            end
+        end
+    end)
+end
+
+local function anchorCharacter(enable)
+    isAnchored = enable
+    
+    if enable then
+        maintainAnchor()
+        print("[Anchor] Character anchored")
+    else
+        if anchorConnection then
+            anchorConnection:Disconnect()
+            anchorConnection = nil
+        end
+        
+        local character = player.Character
+        if character then
+            local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            
+            if root then
+                root.Anchored = false
+            end
+            
+            if humanoid then
+                humanoid.PlatformStand = false
+                humanoid.AutoRotate = true
+            end
+        end
+        
+        print("[Anchor] Character unanchored")
+    end
+end
+
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
     
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not root then return end
     
-    -- Anchor untuk stability (prevent falling/tilting)
-    if humanoid then
-        humanoid.PlatformStand = true
-    end
-    root.Anchored = true
-    
-    -- Teleport langsung ke position (NO height adjustment)
+    -- Teleport langsung (character sudah di-anchor dari auto solver loop)
     root.CFrame = CFrame.new(position)
-    
-    -- Unanchor setelah stable
-    task.wait(0.05)
-    root.Anchored = false
-    if humanoid then
-        humanoid.PlatformStand = false
-    end
 end
 
 -- Fungsi flag bomb
 local function flagBomb(part)
-    if not part or not part.Parent then return false end
+    if not part or not part.Parent then 
+        warn("[FlagBomb] Part invalid or no parent")
+        return false 
+    end
     
     -- Check already flagged
     if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
+        print("[FlagBomb] Already has Flag child")
         return false
     end
     
-    if part:GetAttribute("Flagged") then return false end
+    if part:GetAttribute("Flagged") then 
+        print("[FlagBomb] Already has Flagged attribute")
+        return false 
+    end
+    
+    print("[FlagBomb] Attempting to flag:", part:GetFullName())
     
     -- Sweep's method: Simple args
     local success, err = pcall(function()
         local replicatedStorage = game:GetService("ReplicatedStorage")
         local events = replicatedStorage:WaitForChild("Events", 2)
-        if not events then return end
+        if not events then 
+            warn("[FlagBomb] Events not found")
+            return 
+        end
         
         local flagEvents = events:WaitForChild("FlagEvents", 2)
-        if not flagEvents then return end
+        if not flagEvents then 
+            warn("[FlagBomb] FlagEvents not found")
+            return 
+        end
         
         local placeFlag = flagEvents:WaitForChild("PlaceFlag", 2)
-        if not placeFlag then return end
+        if not placeFlag then 
+            warn("[FlagBomb] PlaceFlag not found")
+            return 
+        end
         
+        print("[FlagBomb] Calling FireServer...")
         -- Sweep uses: unpack({part})
         placeFlag:FireServer(unpack({part}))
         part:SetAttribute("Flagged", true)
+        print("[FlagBomb] Success!")
     end)
+    
+    if not success then
+        warn("[FlagBomb] Error:", err)
+    end
     
     return success
 end
@@ -730,6 +806,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             local mines = {}
             local safes = {}
             
+            print("[Corner Detection] Starting scan...")
+            
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
                     local cell = b0[r0][c0]
@@ -754,6 +832,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         
                         -- Jika sisa ubin tertutup == sisa bom → semua BOM
                         if remaining == #covered and #covered > 0 then
+                            print("[Corner] Cell", r0, c0, "value:", cell.b, "- Found", #covered, "certain bombs")
                             for _, bombCell in ipairs(covered) do
                                 mines[bombCell] = true
                             end
@@ -761,6 +840,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                         
                         -- Jika tidak ada sisa bom → semua AMAN
                         if remaining == 0 and #covered > 0 then
+                            print("[Corner] Cell", r0, c0, "value:", cell.b, "- Found", #covered, "safe tiles")
                             for _, safeCell in ipairs(covered) do
                                 safes[safeCell] = true
                             end
@@ -768,6 +848,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     end
                 end
             end
+            
+            -- Count results
+            local mineCount = 0
+            local safeCount = 0
+            for _ in pairs(mines) do mineCount = mineCount + 1 end
+            for _ in pairs(safes) do safeCount = safeCount + 1 end
+            print("[Corner Detection] Total: ", mineCount, "mines,", safeCount, "safes")
             
             -- AUTO FLAG: Flag bombs (prioritas utama)
             local bombsToFlag = {}
@@ -780,18 +867,21 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             end
             
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs (corner)..."
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent then
-                        local success = flagBomb(part)
-                        if success then
-                            task.wait(flagSpeed)
-                        end
+                    if part and part.Parent and not part:GetAttribute("Flagged") then
+                        task.spawn(function()
+                            local success = flagBomb(part)
+                            if success then
+                                task.wait(0.05)  -- Sweep's default
+                            end
+                        end)
                     end
                 end
+                
+                task.wait(0.1)  -- Wait for all flags to process
             end
             
             -- AUTO SOLVER: Teleport ke tile aman
@@ -818,18 +908,23 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     
                     if #safeTiles > 0 then
                         if instantMode then
-                            -- INSTANT: Process all tiles without delay
+                            -- INSTANT: Process all tiles
+                            print("[Solver] Instant mode: Processing", #safeTiles, "tiles")
                             for _, tile in ipairs(safeTiles) do
                                 teleportTo(tile.pos)
+                                task.wait(0.01)  -- Tiny delay for server
                             end
-                            statusLabel.Text = "Instant TP: " .. #safeTiles .. " tiles"
+                            statusLabel.Text = "Instant: Processed " .. #safeTiles
                         else
-                            -- NORMAL: One tile with delay
+                            -- NORMAL: One tile
+                            print("[Solver] Sequential mode: Processing 1 of", #safeTiles)
                             local target = safeTiles[1]
                             teleportTo(target.pos)
-                            statusLabel.Text = "Sequential: " .. #safeTiles .. " remaining"
+                            statusLabel.Text = "Sequential: " .. #safeTiles .. " left"
                             task.wait(teleportDelay)
                         end
+                    else
+                        print("[Solver] No safe tiles found")
                     end
                 end)
             end
@@ -1322,10 +1417,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             A3.j, A3.k = pr, gP
         end
         
+        -- Anchor character before starting solver loop
+        anchorCharacter(true)
+        
         while state and state.b and state.c == q do
             pcall(B6)
             task.wait(r or 0.01)
         end
+        
+        -- Unanchor when solver stops
+        anchorCharacter(false)
         
         if not state or state.c == q then 
             k()
