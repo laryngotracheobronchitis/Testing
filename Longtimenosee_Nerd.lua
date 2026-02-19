@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- OPTIMIZED VERSION - Deterministic detection with 8-direction grid & improved teleport
+-- FIXED DETERMINISTIC VERSION - 8-way detection & Y=3.85 teleport
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -84,7 +84,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "AUTO SOLVER - Deterministic 8-Way Detection",
+    Text = "AUTO SOLVER - Deterministic 8-Way",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -306,12 +306,13 @@ local function flagBomb(part)
     if flagged then return false end
     
     -- Coba flag via ClickDetector dulu
-    local cd = part:FindFirstChildOfClass("ClickDetector", true)
+    local cd = part:FindFirstChildOfClass("ClickDetector")
     if cd then
         pcall(function()
             fireclickdetector(cd)
         end)
         task.wait(0.05)
+        return true
     end
     
     -- Coba flag via RemoteEvent
@@ -347,8 +348,10 @@ local function extractNumber(text)
 end
 
 -- Fungsi mendapatkan tetangga dalam grid (8 arah)
-local function getNeighbors(row, col, grid, height, width)
+local function getNeighbors(row, col, grid)
     local neighbors = {}
+    local height = #grid
+    local width = #grid[1]
     
     for _, offset in ipairs(neighborOffsets) do
         local nr = row + offset[1]
@@ -363,39 +366,6 @@ local function getNeighbors(row, col, grid, height, width)
     end
     
     return neighbors
-end
-
--- Fungsi deterministik untuk deteksi bom dan aman
-local function checkDeterministic(cell, grid, height, width)
-    if not cell or cell.a ~= "revealed" or not cell.b then
-        return nil, nil
-    end
-    
-    local neighbors = getNeighbors(cell.r, cell.c, grid, height, width)
-    local covered = {}
-    local flagged = 0
-    
-    for _, nb in ipairs(neighbors) do
-        if nb.a == "flagged" then
-            flagged = flagged + 1
-        elseif nb.a == "covered" then
-            table.insert(covered, nb)
-        end
-    end
-    
-    local remaining = cell.b - flagged
-    
-    -- Jika jumlah ubin tertutup sama dengan angka yang tersisa -> SEMUA BOM
-    if remaining == #covered and #covered > 0 then
-        return "MINE", covered
-    end
-    
-    -- Jika tidak ada sisa angka dan ada ubin tertutup -> SEMUA AMAN
-    if remaining == 0 and #covered > 0 then
-        return "SAFE", covered
-    end
-    
-    return nil, nil
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
@@ -711,7 +681,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             for r0 = 1, Hc do
                 b0[r0] = {}
                 for c0 = 1, Wc do
-                    b0[r0][c0] = { a = "covered", b = nil, c = nil, r = r0, c_col = c0 }
+                    b0[r0][c0] = { a = "covered", b = nil, c = nil }
                 end
             end
             for _, V in ipairs(a0) do
@@ -749,16 +719,32 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 for c0 = 1, Wc do
                     local cell = b0[r0][c0]
                     if cell.a == "revealed" and cell.b and cell.b > 0 then
-                        local result, cells = checkDeterministic(cell, b0, Hc, Wc)
+                        local neighbors = getNeighbors(r0, c0, b0)
+                        local covered = {}
+                        local flagged = 0
                         
-                        if result == "MINE" then
-                            for _, mineCell in ipairs(cells) do
+                        for _, nb in ipairs(neighbors) do
+                            if nb.a == "flagged" then
+                                flagged = flagged + 1
+                            elseif nb.a == "covered" then
+                                table.insert(covered, nb)
+                            end
+                        end
+                        
+                        local remaining = cell.b - flagged
+                        
+                        -- Jika jumlah ubin tertutup sama dengan angka yang tersisa -> SEMUA BOM
+                        if remaining == #covered and #covered > 0 then
+                            for _, mineCell in ipairs(covered) do
                                 if mineCell.c and mineCell.c.a then
                                     mines[mineCell] = true
                                 end
                             end
-                        elseif result == "SAFE" then
-                            for _, safeCell in ipairs(cells) do
+                        end
+                        
+                        -- Jika tidak ada sisa angka dan ada ubin tertutup -> SEMUA AMAN
+                        if remaining == 0 and #covered > 0 then
+                            for _, safeCell in ipairs(covered) do
                                 if safeCell.c and safeCell.c.a then
                                     safes[safeCell] = true
                                 end
@@ -773,16 +759,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             for cell, _ in pairs(mines) do
                 if cell.c and cell.c.a then
                     table.insert(bombsToFlag, {
-                        part = cell.c.a,
-                        row = cell.r,
-                        col = cell.c_col
+                        part = cell.c.a
                     })
                 end
             end
             
             if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs (deterministic)..."
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
@@ -827,7 +811,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end)
             end
             
-            -- GUI Updates (tetap menggunakan visual yang sama)
+            -- GUI Updates
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -846,13 +830,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
                         elseif d8.a == "covered" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(200, 200, 200)}
-                        else
-                            local H2 = B4(p3)
-                            local I = F0:FindFirstChild(H2)
-                            if I then
-                                I.Enabled = false
-                                lastSeenRun[I] = G
-                            end
                         end
                     end
                 end
