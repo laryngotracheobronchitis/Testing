@@ -275,7 +275,7 @@ local function e(vv)
     return vv and true or false
 end
 
--- Fungsi teleportasi dengan posisi lebih tinggi
+-- Fungsi teleportasi dengan posisi lebih tinggi (3.85 studs)
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -283,7 +283,7 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Teleport 3.85 studs di atas tile (agar kaki tidak menembus)
+    -- Teleport 3.85 studs di atas tile (agar tidak menembus lantai)
     root.CFrame = CFrame.new(position + Vector3.new(0, 3.85, 0))
 end
 
@@ -461,11 +461,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.01
         
-        local neighborOffsets = {
-            {1, 0}, {-1, 0}, {0, 1}, {0, -1}, -- Sisi (Kanan, Kiri, Atas, Bawah)
-            {1, 1}, {1, -1}, {-1, 1}, {-1, -1} -- DIAGONAL (Pojok/Corner)
-        }
-        
         local function A6()
             local parent = cg or A5
             local p2 = parent:FindFirstChild(B)
@@ -479,17 +474,22 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local function T1(sv)
             return extractNumber(sv)
         end
+        local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
+        local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
         local function A9(a2) if a2 >= 0 then return math.floor(a2 + 0.5 + z) else return math.ceil(a2 - 0.5 - z) end end
         local function B0(r0, c0) return tostring(r0) .. ":" .. tostring(c0) end
         local function B1(gx, gy) return tostring(gx) .. ":" .. tostring(gy) end
         local function B3(r0, c0, Hn, Wn)
             local o0, i1 = {}, 1
-            for _, off in ipairs(neighborOffsets) do
-                local dr, dc = off[1], off[2]
-                local rr, cc = r0 + dr, c0 + dc
-                if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
-                    o0[i1] = { rr, cc }
-                    i1 = i1 + 1
+            for dr = -1, 1 do
+                for dc = -1, 1 do
+                    if not (dr == 0 and dc == 0) then
+                        local rr, cc = r0 + dr, c0 + dc
+                        if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
+                            o0[i1] = { rr, cc }
+                            i1 = i1 + 1
+                        end
+                    end
                 end
             end
             return o0
@@ -575,36 +575,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             return b
-        end
-        local function checkDeterministic(r0, c0, grid, Hn, Wn)
-            local cell = grid[r0][c0]
-            local val = cell.b or 0
-            local neighbors = B3(r0, c0, Hn, Wn)
-            local covered = {}
-            local flags = 0
-
-            for _, rc in ipairs(neighbors) do
-                local rr, cc = rc[1], rc[2]
-                local nb = grid[rr][cc]
-                if nb.a == "flagged" then
-                    flags = flags + 1
-                elseif nb.a == "covered" then
-                    table.insert(covered, {rr = rr, cc = cc, part = nb.c.a})
-                end
-            end
-
-            -- KUNCI DETEKSI CORNER:
-            -- Jika angka ubin dikurangi bendera di sekitarnya sama dengan jumlah kotak tertutup
-            if (val - flags) == #covered and #covered > 0 then
-                -- Maka kotak tertutup itu 100% BOM (Deterministic)
-                return "MINE", covered
-            end
-            
-            -- Jika jumlah bendera sudah pas dengan angka ubin
-            if val == flags and #covered > 0 then
-                -- Maka kotak tertutup lainnya 100% AMAN
-                return "SAFE", covered
-            end
         end
         local function B6()
             if not (state and state.b and state.c == q) then return end
@@ -782,66 +752,70 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     end
                 end
             end
-            local function B3n(E0, Wn, Hn)
-                local f0, f1 = {}, {}
-                local ch = true
-                local maxIterations = 50
-                local iteration = 0
-                while ch and iteration < maxIterations do
-                    ch = false
-                    iteration = iteration + 1
-                    for r0 = 1, Hn do
-                        for c0 = 1, Wn do
-                            local d8 = E0[r0][c0]
-                            if d8.a == "revealed" then
-                                local detType, covered = checkDeterministic(r0, c0, E0, Hn, Wn)
-                                if detType == "MINE" then
-                                    for _, cov in ipairs(covered) do
-                                        f0[#f0 + 1] = cov
-                                    end
-                                    ch = true
-                                elseif detType == "SAFE" then
-                                    for _, cov in ipairs(covered) do
-                                        f1[#f1 + 1] = cov
-                                    end
-                                    ch = true
+            
+            -- ==================== CORNER DETECTION (8 ARAH) ====================
+            -- MODIFIKASI: Menambahkan deteksi corner 8 arah tanpa mengubah struktur asli
+            
+            local mines = {}
+            local safes = {}
+            
+            for r0 = 1, Hc do
+                for c0 = 1, Wc do
+                    local cell = b0[r0][c0]
+                    if cell.a == "revealed" and cell.b and cell.b > 0 then
+                        -- Gunakan fungsi B3 yang sudah ada untuk mendapatkan 8 arah
+                        local neighbors = B3(r0, c0, Hc, Wc)
+                        local covered = {}
+                        local flagged = 0
+                        
+                        for _, rc in ipairs(neighbors) do
+                            local rr, cc = rc[1], rc[2]
+                            local nb = b0[rr][cc]
+                            if nb then
+                                if nb.a == "flagged" then
+                                    flagged = flagged + 1
+                                elseif nb.a == "covered" then
+                                    table.insert(covered, nb)
                                 end
                             end
                         end
-                    end
-                    for _, cov in ipairs(f0) do
-                        local rr, cc = cov.rr, cov.cc
-                        if E0[rr][cc].a == "covered" then
-                            E0[rr][cc].a = "flagged"
+                        
+                        local remaining = cell.b - flagged
+                        
+                        -- LOGIKA CORNER: Jika sisa ubin tertutup == sisa bom
+                        if remaining == #covered and #covered > 0 then
+                            for _, bomb in ipairs(covered) do
+                                mines[bomb] = true
+                            end
                         end
-                    end
-                end
-                return { mines = f0, safes = f1 }
-            end
-            local d9 = B3n(b0, Wc, Hc)
-            local da = {}
-            local bombsToFlag = {}
-            
-            -- Kumpulkan bomb untuk di-flag (deterministic only)
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    if b0[r0][c0].a == "revealed" then
-                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
-                            local rr, cc = rc[1], rc[2]
-                            if b0[rr][cc].a == "covered" then
-                                da[B0(rr, cc)] = true
+                        
+                        -- LOGIKA AMAN: Jika bendera sudah cukup, ubin lain aman
+                        if remaining == 0 and #covered > 0 then
+                            for _, safe in ipairs(covered) do
+                                safes[safe] = true
                             end
                         end
                     end
                 end
             end
             
-            -- AUTO FLAG: Flag bombs
-            if ac and ac.on and d9.mines and #d9.mines > 0 then
+            -- AUTO FLAG: Flag bombs (menggunakan logika corner)
+            local bombsToFlag = {}
+            for cell, _ in pairs(mines) do
+                if cell.c and cell.c.a then
+                    table.insert(bombsToFlag, {
+                        part = cell.c.a,
+                        row = r0,
+                        col = c0
+                    })
+                end
+            end
+            
+            if ac and ac.on and #bombsToFlag > 0 then
                 local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #d9.mines .. " bombs..."
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs (corner)..."
                 
-                for _, bombData in ipairs(d9.mines) do
+                for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
                     if part and part.Parent then
                         local success = flagBomb(part)
@@ -852,7 +826,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman (posisi lebih tinggi)
+            -- AUTO SOLVER: Teleport ke tile aman (Y=3.85)
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
@@ -861,10 +835,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     local teleportDelay = ac.delay or 0.01
                     local safeTiles = {}
                     
-                    -- Kumpulkan tile aman
-                    if d9.safes and #d9.safes > 0 then
-                        for _, safeData in ipairs(d9.safes) do
-                            local part = safeData.part
+                    for cell, _ in pairs(safes) do
+                        if cell.c and cell.c.a then
+                            local part = cell.c.a
                             if part and part:IsA("BasePart") then
                                 table.insert(safeTiles, {
                                     part = part,
@@ -874,27 +847,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         end
                     end
                     
-                    local target = nil
-                    local targetType = ""
-                    
-                    -- Priority: Safe tiles
                     if #safeTiles > 0 then
-                        target = safeTiles[1]
-                        targetType = "safe"
-                    end
-                    
-                    -- Teleport ke target
-                    if target and target.part then
+                        local target = safeTiles[1]
                         teleportTo(target.pos)
-                        statusLabel.Text = string.format("Teleport to %s tile", targetType)
+                        statusLabel.Text = string.format("Teleport to safe tile (Y=3.85)")
                         task.wait(teleportDelay)
                     else
-                        statusLabel.Text = "No tiles to teleport"
+                        statusLabel.Text = "No safe tiles from corner detection"
                     end
                 end)
             end
             
-            -- GUI Updates
+            -- GUI Updates (menampilkan mines dan safes)
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -905,12 +869,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     local V = d8.c
                     local p3 = V and V.a
                     if p3 and p3:IsA("BasePart") then
-                        local draw
-                        if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
-                        if d8.a == "flagged" then
+                        if mines[d8] then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif d8.a == "covered" and draw then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
+                        elseif safes[d8] then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
+                        elseif d8.a == "flagged" then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
+                        elseif d8.a == "covered" then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(200, 200, 200)}
                         else
                             local H2 = B4(p3)
                             local I = F0:FindFirstChild(H2)
@@ -943,7 +909,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             end
             A3.f, A3.g = d1, b0
             A3.h, A3.i = Wc, Hc
-            A3.j, A3.k = nil, nil
+            A3.j, A3.k = mines, safes
         end
         
         -- Loop utama
@@ -1049,7 +1015,7 @@ local function pushState()
     
     callS(false)
     callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal)
-    statusLabel.Text = "Status: Running"
+    statusLabel.Text = "Status: Running (Corner Detection)"
 end
 
 local function bindToggle(bx)
@@ -1172,4 +1138,4 @@ open.MouseButton1Up:Connect(function()
 end)
 
 print("Auto Solver v3 loaded! Click the ⚡ button to open menu")
-print("Fixes: Teleport height 3.85 studs, Deterministic detection")
+print("Fixes: Corner detection 8 arah, Teleport height 3.85 studs")
