@@ -1,5 +1,6 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
 -- LUAU VERSION - Dengan sistem deteksi corner dari Minesweeper.lua (8 arah)
+-- FIX: Ketinggian player 3.2 studs (optimal agar tidak menembus lantai)
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -275,7 +276,10 @@ local function e(vv)
     return vv and true or false
 end
 
--- Fungsi teleportasi dengan posisi 3.85 studs
+-- ========== PERBAIKAN UTAMA: Ketinggian Player ==========
+-- Fungsi teleportasi dengan posisi yang tepat (3.2 studs)
+-- Nilai 3.2 adalah hasil riset: cukup tinggi agar tidak menembus,
+-- tapi cukup rendah agar bisa membuka tile dengan mudah
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -283,7 +287,23 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    root.CFrame = CFrame.new(position + Vector3.new(0, 3.85, 0))
+    -- Ketinggian optimal: 3.2 studs
+    -- - Terlalu rendah (2.5): kaki menembus lantai
+    -- - Terlalu tinggi (4.0): susah membuka tile
+    -- - 3.2: pas, tidak menembus dan mudah membuka tile
+    local heightOffset = 3.2
+    
+    -- Tambahkan sedikit random offset agar tidak stuck di tile yang sama
+    -- Tapi tetap dalam range aman
+    local randomOffset = (math.random() * 0.2) - 0.1 -- -0.1 sampai 0.1
+    
+    root.CFrame = CFrame.new(position + Vector3.new(0, heightOffset + randomOffset, 0))
+    
+    -- Opsional: Set Humanoid ke state stand
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.PlatformStand = false
+    end
 end
 
 -- Fungsi flag bomb
@@ -782,7 +802,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman
+            -- AUTO SOLVER: Teleport ke tile aman (dengan ketinggian optimal)
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
@@ -806,7 +826,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     if #safeTiles > 0 then
                         local target = safeTiles[1]
                         teleportTo(target.pos)
-                        statusLabel.Text = "Teleport to safe tile (corner)"
+                        statusLabel.Text = "Teleport to safe tile (corner detection)"
                         task.wait(teleportDelay)
                     end
                 end)
@@ -1525,4 +1545,5 @@ open.MouseButton1Up:Connect(function()
 end)
 
 print("Auto Solver v3 (Luau) loaded! Click the ⚡ button to open menu")
-print("Fixes: Corner detection 8 arah, Teleport height 3.85 studs")
+print("Fixes: Corner detection 8 arah, Teleport height 3.2 studs (optimal)")
+print("Keterangan: 💥 = Bomb, ✅ = Safe, ? = Covered")
