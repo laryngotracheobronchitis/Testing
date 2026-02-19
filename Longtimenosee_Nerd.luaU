@@ -118,7 +118,7 @@ end
 local btnScript = ico("script", .10419)    -- Auto Solver
 local btnInstant = ico("instant", .27886)  -- Instant TP
 local btnRange = ico("range", .45352)      -- Range
-local btnAuto = ico("autoclick", .62818)   -- Flag
+local btnAuto = ico("autoclick", .62818)   -- Flag  
 local btnGuess = ico("guess", .80284)      -- Auto Guess
 
 local function gradL(p)
@@ -286,16 +286,16 @@ local function teleportTo(position)
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not root then return end
     
-    -- Anchor character to prevent falling/tilting
+    -- Anchor untuk stability (prevent falling/tilting)
     if humanoid then
         humanoid.PlatformStand = true
     end
     root.Anchored = true
     
-    -- Direct teleport to part position (NO height adjustment)
+    -- Teleport langsung ke position (NO height adjustment)
     root.CFrame = CFrame.new(position)
     
-    -- Small delay then unanchor
+    -- Unanchor setelah stable
     task.wait(0.05)
     root.Anchored = false
     if humanoid then
@@ -303,34 +303,32 @@ local function teleportTo(position)
     end
 end
 
--- Fungsi flag bomb (dari Sweep.lua - CORRECT VERSION)
+-- Fungsi flag bomb
 local function flagBomb(part)
     if not part or not part.Parent then return false end
     
-    -- Check if already flagged
+    -- Check already flagged
     if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
         return false
     end
     
-    local flagged = part:GetAttribute("Flagged")
-    if flagged then return false end
+    if part:GetAttribute("Flagged") then return false end
     
-    -- Sweep's method: Direct FireServer with proper args
+    -- Sweep's method: Simple args
     local success, err = pcall(function()
         local replicatedStorage = game:GetService("ReplicatedStorage")
-        local events = replicatedStorage:FindFirstChild("Events")
-        if events then
-            local flagEvents = events:FindFirstChild("FlagEvents")
-            if flagEvents then
-                local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
-                if placeFlag then
-                    -- Sweep uses: {part} only
-                    local args = {part}
-                    placeFlag:FireServer(unpack(args))
-                    part:SetAttribute("Flagged", true)
-                end
-            end
-        end
+        local events = replicatedStorage:WaitForChild("Events", 2)
+        if not events then return end
+        
+        local flagEvents = events:WaitForChild("FlagEvents", 2)
+        if not flagEvents then return end
+        
+        local placeFlag = flagEvents:WaitForChild("PlaceFlag", 2)
+        if not placeFlag then return end
+        
+        -- Sweep uses: unpack({part})
+        placeFlag:FireServer(unpack({part}))
+        part:SetAttribute("Flagged", true)
     end)
     
     return success
@@ -377,7 +375,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             on = e(x1), 
             rad = tonumber(v1) or 20, 
             intv = tonumber(n1) or 0.01, 
-            fspd = tonumber(boxFS and boxFS.Text) or 0.05, 
+            fspd = 0.05,  -- Sweep's default
             guess = e(guessOn), 
             delay = tonumber(delayVal) or 0.01,
             instant = e(instantOn)  -- Instant TP mode
@@ -781,20 +779,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                 end
             end
             
-            -- AUTO FLAG: Sweep's method (NO TELEPORT, just flag)
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = 0.05  -- Sweep's default
+                local flagSpeed = ac.fspd or 0.01
+                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs (corner)..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                        if not part:GetAttribute("Flagged") then
-                            task.spawn(function()
-                                local success = flagBomb(part)
-                                if success then
-                                    task.wait(flagSpeed)
-                                end
-                            end)
+                    if part and part.Parent then
+                        local success = flagBomb(part)
+                        if success then
+                            task.wait(flagSpeed)
                         end
                     end
                 end
@@ -824,17 +818,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     
                     if #safeTiles > 0 then
                         if instantMode then
-                            -- INSTANT MODE: Teleport to ALL safe tiles rapidly (no delay between)
-                            statusLabel.Text = "Instant TP: Processing " .. #safeTiles .. " tiles"
+                            -- INSTANT: Process all tiles without delay
                             for _, tile in ipairs(safeTiles) do
                                 teleportTo(tile.pos)
-                                -- No wait - instant!
                             end
+                            statusLabel.Text = "Instant TP: " .. #safeTiles .. " tiles"
                         else
-                            -- NORMAL MODE: Teleport one-by-one with delay
+                            -- NORMAL: One tile with delay
                             local target = safeTiles[1]
                             teleportTo(target.pos)
-                            statusLabel.Text = "Sequential TP: " .. #safeTiles .. " remaining"
+                            statusLabel.Text = "Sequential: " .. #safeTiles .. " remaining"
                             task.wait(teleportDelay)
                         end
                     end
@@ -1167,7 +1160,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
-            local bombsToFlag = {}  -- Initialize for probability system
             
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
@@ -1176,23 +1168,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
-                                
-                                -- Collect bombs from probability (v0 >= 0.99)
-                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        local cellData = b0[rr][cc]
-                                        if cellData and cellData.c and cellData.c.a then
-                                            table.insert(bombsToFlag, {
-                                                part = cellData.c.a,
-                                                row = rr,
-                                                col = cc,
-                                                prob = v0
-                                            })
-                                        end
-                                    end
-                                end
                             end
                         end
                     end
@@ -1201,25 +1176,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             
             -- AUTO FLAG: Flag bombs (sistem probabilitas)
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = 0.05  -- Sweep's speed
+                local flagSpeed = ac.fspd or 0.01
                 statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
-                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
-                        if not part:GetAttribute("Flagged") then
-                            task.spawn(function()
-                                pcall(function()
-                                    local args = {part}
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
-                                    part:SetAttribute("Flagged", true)
-                                end)
-                            end)
-                            task.wait(flagSpeed)
-                        end
-                    end
-                end
-            end
                     if part and part.Parent then
                         local success = flagBomb(part)
                         if success then
@@ -1450,7 +1411,7 @@ local function pushState()
     local fe = boxText and parseFont(boxText.Text) or Enum.Font.Arcade
     local r2 = boxR and tonum(boxR.Text) or 100
     local rOn = btnBool(btnRange)
-    local instantOn = btnBool(btnInstant)  -- Instant TP toggle
+    local instantOn = btnBool(btnInstant)  -- Instant TP
     local aOn = btnBool(btnAuto)
     local f2 = boxF and tonum(boxF.Text) or 16
     local fs = boxFS and tonum(boxFS.Text) or 0.05
@@ -1465,7 +1426,7 @@ local function pushState()
     callS(false)
     callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal, instantOn)
     
-    local mode = instantOn and "Instant Random" or "Sequential"
+    local mode = instantOn and "Instant" or "Sequential"
     statusLabel.Text = "Status: Running (" .. mode .. ")"
 end
 
