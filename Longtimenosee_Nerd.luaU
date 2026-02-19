@@ -278,8 +278,9 @@ local function e(vv)
     return vv and true or false
 end
 
--- ========== FUNGSI TELEPORT DENGAN VARIABEL KETINGGIAN ==========
--- Fungsi teleportasi menggunakan TELEPORT_HEIGHT yang sudah ditentukan
+-- ========== FUNGSI TELEPORT OPTIMAL ==========
+-- Fungsi teleportasi yang hanya mengubah ketinggian (Y)
+-- Posisi X dan Z tetap persis di tengah tile
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -287,10 +288,17 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Gunakan variabel TELEPORT_HEIGHT dari atas
-    root.CFrame = CFrame.new(position + Vector3.new(0, TELEPORT_HEIGHT, 0))
+    -- Ambil posisi X dan Z dari tile (tetap)
+    -- Hanya Y yang diubah sesuai TELEPORT_HEIGHT
+    local newPosition = Vector3.new(
+        position.X,  -- X tetap persis di tengah tile
+        position.Y + TELEPORT_HEIGHT,  -- Y = posisi tile + ketinggian
+        position.Z   -- Z tetap persis di tengah tile
+    )
+    
+    root.CFrame = CFrame.new(newPosition)
 end
--- =================================================================
+-- =============================================
 
 -- Fungsi membaca angka
 local function extractNumber(text)
@@ -1158,7 +1166,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         target = probTiles[1]
                     end
                     
-                    -- Teleport ke target (menggunakan TELEPORT_HEIGHT)
+                    -- Teleport ke target (menggunakan fungsi teleportTo yang sudah dioptimasi)
                     if target and target.part then
                         teleportTo(target.pos)
                         task.wait(teleportDelay)
@@ -1457,3 +1465,4 @@ end)
 
 print("Auto Solver loaded! Click the ⚡ button to open menu")
 print("Teleport height: " .. TELEPORT_HEIGHT .. " studs (ubah di line 7-8)")
+print("Mode: Hanya Y yang berubah, X dan Z tetap di tengah tile")
