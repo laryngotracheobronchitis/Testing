@@ -1,4 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
+-- FIXED VERSION - Dengan pembacaan angka yang lebih baik
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -294,54 +295,19 @@ local function isBorderCell(row, col, totalRows, totalCols)
            (row == 1 or row == totalRows or col == 1 or col == totalCols)
 end
 
--- Mencari sel teraman untuk diklik
-local function findSafestCell(grid, probabilities, rows, cols)
-    local safestCell = nil
-    local lowestProb = 1.0
-    local safeCells = {}
+-- Fungsi membaca angka dengan lebih baik
+local function extractNumber(text)
+    if not text or text == "" then return nil end
     
-    for r = 1, rows do
-        for c = 1, cols do
-            if grid[r] and grid[r][c] and grid[r][c].a == "covered" then
-                local cellData = grid[r][c]
-                if cellData.c and cellData.c.a then
-                    local prob = (probabilities[r] and probabilities[r][c]) or 0.5
-                    
-                    -- Koreksi untuk corner dan border
-                    if isCornerCell(r, c, rows, cols) then
-                        -- Corner hampir pasti bomb, jangan diklik
-                        prob = 1.0
-                    elseif isBorderCell(r, c, rows, cols) then
-                        -- Border lebih berisiko
-                        prob = math.min(prob + 0.2, 1.0)
-                    end
-                    
-                    if prob < lowestProb then
-                        lowestProb = prob
-                        safestCell = cellData.c.a
-                    end
-                    
-                    -- Kumpulkan sel yang aman (probabilitas rendah)
-                    if prob <= 0.2 then
-                        table.insert(safeCells, {
-                            cell = cellData.c.a,
-                            prob = prob,
-                            row = r,
-                            col = c
-                        })
-                    end
-                end
-            end
-        end
-    end
+    -- Coba ambil angka dari text
+    local num = tonumber(text)
+    if num then return num end
     
-    -- Prioritaskan sel yang benar-benar aman
-    if #safeCells > 0 then
-        table.sort(safeCells, function(a, b) return a.prob < b.prob end)
-        return safeCells[1].cell, safeCells[1].prob
-    end
+    -- Coba ambil digit pertama (untuk kasus "1" atau angka tunggal)
+    local digit = text:match("%d")
+    if digit then return tonumber(digit) end
     
-    return safestCell, lowestProb
+    return nil
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
@@ -362,13 +328,13 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         rotOn = e(y1)
     end
     i.d = {
-        r = tonumber(c1) or 0.01,  -- Ubah ke 0.01 untuk kecepatan maksimal
+        r = tonumber(c1) or 0.01,
         s = tonumber(d1) or 3,
         t = f1 or Enum.Font.Arcade,
         u = tonumber(g1) or 100,
         vb = e(h1),
         w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },  -- Ubah interval ke 0.01
+        ac = { on = e(x1), rad = tonumber(v1) or 20, intv = tonumber(n1) or 0.01 },
         rot = {
             on = rotOn == nil and false or rotOn,
             ro = tonumber(rotOpt and rotOpt.ro) or 180,
@@ -446,7 +412,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         end
         local RotCtl = mkRotCtl(rot)
         
-        -- Auto clicker untuk flag dan klik
         if ac.on then
             task.spawn(function()
                 local l = game:GetService("Players")
@@ -506,7 +471,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local guiCache = {}
         local partCache = {}
         local updateThrottle = 0
-        local THROTTLE_INTERVAL = 0.01  -- Ubah ke 0.01 untuk update lebih cepat
+        local THROTTLE_INTERVAL = 0.01
         
         local function A6()
             local parent = cg or A5
@@ -519,9 +484,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return p2
         end
         local function T1(sv)
-            if type(sv) ~= "string" then return nil end
-            local d = sv:match("(%d)")
-            return d and tonumber(d) or nil
+            return extractNumber(sv)  -- Gunakan fungsi extractNumber yang baru
         end
         local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
         local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
@@ -626,7 +589,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return b
         end
         
-        -- Main loop yang dimodifikasi untuk auto solver
         local function B6()
             if not (state and state.b and state.c) then return end
             local currentTime = tick()
@@ -663,10 +625,18 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             local W
                             local X = R:FindFirstChild("NumberGui", true)
                             if X then
+                                -- Cari TextLabel dengan berbagai cara
                                 if X.FindFirstChildWhichIsA then
                                     W = X:FindFirstChildWhichIsA("TextLabel")
                                 end
-                                if not W then W = X:FindFirstChild("TextLabel") end
+                                if not W then
+                                    for _, child in ipairs(X:GetChildren()) do
+                                        if child:IsA("TextLabel") then
+                                            W = child
+                                            break
+                                        end
+                                    end
+                                end
                             end
                             local Y = false
                             if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
@@ -692,7 +662,14 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                     if X.FindFirstChildWhichIsA then
                                         W = X:FindFirstChildWhichIsA("TextLabel")
                                     end
-                                    if not W then W = X:FindFirstChild("TextLabel") end
+                                    if not W then
+                                        for _, child in ipairs(X:GetChildren()) do
+                                            if child:IsA("TextLabel") then
+                                                W = child
+                                                break
+                                            end
+                                        end
+                                    end
                                     if W and W:IsA("TextLabel") then V.d = W end
                                 end
                             end
@@ -784,7 +761,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 local c0 = gx - offGX
                 if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
                     b0[r0][c0].a = "revealed"
-                    b0[r0][c0].b = (T1(V.d.Text) or tonumber(V.d.Text) or 0)
+                    b0[r0][c0].b = extractNumber(V.d.Text) or 0  -- Gunakan extractNumber
                     b0[r0][c0].c = V
                 end
             end
@@ -1126,8 +1103,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local gP = d9.b
             local da = {}
             local bombsToFlag = {}
-            
-            -- AUTO SOLVER: Cari sel untuk diklik
             local cellsToClick = {}
             
             for r0 = 1, Hc do
@@ -1145,15 +1120,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                     local isCorner = isCornerCell(rr, cc, Hc, Wc)
                                     local isBorder = isBorderCell(rr, cc, Hc, Wc)
                                     
-                                    -- Koreksi probabilitas untuk corner dan border
+                                    -- Logika deteksi bomb yang lebih baik
                                     if isCorner then
-                                        v0 = 1.0  -- Corner dianggap bomb
+                                        -- Corner hampir pasti bomb
+                                        v0 = 0.99
                                     elseif isBorder then
-                                        v0 = math.min(v0 + 0.2, 1.0)  -- Border lebih berisiko
+                                        -- Border perlu analisis lebih
+                                        v0 = math.min(v0 + 0.1, 1.0)
                                     end
                                     
-                                    if tonumber(v0) and v0 >= 0.99 then
-                                        -- Ini bomb, tambahkan ke daftar flag
+                                    if tonumber(v0) and v0 >= 0.85 then  -- Turunkan threshold untuk bomb
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
                                             table.insert(bombsToFlag, {
@@ -1163,8 +1139,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                                 prob = v0
                                             })
                                         end
-                                    elseif tonumber(v0) and v0 <= 0.2 then
-                                        -- Ini aman, tambahkan ke daftar klik
+                                    elseif tonumber(v0) and v0 <= 0.3 then  -- Naikkan threshold untuk sel aman
                                         local cellData = b0[rr][cc]
                                         if cellData and cellData.c and cellData.c.a then
                                             table.insert(cellsToClick, {
@@ -1182,9 +1157,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
             
-            -- AUTO SOLVER: Eksekusi
+            -- Eksekusi auto solver
             if ac and ac.on then
-                -- 1. Flag bomb terlebih dahulu
+                -- Flag bomb
                 if #bombsToFlag > 0 then
                     local flagSpeed = tonumber(boxFS and boxFS.Text) or 0.01
                     for _, bombData in ipairs(bombsToFlag) do
@@ -1194,7 +1169,16 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             if not flagged then
                                 pcall(function()
                                     local args = {part}
-                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+                                    local flagEvent = game:GetService("ReplicatedStorage"):FindFirstChild("Events")
+                                    if flagEvent then
+                                        local flagEvents = flagEvent:FindFirstChild("FlagEvents")
+                                        if flagEvents then
+                                            local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
+                                            if placeFlag then
+                                                placeFlag:FireServer(unpack(args))
+                                            end
+                                        end
+                                    end
                                     part:SetAttribute("Flagged", true)
                                 end)
                                 task.wait(flagSpeed)
@@ -1203,9 +1187,8 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                     end
                 end
                 
-                -- 2. Klik sel yang aman
+                -- Klik sel aman
                 if #cellsToClick > 0 then
-                    -- Urutkan berdasarkan probabilitas terendah
                     table.sort(cellsToClick, function(a, b) return a.prob < b.prob end)
                     
                     local clickSpeed = tonumber(boxPS and boxPS.Text) or 0.01
@@ -1232,7 +1215,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 end
             end
             
-            -- GUI Updates (tetap sama seperti asli)
+            -- GUI Updates
             local F0 = A6()
             local G = tick()
             local guiUpdates = {}
@@ -1254,7 +1237,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                             else
                                 local v0 = A7(v0raw)
                                 
-                                -- Deteksi corner untuk visual
                                 local isCorner = isCornerCell(r0, c0, Hc, Wc)
                                 local isBorder = isBorderCell(r0, c0, Hc, Wc)
                                 
@@ -1262,9 +1244,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = "C", color = Color3.fromRGB(255, 0, 0)}
                                 elseif isBorder then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = "B", color = Color3.fromRGB(255, 165, 0)}
-                                elseif tonumber(v0) and v0 >= 0.99 then
+                                elseif tonumber(v0) and v0 >= 0.85 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                                elseif tonumber(v0) and v0 <= 0.01 then
+                                elseif tonumber(v0) and v0 <= 0.3 then
                                     guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
                                 else
                                     local pct = v0 * 100
