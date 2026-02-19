@@ -1,5 +1,5 @@
 -- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- FIXED DETERMINISTIC VERSION - 8-way detection & Y=3.85 teleport
+-- FIXED VERSION - Auto Flag berfungsi & posisi teleport lebih baik
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
 end
@@ -84,7 +84,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "AUTO SOLVER - Deterministic 8-Way",
+    Text = "AUTO SOLVER - Fixed Teleport & Flag",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -212,7 +212,7 @@ local boxDelay = txt("delay", "0.01", .16214, .60268, .05417, "0.01")
 local boxPS   = txt("pspeed", "1", .16214, .79948, .05417, "1")
 local boxR    = txt("r", "100", .16214, .40403, .23729, "100")
 local boxF    = txt("f", "16", .16398, .40403, .4204, "16")
-local boxFS   = txt("fspeed", "0.01", .16398, .60019, .4204, "0.01")
+local boxFS   = txt("fspeed", "0.01", .16398, .60019, .4204, "0.01")  -- Flag speed 0.01
 local boxText = txt("text", "Arcade", .55574, .40588, .60351, "Arcade")
 
 local img = n("ImageLabel", a, {
@@ -275,13 +275,7 @@ local function e(vv)
     return vv and true or false
 end
 
--- NEIGHBOR OFFSETS untuk 8 arah (termasuk diagonal)
-local neighborOffsets = {
-    {1, 0}, {-1, 0}, {0, 1}, {0, -1}, -- Sisi (Kanan, Kiri, Atas, Bawah)
-    {1, 1}, {1, -1}, {-1, 1}, {-1, -1} -- DIAGONAL (Pojok/Corner)
-}
-
--- Fungsi teleportasi dengan posisi Y = 3.85 studs di atas tile
+-- Fungsi teleportasi dengan posisi lebih tinggi
 local function teleportTo(position)
     local character = player.Character
     if not character then return end
@@ -289,7 +283,7 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Teleport 3.85 studs di atas tile (agar tidak menembus lantai)
+    -- Teleport 3.85 studs di atas tile (agar kaki tidak menembus)
     root.CFrame = CFrame.new(position + Vector3.new(0, 3.85, 0))
 end
 
@@ -306,13 +300,12 @@ local function flagBomb(part)
     if flagged then return false end
     
     -- Coba flag via ClickDetector dulu
-    local cd = part:FindFirstChildOfClass("ClickDetector")
+    local cd = part:FindFirstChildOfClass("ClickDetector", true)
     if cd then
         pcall(function()
             fireclickdetector(cd)
         end)
         task.wait(0.05)
-        return true
     end
     
     -- Coba flag via RemoteEvent
@@ -345,27 +338,6 @@ local function extractNumber(text)
     if digits then return tonumber(digits) end
     
     return nil
-end
-
--- Fungsi mendapatkan tetangga dalam grid (8 arah)
-local function getNeighbors(row, col, grid)
-    local neighbors = {}
-    local height = #grid
-    local width = #grid[1]
-    
-    for _, offset in ipairs(neighborOffsets) do
-        local nr = row + offset[1]
-        local nc = col + offset[2]
-        
-        if nr >= 1 and nr <= height and nc >= 1 and nc <= width then
-            local cell = grid[nr][nc]
-            if cell then
-                table.insert(neighbors, cell)
-            end
-        end
-    end
-    
-    return neighbors
 end
 
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
@@ -424,6 +396,58 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local vb = i.d.vb
         local w2 = i.d.w
         local ac = i.d.ac
+        local rot = i.d.rot
+        local function mkRotCtl(opt)
+            local th = {}
+            local function ha(vv)
+                local a0 = math.deg(math.atan2(vv.X, vv.Z))
+                if a0 < 0 then a0 = a0 + 360 end
+                return a0
+            end
+            local function add(lbl, part)
+                if not lbl or not lbl.Parent or not lbl.IsA or not lbl:IsA("TextLabel") then return end
+                if th[lbl] then return end
+                local p1 = part
+                if not p1 or not p1.IsA or not p1:IsA("BasePart") then
+                    local par = lbl.Parent
+                    local ok, ad = pcall(function() return par.Adornee end)
+                    if not (ok and ad and ad.IsA and ad:IsA("BasePart")) then return end
+                    p1 = ad
+                end
+                local co = coroutine.create(function()
+                    local fc = 0
+                    while state and state.b and state.c == q and rot.on do
+                        if not lbl.Parent or not p1.Parent then break end
+                        fc = fc + 1
+                        if fc >= opt.tN then
+                            fc = 0
+                            local okc, cf = pcall(function() return workspace.CurrentCamera and workspace.CurrentCamera.CFrame end)
+                            if okc and cf then
+                                local cy = ha(cf.LookVector)
+                                local okp, rv = pcall(function() return p1.CFrame.RightVector end)
+                                if okp and rv then
+                                    local by = ha(rv)
+                                    local rel = (cy - by) % 360
+                                    local rotv = (-rel + opt.ro) % 360
+                                    pcall(function() lbl.Rotation = rotv end)
+                                end
+                            end
+                        end
+                        task.wait()
+                    end
+                    th[lbl] = nil
+                end)
+                th[lbl] = co
+                coroutine.resume(co)
+            end
+            local function stop()
+                for lbl, _ in pairs(th) do
+                    th[lbl] = nil
+                end
+            end
+            return { add = add, stop = stop }
+        end
+        local RotCtl = mkRotCtl(rot)
         
         local z = 1e-4
         local A2 = 1e-6
@@ -436,6 +460,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local guiCache = {}
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.01
+        
+        local neighborOffsets = {
+            {1, 0}, {-1, 0}, {0, 1}, {0, -1}, -- Sisi (Kanan, Kiri, Atas, Bawah)
+            {1, 1}, {1, -1}, {-1, 1}, {-1, -1} -- DIAGONAL (Pojok/Corner)
+        }
         
         local function A6()
             local parent = cg or A5
@@ -450,11 +479,21 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
         local function T1(sv)
             return extractNumber(sv)
         end
-        local function A7(a2) a2 = tonumber(a2) or 0 if a2 < 0 then return 0 elseif a2 > 1 then return 1 else return a2 end end
-        local function A8(pv) pv = A7(pv) if pv <= 0.5 then local q0 = pv / 0.5 return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) else local q0 = (pv - 0.5) / 0.5 return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) end end
         local function A9(a2) if a2 >= 0 then return math.floor(a2 + 0.5 + z) else return math.ceil(a2 - 0.5 - z) end end
         local function B0(r0, c0) return tostring(r0) .. ":" .. tostring(c0) end
         local function B1(gx, gy) return tostring(gx) .. ":" .. tostring(gy) end
+        local function B3(r0, c0, Hn, Wn)
+            local o0, i1 = {}, 1
+            for _, off in ipairs(neighborOffsets) do
+                local dr, dc = off[1], off[2]
+                local rr, cc = r0 + dr, c0 + dc
+                if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
+                    o0[i1] = { rr, cc }
+                    i1 = i1 + 1
+                end
+            end
+            return o0
+        end
         local function B4(p0) return tostring(p0:GetDebugId()) end
         local function B5(Fo, part, G)
             if not (part and part:IsA("BasePart")) then return nil end
@@ -502,6 +541,9 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 J.Parent = I
             end
             I.Enabled, J.Visible = true, true
+            if rot.on then
+                pcall(function() RotCtl.add(J, part) end)
+            end
             return I, J
         end
         local function GridIndex(vDelta, cell, tol)
@@ -533,6 +575,36 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             return b
+        end
+        local function checkDeterministic(r0, c0, grid, Hn, Wn)
+            local cell = grid[r0][c0]
+            local val = cell.b or 0
+            local neighbors = B3(r0, c0, Hn, Wn)
+            local covered = {}
+            local flags = 0
+
+            for _, rc in ipairs(neighbors) do
+                local rr, cc = rc[1], rc[2]
+                local nb = grid[rr][cc]
+                if nb.a == "flagged" then
+                    flags = flags + 1
+                elseif nb.a == "covered" then
+                    table.insert(covered, {rr = rr, cc = cc, part = nb.c.a})
+                end
+            end
+
+            -- KUNCI DETEKSI CORNER:
+            -- Jika angka ubin dikurangi bendera di sekitarnya sama dengan jumlah kotak tertutup
+            if (val - flags) == #covered and #covered > 0 then
+                -- Maka kotak tertutup itu 100% BOM (Deterministic)
+                return "MINE", covered
+            end
+            
+            -- Jika jumlah bendera sudah pas dengan angka ubin
+            if val == flags and #covered > 0 then
+                -- Maka kotak tertutup lainnya 100% AMAN
+                return "SAFE", covered
+            end
         end
         local function B6()
             if not (state and state.b and state.c == q) then return end
@@ -710,44 +782,54 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     end
                 end
             end
+            local function B3n(E0, Wn, Hn)
+                local f0, f1 = {}, {}
+                local ch = true
+                local maxIterations = 50
+                local iteration = 0
+                while ch and iteration < maxIterations do
+                    ch = false
+                    iteration = iteration + 1
+                    for r0 = 1, Hn do
+                        for c0 = 1, Wn do
+                            local d8 = E0[r0][c0]
+                            if d8.a == "revealed" then
+                                local detType, covered = checkDeterministic(r0, c0, E0, Hn, Wn)
+                                if detType == "MINE" then
+                                    for _, cov in ipairs(covered) do
+                                        f0[#f0 + 1] = cov
+                                    end
+                                    ch = true
+                                elseif detType == "SAFE" then
+                                    for _, cov in ipairs(covered) do
+                                        f1[#f1 + 1] = cov
+                                    end
+                                    ch = true
+                                end
+                            end
+                        end
+                    end
+                    for _, cov in ipairs(f0) do
+                        local rr, cc = cov.rr, cov.cc
+                        if E0[rr][cc].a == "covered" then
+                            E0[rr][cc].a = "flagged"
+                        end
+                    end
+                end
+                return { mines = f0, safes = f1 }
+            end
+            local d9 = B3n(b0, Wc, Hc)
+            local da = {}
+            local bombsToFlag = {}
             
-            -- DETERMINISTIC DETECTION (8 arah)
-            local mines = {}  -- Bom pasti
-            local safes = {}  -- Aman pasti
-            
+            -- Kumpulkan bomb untuk di-flag (deterministic only)
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
-                    local cell = b0[r0][c0]
-                    if cell.a == "revealed" and cell.b and cell.b > 0 then
-                        local neighbors = getNeighbors(r0, c0, b0)
-                        local covered = {}
-                        local flagged = 0
-                        
-                        for _, nb in ipairs(neighbors) do
-                            if nb.a == "flagged" then
-                                flagged = flagged + 1
-                            elseif nb.a == "covered" then
-                                table.insert(covered, nb)
-                            end
-                        end
-                        
-                        local remaining = cell.b - flagged
-                        
-                        -- Jika jumlah ubin tertutup sama dengan angka yang tersisa -> SEMUA BOM
-                        if remaining == #covered and #covered > 0 then
-                            for _, mineCell in ipairs(covered) do
-                                if mineCell.c and mineCell.c.a then
-                                    mines[mineCell] = true
-                                end
-                            end
-                        end
-                        
-                        -- Jika tidak ada sisa angka dan ada ubin tertutup -> SEMUA AMAN
-                        if remaining == 0 and #covered > 0 then
-                            for _, safeCell in ipairs(covered) do
-                                if safeCell.c and safeCell.c.a then
-                                    safes[safeCell] = true
-                                end
+                    if b0[r0][c0].a == "revealed" then
+                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
+                            local rr, cc = rc[1], rc[2]
+                            if b0[rr][cc].a == "covered" then
+                                da[B0(rr, cc)] = true
                             end
                         end
                     end
@@ -755,20 +837,11 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             end
             
             -- AUTO FLAG: Flag bombs
-            local bombsToFlag = {}
-            for cell, _ in pairs(mines) do
-                if cell.c and cell.c.a then
-                    table.insert(bombsToFlag, {
-                        part = cell.c.a
-                    })
-                end
-            end
-            
-            if ac and ac.on and #bombsToFlag > 0 then
+            if ac and ac.on and d9.mines and #d9.mines > 0 then
                 local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
+                statusLabel.Text = "Flagging " .. #d9.mines .. " bombs..."
                 
-                for _, bombData in ipairs(bombsToFlag) do
+                for _, bombData in ipairs(d9.mines) do
                     local part = bombData.part
                     if part and part.Parent then
                         local success = flagBomb(part)
@@ -779,7 +852,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                 end
             end
             
-            -- AUTO SOLVER: Teleport ke tile aman
+            -- AUTO SOLVER: Teleport ke tile aman (posisi lebih tinggi)
             if state and state.b and state.c == q then
                 pcall(function()
                     local root = M
@@ -788,9 +861,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     local teleportDelay = ac.delay or 0.01
                     local safeTiles = {}
                     
-                    for cell, _ in pairs(safes) do
-                        if cell.c and cell.c.a then
-                            local part = cell.c.a
+                    -- Kumpulkan tile aman
+                    if d9.safes and #d9.safes > 0 then
+                        for _, safeData in ipairs(d9.safes) do
+                            local part = safeData.part
                             if part and part:IsA("BasePart") then
                                 table.insert(safeTiles, {
                                     part = part,
@@ -800,13 +874,22 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                         end
                     end
                     
+                    local target = nil
+                    local targetType = ""
+                    
+                    -- Priority: Safe tiles
                     if #safeTiles > 0 then
-                        local target = safeTiles[1]
+                        target = safeTiles[1]
+                        targetType = "safe"
+                    end
+                    
+                    -- Teleport ke target
+                    if target and target.part then
                         teleportTo(target.pos)
-                        statusLabel.Text = "Teleport to safe tile (Y=3.85)"
+                        statusLabel.Text = string.format("Teleport to %s tile", targetType)
                         task.wait(teleportDelay)
                     else
-                        statusLabel.Text = "No deterministic safe tiles"
+                        statusLabel.Text = "No tiles to teleport"
                     end
                 end)
             end
@@ -822,14 +905,19 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
                     local V = d8.c
                     local p3 = V and V.a
                     if p3 and p3:IsA("BasePart") then
-                        if mines[d8] then
+                        local draw
+                        if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
+                        if d8.a == "flagged" then
                             guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif safes[d8] then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                        elseif d8.a == "flagged" then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif d8.a == "covered" then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(200, 200, 200)}
+                        elseif d8.a == "covered" and draw then
+                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
+                        else
+                            local H2 = B4(p3)
+                            local I = F0:FindFirstChild(H2)
+                            if I then
+                                I.Enabled = false
+                                lastSeenRun[I] = G
+                            end
                         end
                     end
                 end
@@ -855,6 +943,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal)
             end
             A3.f, A3.g = d1, b0
             A3.h, A3.i = Wc, Hc
+            A3.j, A3.k = nil, nil
         end
         
         -- Loop utama
@@ -960,7 +1049,7 @@ local function pushState()
     
     callS(false)
     callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal)
-    statusLabel.Text = "Status: Running (8-Way Deterministic)"
+    statusLabel.Text = "Status: Running"
 end
 
 local function bindToggle(bx)
@@ -1082,6 +1171,5 @@ open.MouseButton1Up:Connect(function()
     clickStart = nil
 end)
 
-print("Auto Solver v3 (Deterministic) loaded!")
-print("Fixes: 8-way detection, Y=3.85 teleport, deterministic logic")
-print("Green check = Safe, Bomb icon = Mine")
+print("Auto Solver v3 loaded! Click the ⚡ button to open menu")
+print("Fixes: Teleport height 3.85 studs, Deterministic detection")
