@@ -283,10 +283,24 @@ local function teleportTo(position)
     if not character then return end
     
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not root then return end
     
-    -- Direct teleport to tile position (no height adjustment)
+    -- Anchor character to prevent falling/tilting
+    if humanoid then
+        humanoid.PlatformStand = true
+    end
+    root.Anchored = true
+    
+    -- Direct teleport to part position (NO height adjustment)
     root.CFrame = CFrame.new(position)
+    
+    -- Small delay then unanchor
+    task.wait(0.05)
+    root.Anchored = false
+    if humanoid then
+        humanoid.PlatformStand = false
+    end
 end
 
 -- Fungsi flag bomb (dari Sweep.lua - CORRECT VERSION)
@@ -793,7 +807,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     if not root then return end
                     
                     local teleportDelay = ac.delay or 0.01
-                    local instantMode = ac.instant or false  -- Instant TP toggle
+                    local instantMode = ac.instant or false
                     local safeTiles = {}
                     
                     for cell, _ in pairs(safes) do
@@ -810,17 +824,17 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                     
                     if #safeTiles > 0 then
                         if instantMode then
-                            -- INSTANT MODE: Teleport to random safe tile
-                            local randomIndex = math.random(1, #safeTiles)
-                            local target = safeTiles[randomIndex]
-                            teleportTo(target.pos)
-                            statusLabel.Text = "Instant TP: Random safe"
-                            task.wait(teleportDelay)
+                            -- INSTANT MODE: Teleport to ALL safe tiles rapidly (no delay between)
+                            statusLabel.Text = "Instant TP: Processing " .. #safeTiles .. " tiles"
+                            for _, tile in ipairs(safeTiles) do
+                                teleportTo(tile.pos)
+                                -- No wait - instant!
+                            end
                         else
-                            -- NORMAL MODE: Teleport to first safe tile (one by one)
+                            -- NORMAL MODE: Teleport one-by-one with delay
                             local target = safeTiles[1]
                             teleportTo(target.pos)
-                            statusLabel.Text = "Teleport: Sequential"
+                            statusLabel.Text = "Sequential TP: " .. #safeTiles .. " remaining"
                             task.wait(teleportDelay)
                         end
                     end
@@ -1153,6 +1167,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             local pr = d9.a or {}
             local gP = d9.b
             local da = {}
+            local bombsToFlag = {}  -- Initialize for probability system
             
             for r0 = 1, Hc do
                 for c0 = 1, Wc do
@@ -1161,6 +1176,23 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
                             local rr, cc = rc[1], rc[2]
                             if b0[rr][cc].a == "covered" then
                                 da[B0(rr, cc)] = true
+                                
+                                -- Collect bombs from probability (v0 >= 0.99)
+                                local v0raw = (pr[rr] and pr[rr][cc]) or gP
+                                if v0raw then
+                                    local v0 = A7(v0raw)
+                                    if tonumber(v0) and v0 >= 0.99 then
+                                        local cellData = b0[rr][cc]
+                                        if cellData and cellData.c and cellData.c.a then
+                                            table.insert(bombsToFlag, {
+                                                part = cellData.c.a,
+                                                row = rr,
+                                                col = cc,
+                                                prob = v0
+                                            })
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
@@ -1169,11 +1201,25 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             
             -- AUTO FLAG: Flag bombs (sistem probabilitas)
             if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.01
+                local flagSpeed = 0.05  -- Sweep's speed
                 statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
                 
                 for _, bombData in ipairs(bombsToFlag) do
                     local part = bombData.part
+                    if part and part.Parent and not part:FindFirstChild("Flag") and not part:FindFirstChild("Flagged") then
+                        if not part:GetAttribute("Flagged") then
+                            task.spawn(function()
+                                pcall(function()
+                                    local args = {part}
+                                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FlagEvents"):WaitForChild("PlaceFlag"):FireServer(unpack(args))
+                                    part:SetAttribute("Flagged", true)
+                                end)
+                            end)
+                            task.wait(flagSpeed)
+                        end
+                    end
+                end
+            end
                     if part and part.Parent then
                         local success = flagBomb(part)
                         if success then
