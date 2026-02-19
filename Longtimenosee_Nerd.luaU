@@ -5,7 +5,7 @@ if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and g
 end
 
 -- ========== PENGATURAN KETINGGIAN TELEPORT ==========
-local TELEPORT_HEIGHT = 4.0  -- GANTI ANGKA INI SESUAI KEINGINAN (4.0 atau 4.5)
+local TELEPORT_HEIGHT = 73.5  -- GANTI ANGKA INI SESUAI KEINGINAN (4.0 atau 4.5)
 -- ====================================================
 
 local v1 = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
