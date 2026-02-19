@@ -285,8 +285,15 @@ local function teleportTo(position)
     local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
     if not root then return end
     
-    -- Direct teleport tanpa offset - biarkan game yang atur posisi character
-    root.CFrame = CFrame.new(position)
+    -- Teleport dengan small offset untuk avoid collision
+    -- Gunakan CFrame.new yang proper dengan orientation
+    local currentOrientation = root.CFrame - root.CFrame.Position
+    local newCFrame = CFrame.new(position) * currentOrientation
+    
+    root.CFrame = newCFrame + Vector3.new(0, 2.5, 0)
+    
+    -- Force physics update
+    task.wait()
 end
 
 -- Fungsi flag bomb
@@ -840,43 +847,60 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instant
             
             -- AUTO SOLVER: Teleport ke safe tiles
             if state and state.b and state.c == q then
-                pcall(function()
-                    local root = M
-                    if not root then return end
-                    
-                    local teleportDelay = ac.delay or 0.01
-                    local instantMode = ac.instant or false
-                    local safeTiles = {}
-                    
-                    for cell, _ in pairs(allSafes) do
-                        if cell.c and cell.c.a then
-                            local part = cell.c.a
-                            if part and part:IsA("BasePart") then
-                                table.insert(safeTiles, {
-                                    part = part,
-                                    pos = part.Position
-                                })
-                            end
-                        end
-                    end
-                    
-                    if #safeTiles > 0 then
-                        if instantMode then
-                            -- INSTANT: All tiles rapidly
-                            for i, tile in ipairs(safeTiles) do
-                                teleportTo(tile.pos)
-                                if i < #safeTiles then
-                                    task.wait(0.001)
+                task.spawn(function()
+                    pcall(function()
+                        local root = M
+                        if not root then return end
+                        
+                        local teleportDelay = ac.delay or 0.01
+                        local instantMode = ac.instant or false
+                        local safeTiles = {}
+                        
+                        -- Collect safe tiles with distance sorting
+                        for cell, _ in pairs(allSafes) do
+                            if cell.c and cell.c.a then
+                                local part = cell.c.a
+                                if part and part:IsA("BasePart") and not part:GetAttribute("Visited") then
+                                    local dist = (part.Position - root.Position).Magnitude
+                                    table.insert(safeTiles, {
+                                        part = part,
+                                        pos = part.Position,
+                                        dist = dist
+                                    })
                                 end
                             end
-                            task.wait(teleportDelay)
-                        else
-                            -- SEQUENTIAL: One at a time
-                            local target = safeTiles[1]
-                            teleportTo(target.pos)
-                            task.wait(teleportDelay)
                         end
-                    end
+                        
+                        if #safeTiles > 0 then
+                            if instantMode then
+                                -- INSTANT: Process ALL tiles rapidly
+                                -- Sort by distance for efficient pathing
+                                table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
+                                
+                                for i, tile in ipairs(safeTiles) do
+                                    teleportTo(tile.pos)
+                                    tile.part:SetAttribute("Visited", true)
+                                    
+                                    -- Micro delay untuk server processing
+                                    if i % 3 == 0 then
+                                        task.wait(0.01)
+                                    end
+                                end
+                                
+                                statusLabel.Text = "Instant: " .. #safeTiles .. " cleared"
+                            else
+                                -- SEQUENTIAL: One at a time, closest first
+                                table.sort(safeTiles, function(a, b) return a.dist < b.dist end)
+                                local target = safeTiles[1]
+                                
+                                teleportTo(target.pos)
+                                target.part:SetAttribute("Visited", true)
+                                
+                                statusLabel.Text = "Sequential: " .. (#safeTiles - 1) .. " remaining"
+                                task.wait(teleportDelay)
+                            end
+                        end
+                    end)
                 end)
             end
             
