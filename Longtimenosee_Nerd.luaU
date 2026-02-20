@@ -1,7 +1,3 @@
--- Minesweeper Auto Solver with Rayfield UI - FIXED
--- Based on shiziks-solver detection system
--- Pure LuaU
-
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,9 +6,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Create Window
 local Window = Rayfield:CreateWindow({
-   Name = "Minesweeper Solver",
-   LoadingTitle = "Minesweeper Auto Solver",
-   LoadingSubtitle = "by Shiziks System",
+   Name = "Goorner script",
+   LoadingTitle = "inspired by deadshizik and made yar",
+   LoadingSubtitle = "STILL IN BETA",
    ConfigurationSaving = {
       Enabled = false
    },
