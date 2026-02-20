@@ -1,3 +1,7 @@
+-- Minesweeper Auto Solver with Rayfield UI - ACCURATE DETECTION
+-- Based on shiziks-solver detection system
+-- Pure LuaU
+
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -6,9 +10,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Create Window
 local Window = Rayfield:CreateWindow({
-   Name = "Goorner script",
-   LoadingTitle = "inspired by deadshizik and made yar",
-   LoadingSubtitle = "STILL IN BETA",
+   Name = "Minesweeper Solver",
+   LoadingTitle = "Minesweeper Auto Solver",
+   LoadingSubtitle = "by Shiziks System",
    ConfigurationSaving = {
       Enabled = false
    },
@@ -34,6 +38,7 @@ local stopExecution = false
 local isGuessing = false
 local lastActionTime = 0
 local characterFrozen = false
+local solvedTiles = {} -- Track tiles yang sudah diproses
 
 -- Helper Functions
 local function isCellOpen(part)
@@ -43,7 +48,22 @@ local function isCellOpen(part)
 end
 
 local function isAlreadyFlagged(part)
-    return part:FindFirstChild("Flag") or part:FindFirstChild("BombFlag") or part:FindFirstChild("FlagModel")
+    if not part then return false end
+    if part:FindFirstChild("Flag") then return true end
+    if part:FindFirstChild("BombFlag") then return true end
+    if part:FindFirstChild("FlagModel") then return true end
+    
+    local success, flagged = pcall(function()
+        return part:GetAttribute("Flagged")
+    end)
+    if success and flagged then return true end
+    
+    return false
+end
+
+local function isMine(part)
+    if not part then return false end
+    return part.Color == Color3.new(0, 0, 0) or isAlreadyFlagged(part)
 end
 
 -- Freeze Character
@@ -123,7 +143,7 @@ local function flagTile(part)
         if cd then
             fireclickdetector(cd)
             flaggedDebounce[part] = tick()
-            return
+            return true
         end
         
         local events = replicatedStorage:FindFirstChild("Events")
@@ -134,6 +154,7 @@ local function flagTile(part)
                 if placeFlag then
                     placeFlag:FireServer(part)
                     flaggedDebounce[part] = tick()
+                    return true
                 end
             end
         end
@@ -152,7 +173,7 @@ local function getPartsFolder()
     return workspace:FindFirstChild("Parts", true)
 end
 
--- Get Solver Data
+-- Get Solver Data dengan validasi lengkap
 local function getSolverData()
     local folder = getPartsFolder()
     if not folder then return {} end
@@ -160,47 +181,229 @@ local function getSolverData()
     local numberData = {}
     local allParts = folder:GetChildren()
     
+    -- Filter part yang valid
+    local validParts = {}
     for _, cell in ipairs(allParts) do
-        if not cell:IsA("BasePart") then continue end
-        if not isCellOpen(cell) then continue end
+        if cell:IsA("BasePart") then
+            table.insert(validParts, cell)
+        end
+    end
+    
+    for _, cell in ipairs(validParts) do
+        if not isCellOpen(cell) then goto continue end
         
-        -- Get number
-        local label = cell:FindFirstChild("NumberGui") and cell.NumberGui:FindFirstChildOfClass("TextLabel")
-        local val = (label and tonumber(label.Text)) or 0
+        -- Get number from GUI
+        local numberGui = cell:FindFirstChild("NumberGui")
+        local label = numberGui and numberGui:FindFirstChildOfClass("TextLabel")
+        local val = 0
+        if label and label.Text then
+            val = tonumber(label.Text) or 0
+        end
         
         -- Build neighbor cache
         if not neighborCache[cell] then
             local nbs = {}
-            for _, n in ipairs(allParts) do
-                if n:IsA("BasePart") and n ~= cell and (n.Position - cell.Position).Magnitude < (cell.Size.X * 1.8) then
-                    table.insert(nbs, n)
+            local cellPos = cell.Position
+            local cellSize = cell.Size.X * 1.8
+            
+            for _, n in ipairs(validParts) do
+                if n ~= cell then
+                    if (n.Position - cellPos).Magnitude < cellSize then
+                        table.insert(nbs, n)
+                    end
                 end
             end
             neighborCache[cell] = nbs
         end
         
-        -- Count hidden and flagged
-        local hidden, mines = {}, 0
+        -- Hitung hidden dan mines
+        local hidden = {}
+        local mines = 0
+        local flagged = 0
+        
         for _, n in ipairs(neighborCache[cell]) do
             if not isCellOpen(n) then
-                if n.Color == Color3.new(0, 0, 0) or isAlreadyFlagged(n) then
+                if isMine(n) then
                     mines = mines + 1
+                elseif isAlreadyFlagged(n) then
+                    flagged = flagged + 1
                 else
                     table.insert(hidden, n)
                 end
             end
         end
         
-        if #hidden > 0 or val == 0 then
+        -- Tambah flagged ke mines count
+        mines = mines + flagged
+        
+        -- Hanya masukkan jika ada hidden cells
+        if #hidden > 0 then
             table.insert(numberData, {
                 obj = cell,
-                eVal = val - mines,
-                hidden = hidden
+                val = val,
+                eVal = val - mines,  -- Expected mines di hidden
+                hidden = hidden,
+                mines = mines,
+                totalHidden = #hidden
             })
         end
+        
+        ::continue::
     end
     
     return numberData
+end
+
+-- Verifikasi tile aman dengan multiple checks
+local function isTileAbsolutelySafe(tile, data)
+    if not tile then return false end
+    if isCellOpen(tile) then return true end
+    if isMine(tile) then return false end
+    
+    -- Cek di semua data
+    for _, d in ipairs(data) do
+        for _, h in ipairs(d.hidden) do
+            if h == tile then
+                -- Jika tile ini ada di hidden, cek expected value
+                if d.eVal == 0 then
+                    return true -- 100% aman
+                elseif d.eVal == d.totalHidden then
+                    return false -- 100% mine
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Deteksi tile yang 100% aman
+local function findSafeTiles(data)
+    local safeTiles = {}
+    
+    -- Metode 1: eVal = 0 (semua hidden aman)
+    for _, d in ipairs(data) do
+        if d.eVal == 0 then
+            for _, tile in ipairs(d.hidden) do
+                safeTiles[tile] = true
+            end
+        end
+    end
+    
+    -- Metode 2: Subset detection
+    for i = 1, #data do
+        for j = 1, #data do
+            if i ~= j then
+                local d1, d2 = data[i], data[j]
+                
+                -- Cek apakah d1.hidden subset dari d2.hidden
+                local isSubset = true
+                local subsetMap = {}
+                
+                for _, tile in ipairs(d1.hidden) do
+                    subsetMap[tile] = true
+                end
+                
+                for _, tile in ipairs(d1.hidden) do
+                    local found = false
+                    for _, tile2 in ipairs(d2.hidden) do
+                        if tile == tile2 then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        isSubset = false
+                        break
+                    end
+                end
+                
+                if isSubset and #d2.hidden > #d1.hidden then
+                    local diffMines = d2.eVal - d1.eVal
+                    local diffTiles = {}
+                    
+                    for _, tile in ipairs(d2.hidden) do
+                        if not subsetMap[tile] then
+                            table.insert(diffTiles, tile)
+                        end
+                    end
+                    
+                    -- Jika selisih mines = 0, semua diffTiles aman
+                    if diffMines == 0 then
+                        for _, tile in ipairs(diffTiles) do
+                            safeTiles[tile] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return safeTiles
+end
+
+-- Deteksi tile yang 100% mine
+local function findMineTiles(data)
+    local mineTiles = {}
+    
+    -- Metode 1: #hidden == eVal (semua hidden adalah mine)
+    for _, d in ipairs(data) do
+        if #d.hidden == d.eVal and d.eVal > 0 then
+            for _, tile in ipairs(d.hidden) do
+                mineTiles[tile] = true
+            end
+        end
+    end
+    
+    -- Metode 2: Subset detection untuk mine
+    for i = 1, #data do
+        for j = 1, #data do
+            if i ~= j then
+                local d1, d2 = data[i], data[j]
+                
+                local isSubset = true
+                local subsetMap = {}
+                
+                for _, tile in ipairs(d1.hidden) do
+                    subsetMap[tile] = true
+                end
+                
+                for _, tile in ipairs(d1.hidden) do
+                    local found = false
+                    for _, tile2 in ipairs(d2.hidden) do
+                        if tile == tile2 then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        isSubset = false
+                        break
+                    end
+                end
+                
+                if isSubset and #d2.hidden > #d1.hidden then
+                    local diffMines = d2.eVal - d1.eVal
+                    local diffTiles = {}
+                    
+                    for _, tile in ipairs(d2.hidden) do
+                        if not subsetMap[tile] then
+                            table.insert(diffTiles, tile)
+                        end
+                    end
+                    
+                    -- Jika selisih mines = jumlah diffTiles, semua adalah mine
+                    if diffMines == #diffTiles and #diffTiles > 0 then
+                        for _, tile in ipairs(diffTiles) do
+                            mineTiles[tile] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return mineTiles
 end
 
 -- Main Detection Loop
@@ -211,129 +414,64 @@ local function mainLoop()
         return 
     end
     
+    -- Ambil data terbaru
     local data = getSolverData()
-    local safeQueue, mineQueue, riskyCells = {}, {}, {}
-    local foundAnything = false
+    if #data == 0 then return end
     
-    -- Basic detection first (yang paling aman)
-    for _, d in ipairs(data) do
-        if #d.hidden > 0 then
-            -- All hidden are safe
-            if d.eVal == 0 then
-                for _, n in ipairs(d.hidden) do
-                    table.insert(safeQueue, n)
-                    foundAnything = true
-                end
-            -- All hidden are mines
-            elseif #d.hidden == d.eVal then
-                for _, n in ipairs(d.hidden) do
-                    table.insert(mineQueue, n)
-                    foundAnything = true
-                end
-            end
-        end
-    end
-    
-    -- Advanced subset detection (Euler)
-    for i = 1, #data do
-        for j = 1, #data do
-            if i ~= j then
-                local d1, d2 = data[i], data[j]
-                if (d1.obj.Position - d2.obj.Position).Magnitude < 12 then
-                    local s1, s2 = d1.hidden, d2.hidden
-                    
-                    -- Check if s1 is subset of s2
-                    local isSubset = true
-                    for _, x in ipairs(s1) do
-                        local found = false
-                        for _, y in ipairs(s2) do
-                            if x == y then
-                                found = true
-                                break
-                            end
-                        end
-                        if not found then
-                            isSubset = false
-                            break
-                        end
-                    end
-                    
-                    if isSubset and #s2 > #s1 then
-                        local diffMines = d2.eVal - d1.eVal
-                        local diffCells = {}
-                        
-                        for _, x in ipairs(s2) do
-                            local inS1 = false
-                            for _, y in ipairs(s1) do
-                                if x == y then
-                                    inS1 = true
-                                    break
-                                end
-                            end
-                            if not inS1 then
-                                table.insert(diffCells, x)
-                            end
-                        end
-                        
-                        if diffMines == 0 then
-                            for _, n in ipairs(diffCells) do
-                                table.insert(safeQueue, n)
-                                foundAnything = true
-                            end
-                        elseif diffMines == #diffCells then
-                            for _, n in ipairs(diffCells) do
-                                table.insert(mineQueue, n)
-                                foundAnything = true
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
+    -- Deteksi tile aman dan mine
+    local safeTiles = findSafeTiles(data)
+    local mineTiles = findMineTiles(data)
     
     -- Mark mines
-    for _, m in ipairs(mineQueue) do
-        if m and m:IsA("BasePart") then
-            m.Color = Color3.new(0, 0, 0)
+    for tile, _ in pairs(mineTiles) do
+        if tile and tile:IsA("BasePart") then
+            tile.Color = Color3.new(0, 0, 0)
         end
     end
     
     -- Auto Flag
     if Config.AutoFlag then
-        for _, mine in ipairs(mineQueue) do
+        for tile, _ in pairs(mineTiles) do
             if not stopExecution then
                 task.spawn(function()
-                    flagTile(mine)
+                    flagTile(tile)
                 end)
             end
         end
     end
     
-    -- Teleport ke safe tiles
-    if #safeQueue > 0 then
-        isGuessing = false
-        for _, s in ipairs(safeQueue) do
-            if stopExecution or not Config.AutoSolver then break end
-            if s and s:IsA("BasePart") and not isCellOpen(s) then
-                teleportTo(s)
+    -- Teleport ke safe tiles (hanya yang 100% aman)
+    local hasTeleported = false
+    for tile, _ in pairs(safeTiles) do
+        if stopExecution or not Config.AutoSolver then break end
+        if tile and tile:IsA("BasePart") and not isCellOpen(tile) then
+            -- Verifikasi sekali lagi
+            if isTileAbsolutelySafe(tile, data) then
+                teleportTo(tile)
+                hasTeleported = true
+                solvedTiles[tile] = true
             end
         end
-    -- Auto Guess
-    elseif Config.AutoGuess and not foundAnything and tick() - lastActionTime > 0.8 then
+    end
+    
+    -- Auto Guess (hanya jika tidak ada safe tiles dan AutoGuess aktif)
+    if not hasTeleported and Config.AutoGuess and tick() - lastActionTime > 1 then
+        -- Kumpulkan kandidat (hidden tiles yang belum di-solve)
+        local candidates = {}
         for _, d in ipairs(data) do
-            for _, n in ipairs(d.hidden) do
-                if n and n:IsA("BasePart") and n.Color ~= Color3.new(0, 0, 0) then
-                    riskyCells[n] = (riskyCells[n] or 0) + 1
+            for _, tile in ipairs(d.hidden) do
+                if tile and tile:IsA("BasePart") and not isMine(tile) and not solvedTiles[tile] then
+                    candidates[tile] = (candidates[tile] or 0) + 1
                 end
             end
         end
         
-        local best, maxWeight = nil, -1
-        for cell, weight in pairs(riskyCells) do
-            if weight > maxWeight then
-                maxWeight = weight
-                best = cell
+        -- Cari tile dengan frekuensi tertinggi (paling aman untuk ditebak)
+        local best, maxCount = nil, -1
+        for tile, count in pairs(candidates) do
+            if count > maxCount then
+                maxCount = count
+                best = tile
             end
         end
         
@@ -343,9 +481,14 @@ local function mainLoop()
             lastActionTime = tick()
         end
     end
+    
+    -- Bersihkan solvedTiles jika terlalu besar
+    if #solvedTiles > 100 then
+        solvedTiles = {}
+    end
 end
 
--- Auto Solver Loop - Single loop dengan update 0.001
+-- Auto Solver Loop
 local function autoSolverLoop()
     while Config.AutoSolver do
         task.wait(0.001) -- Update sangat cepat
@@ -355,7 +498,6 @@ local function autoSolverLoop()
             break 
         end
         
-        -- Panggil main loop dalam protected call
         local success, err = pcall(mainLoop)
         if not success then
             warn("Error in mainLoop:", err)
@@ -378,6 +520,7 @@ local function handleDeath()
     isGuessing = false
     stopExecution = true
     neighborCache = {}
+    solvedTiles = {}
     if characterFrozen then freezeCharacter(false) end
     
     task.wait(1)
@@ -387,6 +530,7 @@ end
 local function setupCharacter(char)
     if not char then return end
     stopExecution = false
+    solvedTiles = {}
     
     local hum = char:WaitForChild("Humanoid", 10)
     if hum then
@@ -414,7 +558,7 @@ local AutoSolverToggle = MainTab:CreateToggle({
            task.spawn(autoSolverLoop)
            Rayfield:Notify({
               Title = "Auto Solver",
-              Content = "Solver Enabled - Update 0.001s",
+              Content = "Solver Enabled - Accurate Detection",
               Duration = 2,
               Image = 4483362458,
            })
@@ -516,11 +660,11 @@ local FlagRangeInput = SettingsTab:CreateInput({
 })
 
 -- Info Section
-MainTab:CreateSection("Fixed Version")
+MainTab:CreateSection("Accurate Detection")
 
 MainTab:CreateParagraph({
-   Title = "Update 0.001s",
-   Content = "✓ Update setiap 0.001 detik\n✓ Teleport di ATAS part\n✓ Freeze character opsional\n✓ Input fields (no slider)\n✓ Tidak berhenti tiba-tiba"
+   Title = "Improved Algorithm",
+   Content = "✓ Multi-layer verification\n✓ Subset detection (Euler)\n✓ 100% safe tile priority\n✓ Mine marking\n✓ Solved tile tracking\n✓ Update 0.001s"
 })
 
 -- Set default values
@@ -539,7 +683,7 @@ end)
 -- Success Notification
 Rayfield:Notify({
    Title = "Solver Loaded",
-   Content = "Update 0.001s - Fixed!",
+   Content = "Accurate Detection - Multi-layer verification",
    Duration = 3,
    Image = 4483362458,
 })
