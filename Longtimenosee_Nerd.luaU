@@ -1,1674 +1,488 @@
--- bLockerman's Minesweeper, NothingNesser's Script Fix (ROBLOX)
--- LUAU VERSION - Dengan sistem deteksi corner dari Minesweeper.lua (8 arah)
--- FIX: Teleportasi normal (ke atas part, bukan ke bawah)
--- FIX: Scrollable toggles dan semua tombol berfungsi
+-- Minesweeper Auto Solver with Rayfield UI - OPTIMIZED (NO NOTIFICATIONS)
+-- Based on shiziks-solver detection system
+-- Pure LuaU - NO DELAY, PERFECT TELEPORT, NO NOTIFICATIONS
 
-if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
-    -- warn("nice game")
-end
-
-local v1 = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
-
-if v1:GetAttribute("gay") then
-    return
-end
-
-v1:SetAttribute("gay", true)
-
-task.spawn(function() task.wait(0) end)
-
-local P = v1
-local c = Color3.fromRGB
-local v = Vector2.new
-local u = UDim2.new
-local N = NumberSequence.new
-local K = NumberSequenceKeypoint.new
-local F = Font.new
-
-local function n(t, p, x)
-    local o = Instance.new(t, p)
-    if x then
-        for k, w in pairs(x) do
-            pcall(function() o[k] = w end)
-        end
-    end
-    return o
-end
-
-local s = n("ScreenGui", P, {
-    DisplayOrder = 2147483647,
-    Name = "MinesweeperHelper",
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    ResetOnSpawn = false
-})
-
-local open = n("TextButton", s, {
-    BorderSizePixel = 2,
-    TextSize = 16,
-    TextColor3 = c(255, 255, 255),
-    BackgroundColor3 = c(40, 40, 40),
-    FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
-    AnchorPoint = v(1, 1),
-    BackgroundTransparency = 0.6,
-    Size = u(0, 60, 0, 60),
-    BorderColor3 = c(100, 100, 100),
-    Text = "⚡",
-    TextScaled = true,
-    Name = "open",
-    Position = u(1, -10, 1, -10),
-    ClipsDescendants = false,
-    Visible = true,
-    Active = true,
-    Draggable = true
-})
-
-n("UICorner", open, { CornerRadius = UDim.new(0.15, 0) })
-n("UIPadding", open, { PaddingTop = UDim.new(.1, 0), PaddingBottom = UDim.new(.1, 0), PaddingLeft = UDim.new(.1, 0), PaddingRight = UDim.new(.1, 0) })
-
--- Main panel dengan ScrollingFrame
-local panel = n("Frame", s, {
-    Visible = false,
-    BorderSizePixel = 0,
-    BackgroundColor3 = c(0, 0, 0),
-    AnchorPoint = v(.5, .5),
-    Size = u(0, 600, 0, 350),
-    Position = u(.5, 0, .5, 0),
-    BorderColor3 = c(0, 0, 0),
-    BackgroundTransparency = 0.1,
-    ClipsDescendants = true
-})
-
-n("UICorner", panel, { CornerRadius = UDim.new(.05, 0) })
-n("UIAspectRatioConstraint", panel, { AspectRatio = 1.71 })
-
--- Background frame
-local a = n("Frame", panel, {
-    BorderSizePixel = 0,
-    BackgroundColor3 = c(20, 20, 20),
-    AnchorPoint = v(.5, .5),
-    Size = u(.99, 0, .99, 0),
-    Position = u(.5, 0, .505, 0),
-    BorderColor3 = c(0, 0, 0)
-})
-
-n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
-
--- ScrollingFrame untuk konten yang bisa di-scroll
-local scrollFrame = n("ScrollingFrame", a, {
-    BorderSizePixel = 0,
-    BackgroundTransparency = 1,
-    Size = u(1, 0, 1, 0),
-    Position = u(0, 0, 0, 0),
-    CanvasSize = u(0, 0, 0, 400), -- Akan di-update nanti
-    ScrollBarThickness = 8,
-    ScrollBarImageColor3 = c(100, 100, 100),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right,
-    ClipsDescendants = false
-})
-
--- Content container di dalam ScrollingFrame
-local content = n("Frame", scrollFrame, {
-    BorderSizePixel = 0,
-    BackgroundTransparency = 1,
-    Size = u(1, 0, 0, 400), -- Fixed height, akan diisi
-    Position = u(0, 0, 0, 0),
-    AutomaticSize = Enum.AutomaticSize.Y
-})
-
-local creditLabel = n("TextLabel", content, {
-    Text = "AUTO SOLVER - Corner Detection (8-Way)",
-    TextSize = 18,
-    TextColor3 = c(0, 255, 255),
-    BackgroundTransparency = 1,
-    Font = Enum.Font.SourceSansBold,
-    TextXAlignment = Enum.TextXAlignment.Right,
-    TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.4, 0, 0.08, 0),
-    Position = u(0.58, 0, 0.01, 0),
-    ZIndex = 10
-})
-
-local function ico(name, y)
-    local i = n("ImageButton", content, {
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        BackgroundColor3 = c(0, 0, 0),
-        AnchorPoint = v(.5, .5),
-        Image = "rbxassetid://16167594452",
-        ImageRectSize = v(90, 90),
-        Size = u(.06363, 0, .12408, 0),
-        BorderColor3 = c(0, 0, 0),
-        Name = name,
-        ImageRectOffset = v(862, 472),
-        Position = u(.06254, 0, y, 0),
-        Active = true,
-        Selected = false,
-        AutoButtonColor = false
-    })
-    n("UIAspectRatioConstraint", i)
-    return i
-end
-
--- 6 tombol dengan posisi yang benar
-local btnScript = ico("script", .08419)    -- Auto Solver
-local btnInstant = ico("instant", .22886)  -- Instant TP
-local btnShowAll = ico("showall", .37352)  -- Show All
-local btnRange = ico("range", .51818)      -- Range
-local btnAuto = ico("autoclick", .66284)   -- Flag  
-local btnGuess = ico("guess", .80750)      -- Auto Guess
-
-local function gradL(p)
-    n("UIGradient", p, { Transparency = N { K(0, 0), K(1, .33125) } })
-end
-
-local function pad(p, t, l, bm)
-    n("UIPadding", p, {
-        PaddingTop = UDim.new(t, 0),
-        PaddingLeft = UDim.new(l, 0),
-        PaddingBottom = UDim.new(bm, 0)
-    })
-end
-
-local function lbl(txt, sx, py, pt, pb)
-    local L = n("TextLabel", content, {
-        TextWrapped = true,
-        BorderSizePixel = 0,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextScaled = true,
-        BackgroundColor3 = c(0, 0, 0),
-        FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
-        TextColor3 = c(255, 255, 255),
-        BackgroundTransparency = 1,
-        Size = u(sx, 0, .15, 0),
-        BorderColor3 = c(0, 0, 0),
-        Text = txt,
-        Position = u(.10693, 0, py, 0)
-    })
-    pad(L, pt, .05, pb)
-    gradL(L)
-    return L
-end
-
-lbl("Auto Solver", .2796, .04033, .06, .15)
-lbl("Instant TP", .29895, .22344, .07, .13)
-lbl("Show All", .2796, .40656, .08, .12)
-lbl("Range", .29895, .58967, .06, .09)
-lbl("Flag", .2796, .77278, .06, .09)
-lbl("Auto Guess", .2796, .95589, .06, .09)
-
-local statusLabel = n("TextLabel", content, {
-    Text = "Status: Ready",
-    TextSize = 14,
-    TextColor3 = c(100, 255, 100),
-    BackgroundTransparency = 1,
-    Font = Enum.Font.SourceSansBold,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.3, 0, 0.06, 0),
-    Position = u(.10693, 0, .78, 0),
-    ZIndex = 5
-})
-
-local function gradB(p)
-    n("UIGradient", p, {
-        Rotation = 90,
-        Transparency = N { K(0, 0), K(.684, 0), K(.9, .3), K(1, 1) }
-    })
-end
-
-local function txt(name, ph, sx, px, py, txtv)
-    local t = n("TextBox", content, {
-        CursorPosition = -1,
-        Name = name,
-        PlaceholderColor3 = c(190, 190, 190),
-        BorderSizePixel = 0,
-        TextWrapped = true,
-        TextSize = 14,
-        TextColor3 = c(0, 0, 0),
-        TextScaled = true,
-        BackgroundColor3 = c(255, 255, 255),
-        FontFace = F("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
-        PlaceholderText = ph,
-        Size = u(sx, 0, .11, 0),
-        Position = u(px, 0, py, 0),
-        BorderColor3 = c(0, 0, 0),
-        Text = txtv or "",
-        ClearTextOnFocus = false
-    })
-    gradB(t)
-    n("UICorner", t, { CornerRadius = UDim.new(.157, 0) })
-    n("UIPadding", t, {
-        PaddingRight = UDim.new(.05, 0),
-        PaddingLeft = UDim.new(.05, 0),
-        PaddingBottom = UDim.new(.1, 0)
-    })
-    return t
-end
-
--- Input boxes
-local boxMax  = txt("max", "5000", .16214, .40588, .05417, "5000")
-local boxDelay = txt("delay", "0.01", .16214, .60268, .05417, "0.01")
-local boxPS   = txt("pspeed", "1", .16214, .79948, .05417, "1")
-local boxR    = txt("r", "100", .16214, .40403, .23729, "100")
-local boxF    = txt("f", "16", .16398, .40403, .4204, "16")
-local boxFS   = txt("fspeed", "0.01", .16398, .60019, .4204, "0.01")
-local boxText = txt("text", "Arcade", .55574, .40588, .60351, "Arcade")
-
-local img = n("ImageLabel", content, {
-    ZIndex = 9,
-    BorderSizePixel = 0,
-    BackgroundColor3 = c(255, 255, 255),
-    ResampleMode = Enum.ResamplerMode.Pixelated,
-    Image = "rbxassetid://91463315015793",
-    Size = u(.46942, 0, .90793, 0),
-    BorderColor3 = c(0, 0, 0),
-    BackgroundTransparency = 1,
-    Position = u(.53564, 0, .15447, 0)
-})
-
-n("TextLabel", img, {
-    TextWrapped = true,
-    BorderSizePixel = 0,
-    TextSize = 14,
-    TextScaled = true,
-    BackgroundColor3 = c(255, 255, 255),
-    FontFace = F("rbxasset://fonts/families/SpecialElite.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
-    TextColor3 = c(255, 255, 255),
-    BackgroundTransparency = 1,
-    Size = u(.41045, 0, .0969, 0),
-    BorderColor3 = c(0, 0, 0),
-    Text = "v3",
-    Rotation = -5,
-    Position = u(.56212, 0, .14326, 0)
-})
-
-local st = n("UIStroke", content, { Color = c(100, 100, 100), Thickness = 2 })
-
-n("ImageLabel", content, {
-    ZIndex = -13456,
-    BorderSizePixel = 0,
-    ScaleType = Enum.ScaleType.Crop,
-    BackgroundColor3 = c(255, 255, 255),
-    ResampleMode = Enum.ResamplerMode.Pixelated,
-    ImageTransparency = .85,
-    Image = "rbxassetid://14755021367",
-    ImageRectSize = v(195, 84),
-    Size = u(1, 0, 1, 0),
-    BorderColor3 = c(0, 0, 0),
-    BackgroundTransparency = 1,
-    Rotation = 180,
-    ImageRectOffset = v(0, 902)
-})
-
--- Update canvas size berdasarkan content
-task.wait(0.1)
-scrollFrame.CanvasSize = u(0, 0, 0, content.AbsoluteSize.Y + 20)
-
--- Variables untuk drag
-local dragging = false
-local dragInput, dragStart, startPos
-
-local draggingOpen = false
-local dragInputOpen, dragStartOpen, startPosOpen
-
--- Drag functions
-local function updateInput(input)
-    if dragging and panel.Visible then
-        local delta = input.Position - dragStart
-        panel.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end
-
-local function updateInputOpen(input)
-    if draggingOpen then
-        local delta = input.Position - dragStartOpen
-        open.Position = UDim2.new(
-            startPosOpen.X.Scale,
-            startPosOpen.X.Offset + delta.X,
-            startPosOpen.Y.Scale,
-            startPosOpen.Y.Offset + delta.Y
-        )
-    end
-end
-
--- Panel drag
-panel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = panel.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-panel.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
--- Open button drag
-open.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingOpen = true
-        dragStartOpen = input.Position
-        startPosOpen = open.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingOpen = false
-            end
-        end)
-    end
-end)
-
-open.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInputOpen = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput then
-        updateInput(input)
-    elseif input == dragInputOpen then
-        updateInputOpen(input)
-    end
-end)
-
--- Click to toggle panel (only if not dragging)
-local clickStart = nil
-local clickThreshold = 0.2
-
-open.MouseButton1Down:Connect(function()
-    clickStart = tick()
-    draggingOpen = false
-end)
-
-open.MouseButton1Up:Connect(function()
-    if clickStart and (tick() - clickStart) < clickThreshold and not draggingOpen then
-        panel.Visible = not panel.Visible
-    end
-    clickStart = nil
-end)
-
--- MAIN LOGIC
-local B = "Flags status"
-local state = { b = false, c = 0, d = nil }
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-local function e(vv)
-    if type(vv) == "boolean" then return vv end
-    if type(vv) == "string" then
-        local s0 = vv:lower()
-        return (s0 == "enable" or s0 == "on" or s0 == "true" or s0 == "start")
-    end
-    return vv and true or false
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Create Window
+local Window = Rayfield:CreateWindow({
+   Name = "Minesweeper Solver",
+   LoadingTitle = "Minesweeper Auto Solver",
+   LoadingSubtitle = "by Shiziks System",
+   ConfigurationSaving = {
+      Enabled = false
+   },
+   Discord = {
+      Enabled = false
+   },
+   KeySystem = false
+})
+
+-- Variables
+local Config = {
+    AutoSolver = false,
+    AutoFlag = false,
+    AutoGuess = false,
+    TeleportSpeed = 0.0001,
+    FlagRange = 25,
+    FreezeEnabled = true
+}
+
+local neighborCache = {}
+local flaggedDebounce = {}
+local stopExecution = false
+local isGuessing = false
+local lastActionTime = 0
+local Controls = nil
+
+-- Get Controls
+pcall(function()
+    Controls = require(player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+end)
+
+-- Helper Functions
+local function isCellOpen(part)
+    if not part or not part.Parent then return true end
+    local isBeige = (part.Color.R > 0.7 and part.Color.G > 0.7 and part.Color.B < 0.6)
+    return part.Transparency > 0.5 or isBeige or part:FindFirstChild("NumberGui")
 end
 
--- Teleport function yang sudah diperbaiki
-local function teleportTo(position, part)
-    local character = player.Character
-    if not character then return end
+local function isAlreadyFlagged(part)
+    return part:FindFirstChild("Flag") or part:FindFirstChild("BombFlag") or part:FindFirstChild("FlagModel")
+end
+
+-- Freeze Function
+local function updatePhysics()
+    local char = player.Character
+    if not char then return end
     
-    local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+    local shouldFreeze = (Config.AutoSolver and Config.FreezeEnabled)
+    
+    for _, p in ipairs(char:GetDescendants()) do 
+        if p:IsA("BasePart") then 
+            p.Anchored = shouldFreeze
+            if shouldFreeze then
+                p.Velocity = Vector3.new(0, 0, 0)
+                p.RotVelocity = Vector3.new(0, 0, 0)
+            end
+        end 
+    end
+    
+    if Controls then
+        if shouldFreeze then 
+            pcall(function() Controls:Disable() end)
+        else 
+            pcall(function() Controls:Enable() end)
+        end
+    end
+end
+
+-- Teleport Function - Instan dan di ATAS part
+local function teleportTo(target)
+    if stopExecution or not target or not target.Parent or isCellOpen(target) then return end
+    
+    local char = player.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
     if not root then return end
     
-    local yOffset = 3
-    if part and part:IsA("BasePart") then
-        yOffset = (part.Size.Y / 2) + 3
-    end
+    -- Hitung posisi di ATAS part
+    local targetPos = target.Position
+    local partSize = target.Size
+    local standHeight = (partSize.Y / 2) + 3
     
-    root.CFrame = CFrame.new(position.X, position.Y + yOffset, position.Z)
+    root.CFrame = CFrame.new(
+        targetPos.X,
+        targetPos.Y + standHeight,
+        targetPos.Z
+    )
+    
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    
+    if Config.FreezeEnabled then
+        updatePhysics()
+    end
 end
 
--- Flag bomb function
-local function flagBomb(part)
-    if not part or not part.Parent then return false end
+-- Flag Function
+local function flagTile(part)
+    if not part or not part.Parent or isAlreadyFlagged(part) then return false end
     
-    if part:FindFirstChild("Flag") or part:FindFirstChild("Flagged") then
-        return false
-    end
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
     
-    if part:GetAttribute("Flagged") then return false end
+    if (part.Position - root.Position).Magnitude > Config.FlagRange then return false end
+    if flaggedDebounce[part] and tick() - flaggedDebounce[part] < 0.3 then return false end
     
-    local success, err = pcall(function()
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        local events = replicatedStorage:WaitForChild("Events", 2)
-        if not events then return end
+    local success = pcall(function()
+        local cd = part:FindFirstChildOfClass("ClickDetector", true)
+        if cd then
+            fireclickdetector(cd)
+            flaggedDebounce[part] = tick()
+            return
+        end
         
-        local flagEvents = events:WaitForChild("FlagEvents", 2)
-        if not flagEvents then return end
-        
-        local placeFlag = flagEvents:WaitForChild("PlaceFlag", 2)
-        if not placeFlag then return end
-        
-        placeFlag:FireServer(unpack({part}))
-        part:SetAttribute("Flagged", true)
+        local events = replicatedStorage:FindFirstChild("Events")
+        if events then
+            local flagEvents = events:FindFirstChild("FlagEvents")
+            if flagEvents then
+                local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
+                if placeFlag then
+                    placeFlag:FireServer(part)
+                    flaggedDebounce[part] = tick()
+                end
+            end
+        end
     end)
     
     return success
 end
 
-local function extractNumber(text)
-    if not text or text == "" then return nil end
-    local num = tonumber(text)
-    if num then return num end
-    local digits = text:match("%d+")
-    if digits then return tonumber(digits) end
-    return nil
-end
-
--- MAIN SOLVER FUNCTION
-function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1, guessOn, delayVal, instantOn, showAll)
-    local i = state
-    local j = e(t)
-    local function k()
-        local cg = game:GetService("CoreGui")
-        if cg then
-            local p0 = cg:FindFirstChild(B)
-            if p0 then p0:Destroy() end
-        end
+-- Get Solver Data
+local function getSolverData()
+    local folder = workspace:FindFirstChild("Flag") and workspace.Flag:FindFirstChild("Parts")
+    if not folder then 
+        folder = workspace:FindFirstChild("Parts", true)
     end
-    local rotOn, rotOpt
-    if type(y1) == "table" then
-        rotOn = e(y1.on == nil and true or y1.on)
-        rotOpt = y1
-    else
-        rotOn = e(y1)
-    end
-    i.d = {
-        r = tonumber(c1) or 0.01,
-        s = tonumber(d1) or 3,
-        t = f1 or Enum.Font.Arcade,
-        u = tonumber(g1) or 100,
-        vb = e(h1),
-        w = { x = tonumber(a1) or 1000, y = tonumber(a1) or 1000 },
-        ac = { 
-            on = e(x1), 
-            rad = tonumber(v1) or 20, 
-            intv = tonumber(n1) or 0.01, 
-            fspd = 0.05,
-            guess = e(guessOn), 
-            delay = tonumber(delayVal) or 0.01,
-            instant = e(instantOn),
-            showAll = e(showAll)
-        },
-        rot = {
-            on = rotOn == nil and false or rotOn,
-            ro = tonumber(rotOpt and rotOpt.ro) or 180,
-            tN = math.max(1, tonumber(rotOpt and rotOpt.tN or 1)),
-            uR = (rotOpt and rotOpt.uR == false) and false or true
-        }
-    }
-    if not j then
-        i.c = i.c + 1
-        i.b = false
-        k()
-        return
-    end
-    i.c = i.c + 1
-    local q = i.c
-    i.b = true
-    task.spawn(function()
-        local r = i.d.r
-        local s2 = i.d.s
-        local t2 = i.d.t
-        local u2 = i.d.u
-        local vb = i.d.vb
-        local w2 = i.d.w
-        local ac = i.d.ac
+    if not folder then return {} end
+    
+    local numberData = {}
+    local allParts = folder:GetChildren()
+    
+    for _, cell in ipairs(allParts) do
+        if not isCellOpen(cell) then continue end
         
-        local z = 1e-4
-        local A2 = 1e-6
-        local A3 = { a = 0, b = nil, c = nil, d = 1, e = nil, f = nil, g = nil, h = 0, i = 0, j = nil, k = 0.5 }
-        local A4 = {}
-        local lastSeenRun = setmetatable({}, { __mode = "k" })
-        local l = game:GetService("Players")
-        local A5 = game:GetService("Workspace")
-        local cg = game:GetService("CoreGui")
-        local guiCache = {}
-        local updateThrottle = 0
-        local THROTTLE_INTERVAL = 0.01
+        local label = cell:FindFirstChild("NumberGui") and cell.NumberGui:FindFirstChildOfClass("TextLabel")
+        local val = (label and tonumber(label.Text)) or 0
         
-        local function A6()
-            local parent = cg or A5
-            local p2 = parent:FindFirstChild(B)
-            if not p2 then
-                p2 = Instance.new("Folder")
-                p2.Name = B
-                p2.Parent = parent
-            end
-            return p2
-        end
-        local function T1(sv)
-            return extractNumber(sv)
-        end
-        local function A7(a2) 
-            a2 = tonumber(a2) or 0 
-            if a2 < 0 then return 0 
-            elseif a2 > 1 then return 1 
-            else return a2 end 
-        end
-        local function A8(pv) 
-            pv = A7(pv) 
-            if pv <= 0.5 then 
-                local q0 = pv / 0.5 
-                return Color3.fromRGB(math.floor(250 * q0 + 0.5), 250, 0) 
-            else 
-                local q0 = (pv - 0.5) / 0.5 
-                return Color3.fromRGB(255, math.floor(250 * (1 - q0) + 0.5), 0) 
-            end 
-        end
-        local function A9(a2) 
-            if a2 >= 0 then 
-                return math.floor(a2 + 0.5 + z) 
-            else 
-                return math.ceil(a2 - 0.5 - z) 
-            end 
-        end
-        local function B0(r0, c0) return tostring(r0) .. ":" .. tostring(c0) end
-        local function B1(gx, gy) return tostring(gx) .. ":" .. tostring(gy) end
-        local function B3(r0, c0, Hn, Wn)
-            local o0, i1 = {}, 1
-            for dr = -1, 1 do
-                for dc = -1, 1 do
-                    if not (dr == 0 and dc == 0) then
-                        local rr, cc = r0 + dr, c0 + dc
-                        if rr >= 1 and rr <= Hn and cc >= 1 and cc <= Wn then
-                            o0[i1] = { rr, cc }
-                            i1 = i1 + 1
-                        end
-                    end
+        if not neighborCache[cell] then
+            local nbs = {}
+            for _, n in ipairs(allParts) do
+                if n ~= cell and (n.Position - cell.Position).Magnitude < (cell.Size.X * 1.8) then
+                    table.insert(nbs, n)
                 end
             end
-            return o0
+            neighborCache[cell] = nbs
         end
-        local function B4(p0) return tostring(p0:GetDebugId()) end
-        local function B5(Fo, part, G)
-            if not (part and part:IsA("BasePart")) then return nil end
-            local H = B4(part)
-            local I = guiCache[H]
-            if not I or not I.Parent then
-                I = Fo:FindFirstChild(H)
-                if not I then
-                    I = Instance.new("SurfaceGui")
-                    I.Name = H
-                    I.AlwaysOnTop = true
-                    I.LightInfluence = 0
-                    pcall(function()
-                        I.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-                        I.PixelsPerStud = 25
-                    end)
-                    I.Face = Enum.NormalId.Top
-                    I.Parent = Fo
-                    I.Adornee = part
-                end
-                guiCache[H] = I
-            end
-            
-            if I.Adornee ~= part then I.Adornee = part end
-            if I.Face ~= Enum.NormalId.Top then I.Face = Enum.NormalId.Top end
-            lastSeenRun[I] = G
-            
-            local J = I:FindFirstChild("ValueText")
-            if not (J and J:IsA("TextLabel")) then
-                for _, K2 in ipairs(I:GetChildren()) do
-                    if K2:IsA("TextLabel") then K2:Destroy() end
-                end
-                J = Instance.new("TextLabel")
-                J.Name = "ValueText"
-                J.Size = UDim2.fromScale(1, 1)
-                J.Position = UDim2.fromScale(0, 0)
-                J.BackgroundTransparency = 1
-                J.TextSize = 60
-                J.TextWrapped = false
-                J.Font = t2
-                J.Text = ""
-                J.TextColor3 = Color3.fromRGB(255, 255, 255)
-                J.TextStrokeTransparency = 0
-                J.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                J.Parent = I
-            end
-            I.Enabled, J.Visible = true, true
-            return I, J
-        end
-        local function GridIndex(vDelta, cell, tol)
-            tol = math.clamp(tol or .25, 0, .49)
-            local raw = vDelta / cell
-            local idx = math.floor(raw + 0.5)
-            if math.abs(raw - idx) > 0.5 + tol then
-                idx = idx + (raw > idx and 1 or -1)
-            end
-            return idx
-        end
-        local function fd()
-            local w = game:GetService("Workspace")
-            local d = w:FindFirstChild("Flag")
-            if d then
-                local u = d:FindFirstChild("Parts")
-                if u and u:IsA("Folder") then return u end
-            end
-            local p = w:FindFirstChild("Parts", true)
-            if p and p:IsA("Folder") then return p end
-            local b, bC = nil, -1
-            for _, i in ipairs(w:GetDescendants()) do
-                if i:IsA("Folder") and i.Name == "Parts" then
-                    local c = 0
-                    for _, ch in ipairs(i:GetChildren()) do
-                        if ch:IsA("BasePart") then c = c + 1 end
-                    end
-                    if c > bC then b, bC = i, c end
-                end
-            end
-            return b
-        end
-        local function B6()
-            if not (state and state.b and state.c == q) then return end
-            local currentTime = tick()
-            if currentTime - updateThrottle < THROTTLE_INTERVAL then
-                return
-            end
-            updateThrottle = currentTime
-            
-            local L = fd()
-            if not L then return end
-            local o0 = l.LocalPlayer
-            local M = nil
-            if o0 and o0.Character then
-                M = o0.Character:FindFirstChild("HumanoidRootPart") or o0.Character:FindFirstChild("Torso")
-            end
-            if vb and u2 and u2 > 0 and not M then return end
-            local useRange = vb and (u2 and u2 > 0 and M ~= nil)
-            local rangeSq = useRange and (u2 * u2) or nil
-            local parts = {}
-            local Q = tick()
-            local partsToProcess = L:GetChildren()
-            
-            for _, R in ipairs(partsToProcess) do
-                if R:IsA("BasePart") and (R.Anchored ~= false) then
-                    local skip = false
-                    if useRange then
-                        local distSq = (R.Position - M.Position).MagnitudeSquared
-                        if distSq > rangeSq then skip = true end
-                    end
-                    if not skip then
-                        local U = R:GetDebugId()
-                        local V = A4[U]
-                        if not V then
-                            local W
-                            local X = R:FindFirstChild("NumberGui", true)
-                            if X then
-                                if X.FindFirstChildWhichIsA then
-                                    W = X:FindFirstChildWhichIsA("TextLabel")
-                                end
-                                if not W then W = X:FindFirstChild("TextLabel") end
-                            end
-                            local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
-                            local Z = nil
-                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
-                            if Z then Y = true end
-                            V = { a = R, b = R.Position, c = R.Size, d = (W and W:IsA("TextLabel")) and W or nil, e = Y, f = Q }
-                            A4[U] = V
-                        else
-                            V.b = R.Position
-                            V.c = R.Size
-                            V.f = Q
-                            local Y = false
-                            if R:FindFirstChild("Flag") or R:FindFirstChild("Flagged") then Y = true end
-                            local Z = nil
-                            if R.GetAttribute then Z = R:GetAttribute("Flagged") end
-                            if Z then Y = true end
-                            V.e = Y
-                            if not V.d then
-                                local X = R:FindFirstChild("NumberGui", true)
-                                if X then
-                                    local W
-                                    if X.FindFirstChildWhichIsA then
-                                        W = X:FindFirstChildWhichIsA("TextLabel")
-                                    end
-                                    if not W then W = X:FindFirstChild("TextLabel") end
-                                    if W and W:IsA("TextLabel") then V.d = W end
-                                end
-                            end
-                        end
-                        parts[#parts + 1] = V
-                    end
-                end
-            end
-            if #parts == 0 then return end
-            local a0 = {}
-            local a1, a2, a3 = nil, nil, math.huge
-            for _, V in ipairs(parts) do
-                if V.d then
-                    a0[#a0 + 1] = V
-                    if M then
-                        local a4 = (V.b - M.Position):Dot(V.b - M.Position)
-                        if a4 < a3 then
-                            a3 = a4
-                            a1 = V.a
-                            a2 = V.b
-                        end
-                    end
-                end
-            end
-            local Q2 = Q
-            local a5 = Q2 - (A3.a or 0)
-            local a6 = (a5 >= s2)
-            if a6 or (A3.b == nil) then
-                A3.a = Q2
-                if a1 then
-                    A3.b = a1
-                    A3.c = a2
-                    local sx = math.max(A2, tonumber(a1.Size.X) or 0)
-                    local sz = math.max(A2, tonumber(a1.Size.Z) or 0)
-                    A3.d = math.max(A2, math.min(sx, sz))
+        
+        local hidden, mines = {}, 0
+        for _, n in ipairs(neighborCache[cell]) do
+            if not isCellOpen(n) then
+                if n.Color == Color3.new(0, 0, 0) or isAlreadyFlagged(n) then
+                    mines = mines + 1
                 else
-                    local F0 = A6()
-                    for _, G in ipairs(F0:GetChildren()) do
-                        G.Enabled = false
-                    end
-                    return
+                    table.insert(hidden, n)
                 end
             end
-            if not A3.b or not A3.c then
-                local F0 = A6()
-                for _, G in ipairs(F0:GetChildren()) do
-                    G.Enabled = false
-                end
-                return
-            end
-            local cpos = A3.c
-            local d0 = A3.d
-            local d1 = {}
-            local d2, d3, d4, d5 = math.huge, -math.huge, math.huge, -math.huge
-            local function d6(V0)
-                local sx = tonumber(V0.c.X) or 0
-                local sz = tonumber(V0.c.Z) or 0
-                return math.abs(sx * sz)
-            end
-            for _, V in ipairs(parts) do
-                local gx = GridIndex(V.b.X - cpos.X, d0, 0.25)
-                local gy = GridIndex(V.b.Z - cpos.Z, d0, 0.25)
-                if gx < d2 then d2 = gx end
-                if gx > d3 then d3 = gx end
-                if gy < d4 then d4 = gy end
-                if gy > d5 then d5 = gy end
-                local K3 = B1(gx, gy)
-                local E = d1[K3]
-                if not E or d6(V) > d6(E) then
-                    d1[K3] = V
-                end
-            end
-            d2, d3, d4, d5 = d2 - 1, d3 + 1, d4 - 1, d5 + 1
-            local offGX, offGY = (d2 - 1), (d4 - 1)
-            local Wc = (d3 - d2 + 1)
-            local Hc = (d5 - d4 + 1)
-            if Wc <= 0 or Hc <= 0 then return end
-            local b0 = {}
-            for r0 = 1, Hc do
-                b0[r0] = {}
-                for c0 = 1, Wc do
-                    b0[r0][c0] = { a = "covered", b = nil, c = nil }
-                end
-            end
-            for _, V in ipairs(a0) do
-                local gx = GridIndex(V.b.X - cpos.X, d0, 0.25)
-                local gy = GridIndex(V.b.Z - cpos.Z, d0, 0.25)
-                local r0 = gy - offGY
-                local c0 = gx - offGX
-                if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
-                    b0[r0][c0].a = "revealed"
-                    b0[r0][c0].b = (T1(V.d.Text) or tonumber(V.d.Text) or 0)
-                    b0[r0][c0].c = V
-                end
-            end
-            for gx = d2, d3 do
-                for gy = d4, d5 do
-                    local V = d1[B1(gx, gy)]
-                    if V then
-                        local r0 = gy - offGY
-                        local c0 = gx - offGX
-                        if r0 >= 1 and r0 <= Hc and c0 >= 1 and c0 <= Wc then
-                            b0[r0][c0].c = V
-                            if b0[r0][c0].a ~= "revealed" then
-                                if V.e then b0[r0][c0].a = "flagged" end
+        end
+        
+        if #hidden > 0 or val == 0 then
+            table.insert(numberData, {
+                obj = cell,
+                eVal = val - mines,
+                hidden = hidden
+            })
+        end
+    end
+    
+    return numberData
+end
+
+-- Main Detection Loop
+local function mainLoop()
+    if stopExecution then return end
+    if not Config.AutoSolver then 
+        updatePhysics()
+        return 
+    end
+    
+    local data = getSolverData()
+    local safeQueue, mineQueue, riskyCells = {}, {}, {}
+    local foundAnything = false
+    
+    -- Advanced subset detection
+    for i = 1, #data do
+        for j = 1, #data do
+            if i ~= j then
+                local d1, d2 = data[i], data[j]
+                if (d1.obj.Position - d2.obj.Position).Magnitude < 12 then
+                    local s1, s2 = d1.hidden, d2.hidden
+                    
+                    local isSubset = true
+                    for _, x in ipairs(s1) do
+                        local found = false
+                        for _, y in ipairs(s2) do
+                            if x == y then
+                                found = true
+                                break
                             end
                         end
+                        if not found then
+                            isSubset = false
+                            break
+                        end
                     end
-                end
-            end
-            
-            -- DETECTION SYSTEM
-            local allMines = {}
-            local allSafes = {}
-            
-            -- PHASE 1: Corner Detection
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    local cell = b0[r0][c0]
-                    if cell.a == "revealed" and cell.b and cell.b > 0 then
-                        local neighbors = B3(r0, c0, Hc, Wc)
-                        local covered = {}
-                        local flagged = 0
+                    
+                    if isSubset and #s2 > #s1 then
+                        local diffMines = d2.eVal - d1.eVal
+                        local diffCells = {}
                         
-                        for _, rc in ipairs(neighbors) do
-                            local rr, cc = rc[1], rc[2]
-                            local nb = b0[rr][cc]
-                            if nb then
-                                if nb.a == "flagged" or allMines[nb] then
-                                    flagged = flagged + 1
-                                elseif nb.a == "covered" and not allSafes[nb] then
-                                    table.insert(covered, nb)
+                        for _, x in ipairs(s2) do
+                            local inS1 = false
+                            for _, y in ipairs(s1) do
+                                if x == y then
+                                    inS1 = true
+                                    break
                                 end
+                            end
+                            if not inS1 then
+                                table.insert(diffCells, x)
                             end
                         end
                         
-                        local remaining = cell.b - flagged
-                        
-                        if remaining == #covered and #covered > 0 then
-                            for _, bombCell in ipairs(covered) do
-                                allMines[bombCell] = true
+                        if diffMines == 0 then
+                            for _, n in ipairs(diffCells) do
+                                table.insert(safeQueue, n)
+                                foundAnything = true
                             end
-                        end
-                        
-                        if remaining == 0 and #covered > 0 then
-                            for _, safeCell in ipairs(covered) do
-                                allSafes[safeCell] = true
-                            end
-                        end
-                    end
-                end
-            end
-            
-            -- PHASE 2: Iterative Detection
-            local changed = true
-            local guard = 0
-            local maxIterations = 100
-            
-            while changed and guard < maxIterations do
-                changed = false
-                guard = guard + 1
-                
-                for r0 = 1, Hc do
-                    for c0 = 1, Wc do
-                        local cell = b0[r0][c0]
-                        if cell.a == "revealed" and cell.b and cell.b > 0 then
-                            local neighbors = B3(r0, c0, Hc, Wc)
-                            local unknowns = {}
-                            local flaggedCount = 0
-                            
-                            for _, rc in ipairs(neighbors) do
-                                local rr, cc = rc[1], rc[2]
-                                local nb = b0[rr][cc]
-                                if nb then
-                                    if nb.a == "flagged" or allMines[nb] then
-                                        flaggedCount = flaggedCount + 1
-                                    elseif nb.a == "covered" and not allSafes[nb] then
-                                        table.insert(unknowns, nb)
-                                    end
-                                end
-                            end
-                            
-                            local remaining = cell.b - flaggedCount
-                            
-                            if remaining > 0 and remaining == #unknowns then
-                                for _, u in ipairs(unknowns) do
-                                    if not allMines[u] then
-                                        allMines[u] = true
-                                        changed = true
-                                    end
-                                end
-                            end
-                            
-                            if remaining == 0 and #unknowns > 0 then
-                                for _, u in ipairs(unknowns) do
-                                    if not allSafes[u] then
-                                        allSafes[u] = true
-                                        changed = true
-                                    end
-                                end
+                        elseif diffMines == #diffCells then
+                            for _, n in ipairs(diffCells) do
+                                table.insert(mineQueue, n)
+                                foundAnything = true
                             end
                         end
                     end
                 end
             end
-            
-            -- Count results
-            local mineCount = 0
-            local safeCount = 0
-            for _ in pairs(allMines) do mineCount = mineCount + 1 end
-            for _ in pairs(allSafes) do safeCount = safeCount + 1 end
-            
-            local modeText = guard > 1 and ("💣 Pass:" .. guard .. " ") or ""
-            statusLabel.Text = modeText .. safeCount .. " safe, " .. mineCount .. " mines"
-            
-            -- AUTO FLAG
-            local bombsToFlag = {}
-            for cell, _ in pairs(allMines) do
-                if cell.c and cell.c.a then
-                    bombsToFlag[#bombsToFlag + 1] = cell.c.a
+        end
+    end
+    
+    -- Basic detection
+    local basicSafe, basicMines = {}, {}
+    for _, d in ipairs(data) do
+        if #d.hidden > 0 then
+            if #d.hidden == d.eVal then
+                for _, n in ipairs(d.hidden) do
+                    table.insert(basicMines, n)
+                    foundAnything = true
+                end
+            elseif d.eVal <= 0 then
+                for _, n in ipairs(d.hidden) do
+                    table.insert(basicSafe, n)
+                    foundAnything = true
                 end
             end
-            
-            if ac and ac.on then
-                if #bombsToFlag > 0 then
-                    for _, part in ipairs(bombsToFlag) do
-                        if part and part.Parent and not part:GetAttribute("Flagged") then
-                            task.spawn(function()
-                                flagBomb(part)
-                                task.wait(0.05)
-                            end)
-                        end
-                    end
-                    task.wait(0.1)
-                end
-            end
-            
-            -- AUTO SOLVER
-            if state and state.b and state.c == q then
+        end
+    end
+    
+    -- Mark mines
+    for _, m in ipairs(mineQueue) do
+        m.Color = Color3.new(0, 0, 0)
+    end
+    for _, m in ipairs(basicMines) do
+        m.Color = Color3.new(0, 0, 0)
+    end
+    
+    -- Auto Flag
+    if Config.AutoFlag then
+        local allMines = {}
+        for _, m in ipairs(mineQueue) do table.insert(allMines, m) end
+        for _, m in ipairs(basicMines) do table.insert(allMines, m) end
+        
+        local uniqueMines = {}
+        for _, mine in ipairs(allMines) do
+            uniqueMines[mine] = mine
+        end
+        
+        for _, mine in pairs(uniqueMines) do
+            if not stopExecution and Config.AutoSolver then
                 task.spawn(function()
-                    pcall(function()
-                        local root = M
-                        if not root then return end
-                        
-                        local teleportDelay = ac.delay or 0.01
-                        local instantMode = ac.instant or false
-                        local safeTiles = {}
-                        
-                        for cell, _ in pairs(allSafes) do
-                            if cell.c and cell.c.a then
-                                local part = cell.c.a
-                                if part and part:IsA("BasePart") then
-                                    local dist = (part.Position - root.Position).Magnitude
-                                    table.insert(safeTiles, {
-                                        part = part,
-                                        pos = part.Position,
-                                        dist = dist
-                                    })
-                                end
-                            end
-                        end
-                        
-                        if #safeTiles > 0 then
-                            table.sort(safeTiles, function(a, b) 
-                                return a.dist < b.dist 
-                            end)
-                            
-                            if instantMode then
-                                for i, tile in ipairs(safeTiles) do
-                                    teleportTo(tile.pos, tile.part)
-                                end
-                                statusLabel.Text = "⚡ Instant: " .. #safeTiles .. " done"
-                                task.wait(teleportDelay)
-                            else
-                                local target = safeTiles[1]
-                                teleportTo(target.pos, target.part)
-                                statusLabel.Text = "→ Next: " .. (#safeTiles - 1) .. " left"
-                                task.wait(teleportDelay)
-                            end
-                        else
-                            statusLabel.Text = "✓ All safe tiles cleared"
-                        end
-                    end)
+                    flagTile(mine)
+                    task.wait(0.01)
                 end)
             end
-            
-            -- Old system calculations
-            local function B3n(E0, Wn, Hn, total, cfg)
-                cfg = cfg or {}
-                local x0 = cfg.maxClusterSize or w2.x
-                local x1 = cfg.hardCapNodes or w2.y
-                local c1, c2 = 0, 0
-                for r0 = 1, Hn do
-                    for c0 = 1, Wn do
-                        local s0 = E0[r0][c0].a
-                        if s0 == "covered" then
-                            c1 = c1 + 1
-                        elseif s0 == "flagged" then
-                            c2 = c2 + 1
-                        end
-                    end
-                end
-                local ch = true
-                local maxIterations = 50
-                local iteration = 0
-                while ch and iteration < maxIterations do
-                    ch = false
-                    iteration = iteration + 1
-                    local f0, f1 = {}, {}
-                    for r0 = 1, Hn do
-                        for c0 = 1, Wn do
-                            local d8 = E0[r0][c0]
-                            if d8.a == "revealed" then
-                                local n0 = B3(r0, c0, Hn, Wn)
-                                local u0 = {}
-                                local f2 = 0
-                                local num = d8.b or 0
-                                for _, rc in ipairs(n0) do
-                                    local rr, cc = rc[1], rc[2]
-                                    local s1 = E0[rr][cc].a
-                                    if s1 == "flagged" then
-                                        f2 = f2 + 1
-                                    elseif s1 == "covered" then
-                                        u0[#u0 + 1] = { rr, cc }
-                                    end
-                                end
-                                if #u0 > 0 then
-                                    if num - f2 == #u0 then
-                                        for _, rc2 in ipairs(u0) do
-                                            f0[#f0 + 1] = rc2
-                                        end
-                                    end
-                                    if num == f2 then
-                                        for _, rc2 in ipairs(u0) do
-                                            f1[#f1 + 1] = rc2
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    for _, rc in ipairs(f0) do
-                        local rr, cc = rc[1], rc[2]
-                        if E0[rr][cc].a == "covered" then
-                            E0[rr][cc].a = "flagged"
-                            c2 = c2 + 1
-                            c1 = c1 - 1
-                            ch = true
-                        end
-                    end
-                end
-                local knownTotal = (total ~= nil)
-                local rem = nil
-                if knownTotal then
-                    rem = math.max((total or 0) - c2, 0)
-                end
-                local vI, iV, cs = {}, {}, {}
-                local function K2(r1, c1x) return tostring(r1) .. ":" .. tostring(c1x) end
-                for r0 = 1, Hn do
-                    for c0 = 1, Wn do
-                        if E0[r0][c0].a == "revealed" then
-                            local u0 = {}
-                            local need = E0[r0][c0].b or 0
-                            for _, rc in ipairs(B3(r0, c0, Hn, Wn)) do
-                                local rr, cc = rc[1], rc[2]
-                                local s1 = E0[rr][cc].a
-                                if s1 == "flagged" then
-                                    need = need - 1
-                                elseif s1 == "covered" then
-                                    local k2 = K2(rr, cc)
-                                    if not vI[k2] then
-                                        vI[k2] = #iV + 1
-                                        iV[#iV + 1] = { rr, cc }
-                                    end
-                                    u0[#u0 + 1] = vI[k2]
-                                end
-                            end
-                            if #u0 > 0 then
-                                cs[#cs + 1] = { vars = u0, need = need }
-                            end
-                        end
-                    end
-                end
-                local ad = {}
-                for i1 = 1, #iV do ad[i1] = {} end
-                for _, con in ipairs(cs) do
-                    for _, a2 in ipairs(con.vars) do
-                        for _, b2 in ipairs(con.vars) do
-                            if a2 ~= b2 then ad[a2][b2] = true end
-                        end
-                    end
-                end
-                local cId, cm = {}, {}
-                local function dfs(vd, id)
-                    cId[vd] = id
-                    cm[id] = cm[id] or {}
-                    cm[id][#cm[id] + 1] = vd
-                    for nbv, _ in pairs(ad[vd]) do
-                        if not cId[nbv] then dfs(nbv, id) end
-                    end
-                end
-                local gid = 0
-                for v2 = 1, #iV do
-                    if not cId[v2] then
-                        gid = gid + 1
-                        dfs(v2, gid)
-                    end
-                end
-                local gC = {}
-                for i1 = 1, gid do gC[i1] = {} end
-                for _, con in ipairs(cs) do
-                    local g = cId[con.vars[1]]
-                    local ok = true
-                    for idx = 2, #con.vars do
-                        if cId[con.vars[idx]] ~= g then ok = false; break end
-                    end
-                    if ok then gC[g][#gC[g] + 1] = con end
-                end
-                local pr = {}
-                for r0 = 1, Hn do pr[r0] = {} end
-                local totalVisited = 0
-                local function topo(vars, cons, map, out)
-                    for _, con in ipairs(cons) do
-                        if not con.vars or #con.vars ~= 2 or con.need ~= 1 then return false end
-                    end
-                    if #vars < 2 then return false end
-                    local deg, adj = {}, {}
-                    for _, v3 in ipairs(vars) do
-                        deg[v3] = 0
-                        adj[v3] = {}
-                    end
-                    for _, con in ipairs(cons) do
-                        local a3, b3 = con.vars[1], con.vars[2]
-                        if not adj[a3][b3] then
-                            adj[a3][b3] = true
-                            adj[b3][a3] = true
-                            deg[a3] = deg[a3] + 1
-                            deg[b3] = deg[b3] + 1
-                        end
-                    end
-                    local ends = {}
-                    for _, v3 in ipairs(vars) do
-                        if deg[v3] == 1 then
-                            ends[#ends + 1] = v3
-                        elseif deg[v3] ~= 2 then
-                            return false
-                        end
-                    end
-                    if #ends ~= 2 then return false end
-                    local seq, seen = {}, {}
-                    local function push(v3) seq[#seq + 1] = v3; seen[v3] = true end
-                    local cur = ends[1]
-                    push(cur)
-                    while true do
-                        local nxt = nil
-                        for nbv, _ in pairs(adj[cur]) do
-                            if not seen[nbv] then nxt = nbv; break end
-                        end
-                        if not nxt then break end
-                        cur = nxt
-                        push(cur)
-                    end
-                    if #seq ~= #vars then return false end
-                    local cnt, sols = {}, 0
-                    for _, v3 in ipairs(vars) do cnt[v3] = 0 end
-                    for sb = 0, 1 do
-                        sols = sols + 1
-                        for i1, v3 in ipairs(seq) do
-                            local bit = (sb + (i1 - 1)) % 2
-                            cnt[v3] = cnt[v3] + bit
-                        end
-                    end
-                    for _, v3 in ipairs(vars) do
-                        local rc = iV[v3]
-                        out[rc[1]][rc[2]] = cnt[v3] / sols
-                    end
-                    return true
-                end
-                local function back(vars, cons)
-                    local V = #vars
-                    local cnt, sols = {}, 0
-                    for i1 = 1, V do cnt[vars[i1]] = 0 end
-                    local st = {}
-                    for ci, con in ipairs(cons) do
-                        st[ci] = { need = math.max(0, math.min(con.need, #con.vars)), undecided = #con.vars }
-                    end
-                    local v2c = {}
-                    for ci, con in ipairs(cons) do
-                        for _, v3 in ipairs(con.vars) do
-                            v2c[v3] = v2c[v3] or {}
-                            v2c[v3][#v2c[v3] + 1] = ci
-                        end
-                    end
-                    local asg = {}
-                    local function apply(ci, isMine)
-                        local s2 = st[ci]
-                        if isMine then s2.need = s2.need - 1 end
-                        s2.undecided = s2.undecided - 1
-                        return not (s2.need < 0 or s2.need > s2.undecided)
-                    end
-                    local function rec(idx)
-                        if totalVisited > x1 then return end
-                        totalVisited = totalVisited + 1
-                        if idx > V then
-                            sols = sols + 1
-                            for i1 = 1, V do
-                                local vid = vars[i1]
-                                if asg[vid] == 1 then cnt[vid] = cnt[vid] + 1 end
-                            end
-                            return
-                        end
-                        local vid = vars[idx]
-                        for _, m0 in ipairs({ 0, 1 }) do
-                            local snaps = {}
-                            local ok = true
-                            for _, ci in ipairs(v2c[vid] or {}) do
-                                local s2 = st[ci]
-                                snaps[#snaps + 1] = { ci = ci, need = s2.need, undecided = s2.undecided }
-                                if not apply(ci, m0 == 1) then ok = false; break end
-                            end
-                            if ok then
-                                asg[vid] = m0
-                                rec(idx + 1)
-                                asg[vid] = nil
-                            end
-                            for i1 = #snaps, 1, -1 do
-                                local s3 = snaps[i1]
-                                st[s3.ci].need = s3.need
-                                st[s3.ci].undecided = s3.undecided
-                            end
-                            if totalVisited > x1 then break end
-                        end
-                    end
-                    rec(1)
-                    return cnt, sols
-                end
-                local function soft(vars, cons)
-                    local sum, ct, totNeed, totUndec = {}, {}, 0, 0
-                    for _, con in ipairs(cons) do
-                        local undec = #con.vars
-                        local need = math.max(0, math.min(con.need, undec))
-                        if undec > 0 then
-                            local frac = need / undec
-                            for _, vid in ipairs(con.vars) do
-                                sum[vid] = (sum[vid] or 0) + frac
-                                ct[vid] = (ct[vid] or 0) + 1
-                            end
-                            totNeed = totNeed + need
-                            totUndec = totUndec + undec
-                        end
-                    end
-                    local avg = (totUndec > 0) and (totNeed / totUndec) or nil
-                    local out = {}
-                    for _, vid in ipairs(vars) do
-                        if ct[vid] and ct[vid] > 0 then
-                            out[vid] = math.clamp(sum[vid] / ct[vid], 0, 1)
-                        else
-                            out[vid] = avg
-                        end
-                    end
-                    return out, avg
-                end
-                local gP_acc, gP_den = 0, 0
-                for gi = 1, #cm do
-                    local vars, cons = cm[gi], gC[gi] or {}
-                    if vars and #vars > 0 then
-                        local did = false
-                        if #vars <= x0 then
-                            local okTopo = topo(vars, cons, iV, pr)
-                            if not okTopo then
-                                local cnt, sols = back(vars, cons)
-                                if sols and sols > 0 then
-                                    for _, vid in ipairs(vars) do
-                                        local rc = iV[vid]
-                                        pr[rc[1]][rc[2]] = cnt[vid] / sols
-                                    end
-                                    did = true
-                                end
-                            else
-                                did = true
-                            end
-                        end
-                        if not did then
-                            local probMap, avg = soft(vars, cons)
-                            for _, vid in ipairs(vars) do
-                                local rc = iV[vid]
-                                pr[rc[1]][rc[2]] = probMap[vid]
-                            end
-                            if avg then
-                                gP_acc = gP_acc + avg
-                                gP_den = gP_den + 1
-                            end
-                        end
-                    end
-                end
-                local gP = nil
-                if gP_den > 0 then gP = gP_acc / gP_den end
-                if knownTotal and rem then
-                    local tc = 0
-                    for r0 = 1, Hn do
-                        for c0 = 1, Wn do
-                            if E0[r0][c0].a == "covered" then tc = tc + 1 end
-                        end
-                    end
-                    if rem > 0 then gP = rem / math.max(tc, 1) end
-                end
-                return { a = pr, b = gP, c = Wn, d = Hn }
+        end
+    end
+    
+    -- Teleport to safe tiles
+    local targetQueue = #safeQueue > 0 and safeQueue or basicSafe
+    if #targetQueue > 0 then
+        isGuessing = false
+        for _, s in ipairs(targetQueue) do
+            if stopExecution or not Config.AutoSolver then break end
+            if not isCellOpen(s) then
+                teleportTo(s)
+                task.wait(Config.TeleportSpeed)
             end
-            local d9 = B3n(b0, Wc, Hc, nil, { maxClusterSize = w2.x, hardCapNodes = w2.y })
-            local pr = d9.a or {}
-            local gP = d9.b
-            local da = {}
-            
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    if b0[r0][c0].a == "revealed" then
-                        for _, rc in ipairs(B3(r0, c0, Hc, Wc)) do
-                            local rr, cc = rc[1], rc[2]
-                            if b0[rr][cc].a == "covered" then
-                                da[B0(rr, cc)] = true
-                            end
-                        end
-                    end
+        end
+    -- Auto Guess
+    elseif Config.AutoGuess and not foundAnything and tick() - lastActionTime > 0.3 then
+        for _, d in ipairs(data) do
+            for _, n in ipairs(d.hidden) do
+                if n.Color ~= Color3.new(0, 0, 0) and not isAlreadyFlagged(n) then
+                    riskyCells[n] = (riskyCells[n] or 0) + 1
                 end
             end
-            
-            -- AUTO FLAG (prob system)
-            if ac and ac.on and #bombsToFlag > 0 then
-                local flagSpeed = ac.fspd or 0.01
-                statusLabel.Text = "Flagging " .. #bombsToFlag .. " bombs..."
-                
-                for _, bombData in ipairs(bombsToFlag) do
-                    local part = bombData
-                    if part and part.Parent then
-                        local success = flagBomb(part)
-                        if success then
-                            task.wait(flagSpeed)
-                        end
-                    end
-                end
-            end
-            
-            -- AUTO SOLVER (prob system)
-            if state and state.b and state.c == q then
-                pcall(function()
-                    local root = M
-                    if not root then return end
-                    
-                    local teleportDelay = ac.delay or 0.01
-                    local safeTiles = {}
-                    local probTiles = {}
-                    
-                    for r0 = 1, Hc do
-                        for c0 = 1, Wc do
-                            local cell = b0[r0][c0]
-                            if cell.a == "covered" and da[B0(r0, c0)] then
-                                local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                                if v0raw then
-                                    local v0 = A7(v0raw)
-                                    local cellData = cell.c
-                                    local part = cellData and cellData.a
-                                    
-                                    if part and part:IsA("BasePart") then
-                                        if tonumber(v0) and v0 <= 0.01 then
-                                            table.insert(safeTiles, {
-                                                part = part,
-                                                pos = part.Position,
-                                                prob = v0
-                                            })
-                                        elseif ac.guess and tonumber(v0) and v0 > 0.01 and v0 < 0.85 then
-                                            table.insert(probTiles, {
-                                                part = part,
-                                                pos = part.Position,
-                                                prob = v0
-                                            })
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    
-                    local target = nil
-                    local targetType = ""
-                    
-                    if #safeTiles > 0 then
-                        table.sort(safeTiles, function(a, b) return a.prob < b.prob end)
-                        target = safeTiles[1]
-                        targetType = "safe"
-                    elseif ac.guess and #probTiles > 0 then
-                        table.sort(probTiles, function(a, b) return a.prob < b.prob end)
-                        target = probTiles[1]
-                        targetType = "guess"
-                    end
-                    
-                    if target and target.part then
-                        teleportTo(target.pos, target.part)
-                        statusLabel.Text = string.format("Teleport to %s tile (%.1f%%)", targetType, target.prob * 100)
-                        task.wait(teleportDelay)
-                    else
-                        statusLabel.Text = "No tiles to teleport"
-                    end
-                end)
-            end
-            
-            -- GUI Updates
-            local F0 = A6()
-            local G = tick()
-            local guiUpdates = {}
-            
-            for r0 = 1, Hc do
-                for c0 = 1, Wc do
-                    local d8 = b0[r0][c0]
-                    local V = d8.c
-                    local p3 = V and V.a
-                    if p3 and p3:IsA("BasePart") then
-                        local draw
-                        if d8.a == "covered" then draw = da[B0(r0, c0)] == true end
-                        
-                        if ac.showAll and allMines[d8] then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "💣", color = nil}
-                        elseif ac.showAll and allSafes[d8] then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = "✅", color = nil}
-                        elseif d8.a == "flagged" then
-                            guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                        elseif d8.a == "covered" and draw then
-                            local v0raw = (pr[r0] and pr[r0][c0]) or gP
-                            if v0raw == nil then
-                                guiUpdates[#guiUpdates + 1] = {part = p3, text = "?", color = Color3.fromRGB(0, 0, 0)}
-                            else
-                                local v0 = A7(v0raw)
-                                if tonumber(v0) and v0 >= 0.85 then
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x1F4A5), color = nil}
-                                elseif tonumber(v0) and v0 <= 0.01 then
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = utf8.char(0x2705), color = nil}
-                                else
-                                    local pct = v0 * 100
-                                    guiUpdates[#guiUpdates + 1] = {part = p3, text = string.format("%.0f%%", pct), color = A8(v0)}
-                                end
-                            end
-                        else
-                            local H2 = B4(p3)
-                            local I = F0:FindFirstChild(H2)
-                            if I then
-                                I.Enabled = false
-                                lastSeenRun[I] = G
-                            end
-                        end
-                    end
-                end
-            end
-            for _, update in ipairs(guiUpdates) do
-                local I, J = B5(F0, update.part, G)
-                if I and J then
-                    if J.Text ~= update.text then
-                        J.Text = update.text
-                        if update.color then
-                            J.TextColor3 = update.color
-                        end
-                    end
-                end
-            end
-            for _, I in ipairs(F0:GetChildren()) do
-                local K0 = lastSeenRun[I]
-                local alive = I.Adornee and I.Adornee.Parent
-                if (K0 ~= G) or (not alive) then
-                    guiCache[I.Name] = nil
-                    I:Destroy()
-                end
-            end
-            A3.f, A3.g = d1, b0
-            A3.h, A3.i = Wc, Hc
-            A3.j, A3.k = pr, gP
         end
         
-        while state and state.b and state.c == q do
-            pcall(B6)
-            task.wait(r or 0.01)
+        local best, maxWeight = nil, -1
+        for cell, weight in pairs(riskyCells) do
+            if weight > maxWeight then
+                maxWeight = weight
+                best = cell
+            end
         end
         
-        if not state or state.c == q then 
-            k()
-            for k in pairs(guiCache) do
-                guiCache[k] = nil
-            end
-            statusLabel.Text = "Status: Stopped"
-        end
-    end)
-end
-
-Scanningmines = S
-
-local UserInputService = game:GetService("UserInputService")
-
-local ON_IMG = "rbxassetid://16884179507"
-local ON_OFF1 = Vector2.new(578, 50)
-local ON_OFF2 = Vector2.new(48, 48)
-local OFF_IMG = "rbxassetid://16167594452"
-local OFF_OFF1 = Vector2.new(862, 472)
-local OFF_OFF2 = Vector2.new(90, 90)
-
-local function callS(...)
-    if type(S) == "function" then
-        pcall(S, ...)
-    end
-end
-
-local btnState = setmetatable({}, { __mode = "k" })
-
-local function setVis(bx, on)
-    if not bx then return end
-    if on then
-        bx.Image = ON_IMG
-        bx.ImageRectOffset = ON_OFF1
-        bx.ImageRectSize = ON_OFF2
-    else
-        bx.Image = OFF_IMG
-        bx.ImageRectOffset = OFF_OFF1
-        bx.ImageRectSize = OFF_OFF2
-    end
-    btnState[bx] = on
-end
-
-local function getState(bx)
-    if not bx then return false end
-    if btnState[bx] ~= nil then return btnState[bx] end
-    return false
-end
-
-local function tonum(sv)
-    if not sv then return nil end
-    sv = sv:match("^%s*(.-)%s*$")
-    return tonumber(sv)
-end
-
-local function parseFont(sv)
-    if not sv or sv == "" then return nil end
-    local input = sv:match("^%s*(.-)%s*$")
-    input = input:gsub("^Enum%.Font%.", ""):gsub("%s+", "")
-    for _, it in ipairs(Enum.Font:GetEnumItems()) do
-        if string.lower(it.Name) == string.lower(input) then
-            return it
+        if best then
+            isGuessing = true
+            teleportTo(best)
+            lastActionTime = tick()
         end
     end
-    return Enum.Font.Arcade
+    
+    updatePhysics()
 end
 
-local toggles = { btnScript, btnInstant, btnShowAll, btnRange, btnAuto, btnGuess }
-for _, btt in ipairs(toggles) do
-    if btt and btt:IsA("ImageButton") then
-        setVis(btt, false)
+-- Auto Solver Loop
+local function autoSolverLoop()
+    while Config.AutoSolver do
+        task.wait(Config.TeleportSpeed)
+        
+        if not Config.AutoSolver then 
+            updatePhysics()
+            break 
+        end
+        
+        pcall(mainLoop)
     end
 end
 
-local function btnBool(b) return (b and getState(b)) or false end
-
-local function pushState()
-    local sOn = btnScript and getState(btnScript) or nil
-    local m = boxMax and tonum(boxMax.Text) or 5000
-    local delayVal = boxDelay and tonum(boxDelay.Text) or 0.01
-    local ps = boxPS and tonum(boxPS.Text) or 1
-    local fe = boxText and parseFont(boxText.Text) or Enum.Font.Arcade
-    local r2 = boxR and tonum(boxR.Text) or 100
-    local rOn = btnBool(btnRange)
-    local instantOn = btnBool(btnInstant)
-    local showAll = btnBool(btnShowAll)
-    local aOn = btnBool(btnAuto)
-    local f2 = boxF and tonum(boxF.Text) or 16
-    local fs = boxFS and tonum(boxFS.Text) or 0.05
-    local guessOn = btnBool(btnGuess)
+-- Death Handler
+local function handleDeath()
+    if not Config.AutoSolver then return end
     
-    if sOn == false then
-        callS(false)
-        statusLabel.Text = "Status: Stopped"
-        return
+    isGuessing = false
+    stopExecution = true
+    neighborCache = {}
+    
+    task.wait(1)
+    stopExecution = false
+end
+
+local function setupCharacter(char)
+    if not char then return end
+    stopExecution = false
+    
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        hum.Died:Connect(handleDeath)
     end
-    
-    callS(false)
-    callS(sOn, m, delayVal, ps, fe, r2, rOn, aOn, f2, fs, false, guessOn, delayVal, instantOn, showAll)
-    
-    local mode = instantOn and "⚡Instant" or "→Sequential"
-    local show = showAll and " 👁️" or ""
-    statusLabel.Text = "Running: " .. mode .. show
 end
 
--- Bind toggle functions dengan event handling yang benar
-local function bindToggle(bx)
-    if not bx then return end
-    
-    -- Hapus event lama jika ada
-    bx.MouseButton1Click:Connect(function()
-        local nstate = not getState(bx)
-        setVis(bx, nstate)
-        pushState()
-    end)
-    
-    -- Pastikan button bisa menerima input
-    bx.Active = true
-    bx.Selected = false
-    bx.AutoButtonColor = false
+if player.Character then
+    setupCharacter(player.Character)
 end
+player.CharacterAdded:Connect(setupCharacter)
 
--- Bind semua toggle
-bindToggle(btnScript)
-bindToggle(btnInstant)
-bindToggle(btnShowAll)
-bindToggle(btnRange)
-bindToggle(btnAuto)
-bindToggle(btnGuess)
+-- Create Tabs
+local MainTab = Window:CreateTab("Main", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
--- Bind text boxes
-local function bindBox(tb)
-    if not tb then return end
-    tb.ClearTextOnFocus = false
-    tb.FocusLost:Connect(function()
-        pushState()
-    end)
-end
+-- Main Tab - Auto Solver
+local AutoSolverToggle = MainTab:CreateToggle({
+   Name = "Auto Solver",
+   CurrentValue = false,
+   Flag = "AutoSolver",
+   Callback = function(Value)
+       Config.AutoSolver = Value
+       if Value then
+           task.spawn(autoSolverLoop)
+           updatePhysics()
+       else
+           updatePhysics()
+       end
+   end,
+})
 
-bindBox(boxMax)
-bindBox(boxDelay)
-bindBox(boxPS)
-bindBox(boxR)
-bindBox(boxF)
-bindBox(boxFS)
-bindBox(boxText)
+-- Main Tab - Auto Flag
+local AutoFlagToggle = MainTab:CreateToggle({
+   Name = "Auto Flag",
+   CurrentValue = false,
+   Flag = "AutoFlag",
+   Callback = function(Value)
+       Config.AutoFlag = Value
+   end,
+})
 
--- Test fungsi toggle (pastikan berfungsi)
-task.wait(1)
-print("✅ Minesweeper Helper Loaded - All toggles are functional!")
-print("📜 Panel bisa di-scroll!")
-print("🔄 Click ⚡ button to open/close panel")
+-- Main Tab - Auto Guess
+local AutoGuessToggle = MainTab:CreateToggle({
+   Name = "Auto Guess",
+   CurrentValue = false,
+   Flag = "AutoGuess",
+   Callback = function(Value)
+       Config.AutoGuess = Value
+   end,
+})
+
+-- Settings Tab - Freeze Toggle
+local FreezeToggle = SettingsTab:CreateToggle({
+   Name = "Freeze Character",
+   CurrentValue = true,
+   Flag = "FreezeEnabled",
+   Callback = function(Value)
+       Config.FreezeEnabled = Value
+       updatePhysics()
+   end,
+})
+
+-- Settings Tab - Teleport Speed
+local SpeedSlider = SettingsTab:CreateSlider({
+   Name = "Teleport Speed",
+   Range = {0.00001, 0.1},
+   Increment = 0.00001,
+   Suffix = "s",
+   CurrentValue = 0.0001,
+   Flag = "TPSpeed",
+   Callback = function(Value)
+       Config.TeleportSpeed = Value
+   end,
+})
+
+-- Settings Tab - Flag Range
+local FlagRangeSlider = SettingsTab:CreateSlider({
+   Name = "Auto Flag Range",
+   Range = {10, 100},
+   Increment = 5,
+   Suffix = " studs",
+   CurrentValue = 25,
+   Flag = "FlagRange",
+   Callback = function(Value)
+       Config.FlagRange = Value
+   end,
+})
+
+-- Info Section
+MainTab:CreateSection("Status")
+
+MainTab:CreateParagraph({
+   Title = "Features",
+   Content = "• NO DELAY\n• 0.0001s speed\n• ABOVE part teleport\n• Auto Flag\n• Auto Guess"
+})
+
+-- Continuous freeze update
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if Config.AutoSolver and Config.FreezeEnabled then
+            pcall(updatePhysics)
+        end
+    end
+end)
