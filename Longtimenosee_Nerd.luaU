@@ -1,7 +1,9 @@
+-- Minesweeper Auto Solver with Rayfield UI - STABLE VERSION
+-- Based on shiziks-solver detection system
+-- Pure LuaU
+
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 -- Load Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -26,7 +28,6 @@ local Config = {
     AutoFlag = false,
     AutoGuess = false,
     TeleportSpeed = 0.1,
-    UpdateSpeed = 0.05, -- Update lebih cepat dari teleport
     FlagRange = 25,
     FreezeCharacter = false
 }
@@ -36,9 +37,8 @@ local flaggedDebounce = {}
 local stopExecution = false
 local isGuessing = false
 local lastActionTime = 0
-local lastUpdateTime = 0
 local characterFrozen = false
-local currentData = {} -- Menyimpan data terakhir
+local solving = false
 
 -- Helper Functions
 local function isCellOpen(part)
@@ -100,7 +100,7 @@ local function teleportTo(target)
     
     -- Bagian ATAS part
     local partTopY = targetPos.Y + (partHeight / 2)
-    local standHeight = 3.1 -- Tinggi karakter dari kaki ke root
+    local standHeight = 3.1 -- Tinggi karakter
     
     -- Posisi akhir: bagian ATAS part + offset
     local finalY = partTopY + standHeight
@@ -112,7 +112,6 @@ local function teleportTo(target)
         targetPos.Z
     )
     
-    -- Small downward velocity
     root.Velocity = Vector3.new(0, -50, 0)
 end
 
@@ -140,16 +139,16 @@ local function flagTile(part)
         
         -- Fallback to RemoteEvent
         local events = replicatedStorage:FindFirstChild("Events")
-        if not events then return end
-        
-        local flagEvents = events:FindFirstChild("FlagEvents")
-        if not flagEvents then return end
-        
-        local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
-        if not placeFlag then return end
-        
-        placeFlag:FireServer(part)
-        flaggedDebounce[part] = tick()
+        if events then
+            local flagEvents = events:FindFirstChild("FlagEvents")
+            if flagEvents then
+                local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
+                if placeFlag then
+                    placeFlag:FireServer(part)
+                    flaggedDebounce[part] = tick()
+                end
+            end
+        end
     end)
     
     return success
@@ -165,19 +164,13 @@ local function getPartsFolder()
     return workspace:FindFirstChild("Parts", true)
 end
 
--- Get Solver Data - UPDATE VERSION (lebih cepat)
+-- Get Solver Data
 local function getSolverData()
     local folder = getPartsFolder()
     if not folder then return {} end
     
     local numberData = {}
     local allParts = folder:GetChildren()
-    local currentTime = tick()
-    
-    -- Bersihkan cache lama
-    if currentTime - lastUpdateTime > 5 then
-        neighborCache = {}
-    end
     
     for _, cell in ipairs(allParts) do
         if not cell:IsA("BasePart") then continue end
@@ -186,31 +179,21 @@ local function getSolverData()
         -- Get number from GUI
         local numberGui = cell:FindFirstChild("NumberGui")
         local label = numberGui and numberGui:FindFirstChildOfClass("TextLabel")
-        local val = 0
-        if label and label.Text then
-            val = tonumber(label.Text) or 0
-        end
+        local val = (label and tonumber(label.Text)) or 0
         
-        -- Build neighbor cache (lebih cepat)
+        -- Build neighbor cache
         if not neighborCache[cell] then
             local nbs = {}
-            local cellPos = cell.Position
-            local cellSize = cell.Size.X * 1.8
-            
             for _, n in ipairs(allParts) do
-                if n:IsA("BasePart") and n ~= cell then
-                    if (n.Position - cellPos).Magnitude < cellSize then
-                        table.insert(nbs, n)
-                    end
+                if n:IsA("BasePart") and n ~= cell and (n.Position - cell.Position).Magnitude < (cell.Size.X * 1.8) then
+                    table.insert(nbs, n)
                 end
             end
             neighborCache[cell] = nbs
         end
         
         -- Count hidden and flagged neighbors
-        local hidden = {}
-        local mines = 0
-        
+        local hidden, mines = {}, 0
         for _, n in ipairs(neighborCache[cell]) do
             if not isCellOpen(n) then
                 if n.Color == Color3.new(0, 0, 0) or isAlreadyFlagged(n) then
@@ -221,7 +204,7 @@ local function getSolverData()
             end
         end
         
-        if #hidden > 0 then
+        if #hidden > 0 or val == 0 then
             table.insert(numberData, {
                 obj = cell,
                 eVal = val - mines,
@@ -231,147 +214,109 @@ local function getSolverData()
         end
     end
     
-    lastUpdateTime = currentTime
     return numberData
 end
 
--- Verifikasi tile sebelum teleport
-local function isTileSafe(tile, data)
-    if not tile then return false end
-    if isCellOpen(tile) then return true end
-    if tile.Color == Color3.new(0, 0, 0) then return false end
-    if isAlreadyFlagged(tile) then return false end
-    
-    -- Cek di data terbaru
-    for _, d in ipairs(data) do
-        for _, h in ipairs(d.hidden) do
-            if h == tile then
-                return d.eVal == 0 -- Aman hanya jika expected mines = 0
+-- Single Loop yang melakukan semuanya
+local function solverLoop()
+    solving = true
+    while Config.AutoSolver and not stopExecution and solving do
+        -- UPDATE: Ambil data terbaru
+        local data = getSolverData()
+        local safeTiles = {}
+        local mineTiles = {}
+        local foundAnything = false
+        
+        -- Deteksi tile aman (eVal = 0)
+        for _, d in ipairs(data) do
+            if #d.hidden > 0 and d.eVal == 0 then
+                for _, n in ipairs(d.hidden) do
+                    safeTiles[n] = true
+                    foundAnything = true
+                end
             end
         end
-    end
-    
-    return false
-end
-
--- Update detection (dipanggil terus)
-local function updateDetection()
-    if stopExecution then return end
-    if not Config.AutoSolver then return end
-    
-    currentData = getSolverData()
-end
-
--- Main Action Loop (untuk teleport)
-local function actionLoop()
-    if stopExecution or not Config.AutoSolver or #currentData == 0 then return end
-    
-    local data = currentData
-    local safeTiles = {}
-    local mineTiles = {}
-    local foundAnything = false
-    
-    -- PRIORITAS 1: Tile yang 100% aman (eVal = 0)
-    for _, d in ipairs(data) do
-        if #d.hidden > 0 and d.eVal == 0 then
-            for _, n in ipairs(d.hidden) do
-                safeTiles[n] = true
-                foundAnything = true
+        
+        -- Deteksi mine
+        for _, d in ipairs(data) do
+            if #d.hidden > 0 and #d.hidden == d.eVal and d.eVal > 0 then
+                for _, n in ipairs(d.hidden) do
+                    mineTiles[n] = true
+                    foundAnything = true
+                end
             end
         end
-    end
-    
-    -- PRIORITAS 2: Tile yang 100% mine
-    for _, d in ipairs(data) do
-        if #d.hidden > 0 and #d.hidden == d.eVal and d.eVal > 0 then
-            for _, n in ipairs(d.hidden) do
-                mineTiles[n] = true
-                foundAnything = true
-            end
-        end
-    end
-    
-    -- Mark mines
-    for tile, _ in pairs(mineTiles) do
-        if tile and tile:IsA("BasePart") then
-            tile.Color = Color3.new(0, 0, 0)
-        end
-    end
-    
-    -- Auto Flag
-    if Config.AutoFlag then
+        
+        -- Mark mines
         for tile, _ in pairs(mineTiles) do
-            if not stopExecution then
-                task.spawn(function()
-                    flagTile(tile)
-                end)
+            if tile and tile:IsA("BasePart") then
+                tile.Color = Color3.new(0, 0, 0)
             end
         end
-    end
-    
-    -- Teleport ke safe tiles (hanya yang 100% aman)
-    local safeList = {}
-    for tile, _ in pairs(safeTiles) do
-        table.insert(safeList, tile)
-    end
-    
-    if #safeList > 0 then
-        isGuessing = false
-        for _, tile in ipairs(safeList) do
+        
+        -- Auto Flag
+        if Config.AutoFlag then
+            for tile, _ in pairs(mineTiles) do
+                if not stopExecution then
+                    task.spawn(function()
+                        flagTile(tile)
+                    end)
+                end
+            end
+        end
+        
+        -- ACTION: Teleport ke safe tiles
+        local hasTeleported = false
+        for tile, _ in pairs(safeTiles) do
             if stopExecution or not Config.AutoSolver then break end
             if tile and tile:IsA("BasePart") and not isCellOpen(tile) then
-                -- Verifikasi ulang dengan data terbaru
-                if isTileSafe(tile, currentData) then
-                    teleportTo(tile)
-                    task.wait(Config.TeleportSpeed)
-                end
+                teleportTo(tile)
+                hasTeleported = true
+                task.wait(Config.TeleportSpeed)
             end
         end
+        
+        -- Auto Guess jika tidak ada yang ditemukan
+        if not hasTeleported and Config.AutoGuess and not foundAnything and tick() - lastActionTime > 1 then
+            local candidates = {}
+            for _, d in ipairs(data) do
+                for _, n in ipairs(d.hidden) do
+                    if n and n:IsA("BasePart") and n.Color ~= Color3.new(0, 0, 0) then
+                        candidates[n] = (candidates[n] or 0) + 1
+                    end
+                end
+            end
+            
+            local best, maxCount = nil, -1
+            for tile, count in pairs(candidates) do
+                if count > maxCount then
+                    maxCount = count
+                    best = tile
+                end
+            end
+            
+            if best then
+                isGuessing = true
+                teleportTo(best)
+                lastActionTime = tick()
+                task.wait(Config.TeleportSpeed)
+            end
+        end
+        
+        -- Update freeze status
+        if Config.AutoSolver and Config.FreezeCharacter and not characterFrozen then
+            freezeCharacter(true)
+        end
+        
+        -- Small wait to prevent CPU overload
+        task.wait(0.01)
     end
     
-    -- Auto Guess (hanya jika tidak ada yang ditemukan)
-    if Config.AutoGuess and not foundAnything and tick() - lastActionTime > 1 then
-        -- Kumpulkan semua hidden tiles
-        local candidates = {}
-        for _, d in ipairs(data) do
-            for _, n in ipairs(d.hidden) do
-                if n and n:IsA("BasePart") and n.Color ~= Color3.new(0, 0, 0) then
-                    candidates[n] = (candidates[n] or 0) + 1
-                end
-            end
-        end
-        
-        -- Cari yang paling sering muncul
-        local best, maxCount = nil, -1
-        for tile, count in pairs(candidates) do
-            if count > maxCount then
-                maxCount = count
-                best = tile
-            end
-        end
-        
-        if best then
-            isGuessing = true
-            teleportTo(best)
-            lastActionTime = tick()
-        end
+    -- Cleanup
+    if characterFrozen then
+        freezeCharacter(false)
     end
-end
-
--- Update Loop (jalan terus untuk update data)
-local function updateLoop()
-    while Config.AutoSolver do
-        task.wait(Config.UpdateSpeed) -- Update lebih cepat
-        pcall(updateDetection)
-    end
-end
-
--- Action Loop (jalan dengan kecepatan teleport)
-local function actionLoopWrapper()
-    while Config.AutoSolver do
-        task.wait(Config.TeleportSpeed)
-        pcall(actionLoop)
-    end
+    solving = false
 end
 
 -- Death Handler
@@ -389,8 +334,6 @@ local function handleDeath()
     isGuessing = false
     stopExecution = true
     neighborCache = {}
-    currentData = {}
-    if characterFrozen then freezeCharacter(false) end
     
     task.wait(1)
     stopExecution = false
@@ -399,7 +342,6 @@ end
 local function setupCharacter(char)
     if not char then return end
     stopExecution = false
-    currentData = {}
     
     local hum = char:WaitForChild("Humanoid", 10)
     if hum then
@@ -423,16 +365,18 @@ local AutoSolverToggle = MainTab:CreateToggle({
    Flag = "AutoSolver",
    Callback = function(Value)
        Config.AutoSolver = Value
-       if Value then
-           task.spawn(updateLoop)
-           task.spawn(actionLoopWrapper)
+       if Value and not solving then
+           task.spawn(solverLoop)
            Rayfield:Notify({
               Title = "Auto Solver",
-              Content = "Solver Enabled - Dual Loop Active",
+              Content = "Solver Enabled - Single Loop",
               Duration = 2,
               Image = 4483362458,
            })
-       else
+       elseif not Value then
+           stopExecution = true
+           task.wait(0.1)
+           stopExecution = false
            if characterFrozen then freezeCharacter(false) end
            Rayfield:Notify({
               Title = "Auto Solver",
@@ -451,15 +395,6 @@ local AutoFlagToggle = MainTab:CreateToggle({
    Flag = "AutoFlag",
    Callback = function(Value)
        Config.AutoFlag = Value
-       
-       if Value then
-           Rayfield:Notify({
-              Title = "Auto Flag",
-              Content = "Auto Flag Enabled",
-              Duration = 2,
-              Image = 4483362458,
-           })
-       end
    end,
 })
 
@@ -470,15 +405,6 @@ local AutoGuessToggle = MainTab:CreateToggle({
    Flag = "AutoGuess",
    Callback = function(Value)
        Config.AutoGuess = Value
-       
-       if Value then
-           Rayfield:Notify({
-              Title = "Auto Guess",
-              Content = "⚠️ Auto Guess Enabled - Will take risks!",
-              Duration = 3,
-              Image = 4483362458,
-           })
-       end
    end,
 })
 
@@ -491,7 +417,7 @@ local FreezeToggle = SettingsTab:CreateToggle({
        Config.FreezeCharacter = Value
        if not Value and characterFrozen then
            freezeCharacter(false)
-       elseif Value and Config.AutoSolver and not characterFrozen then
+       elseif Value and Config.AutoSolver and not characterFrozen and solving then
            freezeCharacter(true)
        end
    end,
@@ -500,7 +426,7 @@ local FreezeToggle = SettingsTab:CreateToggle({
 -- Settings Tab - Teleport Speed (INPUT)
 SettingsTab:CreateParagraph({
    Title = "Teleport Speed",
-   Content = "0.1 = Balanced | 0.05 = Fast | 0.01 = Very Fast | 0.2 = Slow"
+   Content = "0.1 = Balanced | 0.05 = Fast | 0.01 = Very Fast"
 })
 
 local SpeedInput = SettingsTab:CreateInput({
@@ -510,25 +436,7 @@ local SpeedInput = SettingsTab:CreateInput({
    Callback = function(Value)
        local num = tonumber(Value)
        if num and num > 0 then
-           Config.TeleportSpeed = math.max(0.005, math.min(0.5, num))
-       end
-   end,
-})
-
--- Settings Tab - Update Speed (INPUT) - BARU!
-SettingsTab:CreateParagraph({
-   Title = "Update Speed",
-   Content = "0.05 = Fast Update | 0.1 = Normal | 0.2 = Slow (harus lebih cepat dari teleport)"
-})
-
-local UpdateSpeedInput = SettingsTab:CreateInput({
-   Name = "Update Speed (seconds)",
-   PlaceholderText = "0.05",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Value)
-       local num = tonumber(Value)
-       if num and num > 0 then
-           Config.UpdateSpeed = math.max(0.01, math.min(0.2, num))
+           Config.TeleportSpeed = math.max(0.01, math.min(0.5, num))
        end
    end,
 })
@@ -552,11 +460,11 @@ local FlagRangeInput = SettingsTab:CreateInput({
 })
 
 -- Info Section
-MainTab:CreateSection("Dual Loop System")
+MainTab:CreateSection("Single Loop System")
 
 MainTab:CreateParagraph({
-   Title = "Fixed Update",
-   Content = "✓ Update Loop: " .. Config.UpdateSpeed .. "s\n✓ Action Loop: " .. Config.TeleportSpeed .. "s\n✓ Update selalu lebih cepat\n✓ Tile diverifikasi sebelum teleport\n✓ Tidak ketinggalan update"
+   Title = "Stable Version",
+   Content = "✓ Satu loop untuk semua\n✓ Update tiap 0.01s\n✓ Teleport sesuai speed\n✓ Tidak berhenti tiba-tiba\n✓ Freeze character opsional"
 })
 
 -- Set default values
@@ -565,9 +473,6 @@ task.spawn(function()
     pcall(function()
         if SpeedInput and SpeedInput.Set then
             SpeedInput:Set("0.1")
-        end
-        if UpdateSpeedInput and UpdateSpeedInput.Set then
-            UpdateSpeedInput:Set("0.05")
         end
         if FlagRangeInput and FlagRangeInput.Set then
             FlagRangeInput:Set("25")
@@ -578,7 +483,7 @@ end)
 -- Success Notification
 Rayfield:Notify({
    Title = "Solver Loaded",
-   Content = "Dual Loop System - Update lebih cepat dari Teleport",
+   Content = "Single Loop System - Stable!",
    Duration = 3,
    Image = 4483362458,
 })
