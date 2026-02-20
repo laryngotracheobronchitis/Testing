@@ -1,6 +1,5 @@
--- MINESWEEPER HYBRID (Sweep GUI + Minesweeper Detection)
--- Menggunakan sistem deteksi corner dari Minesweeper.lua
--- Dengan GUI dan framework dari Sweep.lua
+-- MINESWEEPER HYBRID DETECTION
+-- Menggabungkan algoritma Sweep (cepat) + Minesweeper (akurat corner)
 
 if game:GetService("RunService"):IsStudio() or (game.PlaceId ~= 7871169780 and game.PlaceId ~= 9797651295) then
     -- warn("nice game")
@@ -86,7 +85,7 @@ local a = n("Frame", panel, {
 n("UICorner", a, { CornerRadius = UDim.new(.05, 0) })
 
 local creditLabel = n("TextLabel", a, {
-    Text = "HYBRID: Sweep GUI + Minesweeper Detection",
+    Text = "HYBRID DETECTION: Sweep + Minesweeper",
     TextSize = 18,
     TextColor3 = c(0, 255, 255),
     BackgroundTransparency = 1,
@@ -160,14 +159,14 @@ lbl("Flag", .2796, .51656, .08, .12)
 lbl("Rotation", .2796, .74967, .06, .09)
 
 local patchedLabel = n("TextLabel", a, {
-    Text = "(Minesweeper Detection)",
+    Text = "(Hybrid Detection)",
     TextSize = 11,
     TextColor3 = c(100, 255, 100),
     BackgroundTransparency = 1,
     Font = Enum.Font.SourceSansBold,
     TextXAlignment = Enum.TextXAlignment.Left,
     TextYAlignment = Enum.TextYAlignment.Top,
-    Size = u(0.2, 0, 0.06, 0),
+    Size = u(0.15, 0, 0.06, 0),
     Position = u(.10693, 0, .68, 0),
     ZIndex = 5
 })
@@ -261,7 +260,7 @@ n("ImageLabel", a, {
     ImageRectOffset = v(0, 902)
 })
 
--- ==================== MINESWEEPER DETECTION SYSTEM ====================
+-- ==================== HYBRID DETECTION SYSTEM ====================
 local B = "Flags status"
 local state = { b = false, c = 0, d = nil }
 
@@ -274,13 +273,13 @@ local function e(vv)
     return vv and true or false
 end
 
--- Data structure dari Minesweeper.lua
+-- Data structure gabungan
 local data = {
     cells = {all = {}, numbered = {}, toFlag = {}, toClear = {}, guess = {}},
     cache = {xs_centers_cached = nil, zs_centers_cached = nil},
     grid = {w = 0, h = 0},
     ui = {PROB_FLAG_THRESHOLD = 0.7, PROB_SAFE_THRESHOLD = 0.3},
-    timing = {lastPlanTick = 0, planIntervalMs = 50},
+    timing = {lastPlanTick = 0, planIntervalMs = 30}, -- Lebih cepat dari Minesweeper (100ms)
     highlights = {}
 }
 
@@ -295,6 +294,7 @@ local function key(ix, iz)
     return tostring(ix) .. ":" .. tostring(iz)
 end
 
+-- CLUSTERING dari Minesweeper (lebih akurat di corner)
 local function clusterSorted(sorted_list, epsilon)
     local clusters = {}
     if #sorted_list == 0 then return clusters end
@@ -366,26 +366,19 @@ local function isPartFlagged(part)
     return false
 end
 
--- Fungsi buildGrid dari Minesweeper.lua (yang lebih akurat di corner)
+-- BUILD GRID dari Minesweeper (akurat corner)
 local function buildGrid()
     data.cells.all = {}
     data.cells.numbered = {}
     data.cells.grid = {}
     
     local root = game.Workspace:FindFirstChild("Flag")
-    if not root then
-        warn("Cannot find workspace.Flag")
-        return
-    end
+    if not root then return end
     
     local partsFolder = root:FindFirstChild("Parts")
-    if not partsFolder then
-        warn("Cannot find workspace.Flag.Parts")
-        return
-    end
+    if not partsFolder then return end
     
     local parts = partsFolder:GetChildren()
-    print("Found " .. #parts .. " parts")
     
     local raw = {}
     local sumY, countY = 0, 0
@@ -419,8 +412,6 @@ local function buildGrid()
     
     data.grid.w = #data.cache.xs_centers_cached
     data.grid.h = #data.cache.zs_centers_cached
-    
-    print("Grid size: " .. data.grid.w .. "x" .. data.grid.h)
     
     local planeY = (countY > 0) and (sumY / countY) or 0
     
@@ -501,8 +492,6 @@ local function buildGrid()
         end
     end
     
-    print("Found " .. #data.cells.numbered .. " numbered cells")
-    
     -- Set neighbors
     for iz = 0, data.grid.h - 1 do
         for ix = 0, data.grid.w - 1 do
@@ -535,8 +524,9 @@ local function neighbors(ix, iz)
     return (c and c.neigh) or {}
 end
 
--- PLAN MOVE dari Minesweeper.lua (deteksi corner yang akurat)
-local function planMove()
+-- ========== HYBRID PLAN MOVE ==========
+-- Menggabungkan fast detection dari Sweep dengan corner accuracy dari Minesweeper
+local function hybridPlanMove()
     if not data.cache.xs_centers_cached or not data.cache.zs_centers_cached or data.grid.w == 0 or data.grid.h == 0 then
         return
     end
@@ -582,10 +572,38 @@ local function planMove()
         return scratch, flaggedCount
     end
     
+    -- PHASE 1: Fast deduction (dari Sweep - tanpa while loop berat)
+    -- Langsung detect tanpa iterasi berulang
+    for _, cell in ipairs(data.cells.numbered) do
+        local num = cell.number or 0
+        local unknowns, flaggedCount = computeUnknowns(cell)
+        local remaining = num - flaggedCount
+        
+        if remaining > 0 and remaining == #unknowns then
+            for i = 1, #unknowns do
+                local u = unknowns[i]
+                if not knownFlag[u] then
+                    knownFlag[u] = true
+                    data.cells.toFlag[u] = true
+                end
+            end
+        elseif remaining == 0 and #unknowns > 0 then
+            for i = 1, #unknowns do
+                local u = unknowns[i]
+                if not knownClear[u] then
+                    knownClear[u] = true
+                    data.cells.toClear[u] = true
+                end
+            end
+        end
+    end
+    
+    -- PHASE 2: Corner detection (dari Minesweeper - limited iterations)
     local changed = true
     local guard = 0
+    local maxIterations = 20  -- Lebih sedikit dari Minesweeper (64) tapi cukup untuk corner
     
-    while changed and guard < 64 do
+    while changed and guard < maxIterations do
         changed = false
         guard = guard + 1
         
@@ -616,6 +634,7 @@ local function planMove()
         end
     end
     
+    -- PHASE 3: Probability (dari Minesweeper)
     local accum = {}
     for _, cell in ipairs(data.cells.numbered) do
         local num = cell.number or 0
@@ -652,6 +671,7 @@ local function planMove()
         end
     end
     
+    -- Cleanup
     for cell, _ in pairs(data.cells.toFlag) do
         data.cells.toClear[cell] = nil
         data.cells.guess[cell] = nil
@@ -669,7 +689,7 @@ local function planMove()
     end
 end
 
--- FUNGSI UTAMA SOLVER (menggabungkan semuanya)
+-- ========== FUNGSI UTAMA ==========
 function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
     local i = state
     local j = e(t)
@@ -833,7 +853,6 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
         local A5 = game:GetService("Workspace")
         local cg = game.CoreGui
         local guiCache = {}
-        local partCache = {}
         local updateThrottle = 0
         local THROTTLE_INTERVAL = 0.05
         
@@ -927,7 +946,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             return I, J
         end
         
-        -- MAIN LOOP - Menggunakan buildGrid dan planMove dari Minesweeper
+        -- MAIN LOOP - Hybrid detection
         local lastBuild = 0
         
         local function update()
@@ -939,7 +958,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             end
             updateThrottle = currentTime
             
-            -- Build grid (dari Minesweeper)
+            -- Build grid (dari Minesweeper - akurat corner)
             if (currentTime - lastBuild) > 2 then
                 buildGrid()
                 lastBuild = currentTime
@@ -949,10 +968,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
                 return
             end
             
-            -- Plan move (dari Minesweeper)
+            -- Hybrid plan move (cepat + akurat)
             local nowMs = currentTime * 1000
             if data.timing.lastPlanTick == 0 or (nowMs - data.timing.lastPlanTick) >= data.timing.planIntervalMs then
-                planMove()
+                hybridPlanMove()
                 data.timing.lastPlanTick = nowMs
             end
             
@@ -961,7 +980,7 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             local G = tick()
             local guiUpdates = {}
             
-            -- Konversi hasil Minesweeper ke GUI Sweep
+            -- Konversi hasil ke GUI
             for _, cell in pairs(data.cells.all) do
                 if cell.part and cell.part:IsA("BasePart") then
                     local part = cell.part
@@ -1013,10 +1032,10 @@ function S(t, a1, c1, d1, f1, g1, h1, x1, v1, n1, y1)
             end
         end
         
-        -- Run loop
+        -- Run loop dengan interval lebih cepat
         while state and state.b and state.c == q do
             pcall(update)
-            task.wait(r)
+            task.wait(r)  -- 0.2 default, bisa diatur
         end
         
         if not state or state.c == q then 
@@ -1030,7 +1049,7 @@ end
 
 Scanningmines = S
 
--- ==================== UI CONTROL ====================
+-- UI Control (sama seperti Sweep)
 local UserInputService = game:GetService("UserInputService")
 
 local ON_IMG = "rbxassetid://16884179507"
@@ -1235,7 +1254,7 @@ open.MouseButton1Up:Connect(function()
     clickStart = nil
 end)
 
-print("✅ HYBRID SOLVER loaded!")
-print("📌 GUI: Sweep.lua")
-print("🎯 Detection: Minesweeper.lua (corner detection)")
-print("⚡ Click the ⚡ button to open menu")
+print("✅ HYBRID DETECTION loaded!")
+print("📌 Build Grid: Minesweeper (akurat corner)")
+print("🎯 Detection: Sweep (cepat) + Minesweeper (corner)")
+print("⚡ Interval: 30ms (lebih cepat dari Minesweeper 100ms)")
