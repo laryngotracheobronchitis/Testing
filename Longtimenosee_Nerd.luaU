@@ -1,7 +1,3 @@
--- Minesweeper Auto Solver with Rayfield UI - FIXED TELEPORT
--- Based on shiziks-solver detection system
--- Pure LuaU
-
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -30,7 +26,7 @@ local Config = {
     AutoGuess = false,
     TeleportSpeed = 0.1,
     FlagRange = 25,
-    FreezeCharacter = true
+    FreezeCharacter = false -- Default off
 }
 
 local neighborCache = {}
@@ -82,10 +78,9 @@ local function freezeCharacter(freeze)
     end
 end
 
--- FIXED TELEPORT FUNCTION - BERDIRI DI ATAS PART
+--- Teleport Function - Berdiri DI ATAS part
 local function teleportTo(target)
     if stopExecution or not target or not target.Parent or isCellOpen(target) then return end
-    
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -95,15 +90,15 @@ local function teleportTo(target)
         freezeCharacter(true)
     end
     
-    -- Hitung posisi di ATAS part
+    -- Hitung posisi di atas part
     local targetPos = target.Position
     local partHeight = target.Size.Y or 1
     
-    -- Bagian ATAS part + offset untuk berdiri
+    -- Bagian atas part
     local partTopY = targetPos.Y + (partHeight / 2)
-    local standHeight = 3.1 -- Tinggi karakter (sama dengan offset original)
+    local standHeight = 3.1 -- Tinggi karakter dari kaki ke root
     
-    -- Posisi akhir: bagian ATAS part + offset
+    -- Posisi akhir: bagian atas part + offset
     local finalY = partTopY + standHeight
     
     -- Teleport dengan CFrame baru (bukan target.CFrame)
@@ -113,7 +108,7 @@ local function teleportTo(target)
         targetPos.Z
     )
     
-    -- Small downward velocity untuk memastikan kontak
+    -- Small downward velocity
     root.Velocity = Vector3.new(0, -50, 0)
     
     task.wait(Config.TeleportSpeed)
@@ -133,8 +128,8 @@ local function flagTile(part)
     if flaggedDebounce[part] and tick() - flaggedDebounce[part] < 1 then return false end
     
     local success = pcall(function()
-        -- Try ClickDetector first
-        local cd = part:FindFirstChildOfClass("ClickDetector")
+        -- Try ClickDetector first (shiziks method)
+        local cd = part:FindFirstChildOfClass("ClickDetector", true)
         if cd then
             fireclickdetector(cd)
             flaggedDebounce[part] = tick()
@@ -151,30 +146,19 @@ local function flagTile(part)
         local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
         if not placeFlag then return end
         
-        placeFlag:FireServer(part)
+        placeFlag:FireServer(unpack({part}))
         flaggedDebounce[part] = tick()
     end)
     
     return success
 end
 
--- Get Parts Folder
-local function getPartsFolder()
-    local flag = workspace:FindFirstChild("Flag")
-    if flag then
-        local parts = flag:FindFirstChild("Parts")
-        if parts then return parts end
-    end
-    
-    local parts = workspace:FindFirstChild("Parts", true)
-    if parts then return parts end
-    
-    return nil
-end
-
--- Get Solver Data
+-- Get Solver Data (shiziks detection system)
 local function getSolverData()
-    local folder = getPartsFolder()
+    local folder = workspace:FindFirstChild("Flag") and workspace.Flag:FindFirstChild("Parts")
+    if not folder then 
+        folder = workspace:FindFirstChild("Parts", true)
+    end
     if not folder then return {} end
     
     local numberData = {}
@@ -185,8 +169,7 @@ local function getSolverData()
         if not isCellOpen(cell) then continue end
         
         -- Get number from GUI
-        local numberGui = cell:FindFirstChild("NumberGui")
-        local label = numberGui and numberGui:FindFirstChildOfClass("TextLabel")
+        local label = cell:FindFirstChild("NumberGui") and cell.NumberGui:FindFirstChildOfClass("TextLabel")
         local val = (label and tonumber(label.Text)) or 0
         
         -- Build neighbor cache
@@ -224,7 +207,7 @@ local function getSolverData()
     return numberData
 end
 
--- Main Detection Loop
+-- Main Detection Loop (shiziks algorithm)
 local function mainLoop()
     if stopExecution then return end
     if not Config.AutoSolver then 
@@ -296,7 +279,7 @@ local function mainLoop()
         end
     end
     
-    -- Basic detection
+    -- Basic detection (corner cases)
     local basicSafe, basicMines = {}, {}
     for _, d in ipairs(data) do
         if #d.hidden > 0 then
@@ -337,11 +320,12 @@ local function mainLoop()
         for _, mine in ipairs(allMines) do
             if not stopExecution then
                 flagTile(mine)
+                task.wait(0.05)
             end
         end
     end
     
-    -- Teleport to safe tiles (PAKAI TELEPORT FIXED)
+    -- Teleport to safe tiles
     local targetQueue = #safeQueue > 0 and safeQueue or basicSafe
     if #targetQueue > 0 then
         isGuessing = false
@@ -397,6 +381,14 @@ end
 local function handleDeath()
     if not Config.AutoSolver then return end
     
+    local deathMsg = isGuessing and "Guess was wrong" or "Hit a mine"
+    Rayfield:Notify({
+       Title = "Death",
+       Content = deathMsg,
+       Duration = 2,
+       Image = 4483362458,
+    })
+    
     isGuessing = false
     stopExecution = true
     neighborCache = {}
@@ -434,11 +426,20 @@ local AutoSolverToggle = MainTab:CreateToggle({
        Config.AutoSolver = Value
        if Value then
            task.spawn(autoSolverLoop)
-           if Config.FreezeCharacter then
-               freezeCharacter(true)
-           end
+           Rayfield:Notify({
+              Title = "Auto Solver",
+              Content = "Solver Enabled - Advanced Detection Active",
+              Duration = 2,
+              Image = 4483362458,
+           })
        else
            if characterFrozen then freezeCharacter(false) end
+           Rayfield:Notify({
+              Title = "Auto Solver",
+              Content = "Solver Disabled",
+              Duration = 2,
+              Image = 4483362458,
+           })
        end
    end,
 })
@@ -450,6 +451,15 @@ local AutoFlagToggle = MainTab:CreateToggle({
    Flag = "AutoFlag",
    Callback = function(Value)
        Config.AutoFlag = Value
+       
+       if Value then
+           Rayfield:Notify({
+              Title = "Auto Flag",
+              Content = "Auto Flag Enabled",
+              Duration = 2,
+              Image = 4483362458,
+           })
+       end
    end,
 })
 
@@ -460,13 +470,22 @@ local AutoGuessToggle = MainTab:CreateToggle({
    Flag = "AutoGuess",
    Callback = function(Value)
        Config.AutoGuess = Value
+       
+       if Value then
+           Rayfield:Notify({
+              Title = "Auto Guess",
+              Content = "⚠️ Auto Guess Enabled - Will take risks!",
+              Duration = 3,
+              Image = 4483362458,
+           })
+       end
    end,
 })
 
--- Settings Tab - Freeze Character
+-- Settings Tab - Freeze Character (OFF by default)
 local FreezeToggle = SettingsTab:CreateToggle({
    Name = "Freeze Character",
-   CurrentValue = true,
+   CurrentValue = false,
    Flag = "FreezeChar",
    Callback = function(Value)
        Config.FreezeCharacter = Value
@@ -480,8 +499,8 @@ local FreezeToggle = SettingsTab:CreateToggle({
 
 -- Settings Tab - Teleport Speed (INPUT)
 SettingsTab:CreateParagraph({
-   Title = "Teleport Speed",
-   Content = "0.01 = Very Fast | 0.1 = Balanced | 0.5 = Slow"
+   Title = "Teleport Speed Settings",
+   Content = "0.01 = Very Fast | 0.1 = Balanced | 0.5 = Slow | 1 = Very Safe"
 })
 
 local SpeedInput = SettingsTab:CreateInput({
@@ -498,8 +517,8 @@ local SpeedInput = SettingsTab:CreateInput({
 
 -- Settings Tab - Flag Range (INPUT)
 SettingsTab:CreateParagraph({
-   Title = "Flag Range",
-   Content = "25 = Default | 50 = Medium | 100 = Far"
+   Title = "Flag Range Settings",
+   Content = "25 = Default | 50 = Medium | 75 = Far | 100 = Max"
 })
 
 local FlagRangeInput = SettingsTab:CreateInput({
@@ -515,18 +534,18 @@ local FlagRangeInput = SettingsTab:CreateInput({
 })
 
 -- Info Section
-MainTab:CreateSection("Fixed Features")
+MainTab:CreateSection("Detection System")
 
 MainTab:CreateParagraph({
-   Title = "FIXED TELEPORT",
-   Content = "✓ Berdiri DI ATAS part\n✓ Tidak menembus part\n✓ Freeze character\n✓ Input fields (no slider)\n✓ 0.1s default speed"
+   Title = "Advanced Detection",
+   Content = "• Euler subset algorithm\n• Corner detection\n• Pattern recognition\n• Auto Guess (risky)"
 })
 
-SettingsTab:CreateSection("Settings Guide")
+SettingsTab:CreateSection("FIXED FEATURES")
 
 SettingsTab:CreateParagraph({
-   Title = "Recommended",
-   Content = "Teleport Speed: 0.1 (Balanced)\nFlag Range: 25 (Default)\nFreeze: ON untuk auto solver"
+   Title = "Teleport Fix",
+   Content = "✓ Berdiri DI ATAS part\n✓ Tidak menembus part\n✓ Freeze character (OFF default)\n✓ Input fields (no slider)"
 })
 
 -- Set default values
@@ -542,5 +561,10 @@ task.spawn(function()
     end)
 end)
 
--- Success message (tanpa notifikasi)
-print("Minesweeper Solver Loaded - Fixed Teleport")
+-- Success Notification
+Rayfield:Notify({
+   Title = "Solver Loaded",
+   Content = "Fixed Teleport - Berdiri DI ATAS part!",
+   Duration = 3,
+   Image = 4483362458,
+})
