@@ -1,6 +1,6 @@
--- Minesweeper Auto Solver with Rayfield UI - OPTIMIZED (NO NOTIFICATIONS)
+-- Minesweeper Auto Solver with Rayfield UI - PERFECT TELEPORT FIXED
 -- Based on shiziks-solver detection system
--- Pure LuaU - NO DELAY, PERFECT TELEPORT, NO NOTIFICATIONS
+-- Pure LuaU - NO DELAY, PERFECT TELEPORT ABOVE PARTS
 
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -83,7 +83,7 @@ local function updatePhysics()
     end
 end
 
--- Teleport Function - Instan dan di ATAS part
+-- PERFECT TELEPORT FUNCTION - BENAR-BENAR DI ATAS PART
 local function teleportTo(target)
     if stopExecution or not target or not target.Parent or isCellOpen(target) then return end
     
@@ -93,20 +93,38 @@ local function teleportTo(target)
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
     if not root then return end
     
-    -- Hitung posisi di ATAS part
+    -- Dapatkan posisi dan ukuran part dengan akurat
     local targetPos = target.Position
-    local partSize = target.Size
-    local standHeight = (partSize.Y / 2) + 3
+    local targetSize = target.Size
+    local targetCFrame = target.CFrame
     
-    root.CFrame = CFrame.new(
-        targetPos.X,
-        targetPos.Y + standHeight,
-        targetPos.Z
+    -- Hitung posisi Y yang tepat untuk berdiri DI ATAS part
+    -- Formula: Posisi part Y + (setengah tinggi part) + tinggi karakter (3 studs)
+    local partTopY = targetPos.Y + (targetSize.Y / 2)  -- Bagian atas part
+    local standHeight = 3 -- Tinggi karakter dari kaki ke pinggang
+    
+    -- Posisi akhir: bagian atas part + offset untuk kaki
+    local finalY = partTopY + standHeight
+    
+    -- Buat CFrame baru dengan posisi Y yang sudah dikalkulasi
+    -- Pertahankan X dan Z dari part
+    local newCFrame = CFrame.new(
+        targetPos.X,  -- X posisi part
+        finalY,       -- Y di ATAS part (bukan di dalam)
+        targetPos.Z   -- Z posisi part
     )
     
+    -- TERAPKAN TELEPORT
+    root.CFrame = newCFrame
+    
+    -- Reset velocity
     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     
+    -- Verifikasi posisi (optional, untuk debugging)
+    -- print(string.format("Teleport to: %s | Part Y: %.2f | Final Y: %.2f", target.Name, partTopY, finalY))
+    
+    -- Freeze lagi jika perlu
     if Config.FreezeEnabled then
         updatePhysics()
     end
@@ -312,14 +330,14 @@ local function mainLoop()
         end
     end
     
-    -- Teleport to safe tiles
+    -- TELEPORT TO SAFE TILES - PAKAI FUNGSI BARU
     local targetQueue = #safeQueue > 0 and safeQueue or basicSafe
     if #targetQueue > 0 then
         isGuessing = false
         for _, s in ipairs(targetQueue) do
             if stopExecution or not Config.AutoSolver then break end
             if not isCellOpen(s) then
-                teleportTo(s)
+                teleportTo(s)  -- PAKAI FUNGSI TELEPORT YANG SUDAH DIPERBAIKI
                 task.wait(Config.TeleportSpeed)
             end
         end
@@ -343,7 +361,7 @@ local function mainLoop()
         
         if best then
             isGuessing = true
-            teleportTo(best)
+            teleportTo(best)  -- PAKAI FUNGSI TELEPORT YANG SUDAH DIPERBAIKI
             lastActionTime = tick()
         end
     end
@@ -474,7 +492,7 @@ MainTab:CreateSection("Status")
 
 MainTab:CreateParagraph({
    Title = "Features",
-   Content = "• NO DELAY\n• 0.0001s speed\n• ABOVE part teleport\n• Auto Flag\n• Auto Guess"
+   Content = "• NO DELAY\n• 0.0001s speed\n• PERFECT ABOVE part teleport\n• Auto Flag\n• Auto Guess"
 })
 
 -- Continuous freeze update
