@@ -1,13 +1,10 @@
--- Minesweeper Auto Solver with Rayfield UI - COMPLETE EDITION (FIXED)
--- Based on shiziks-solver detection system + Sweep.lua visuals
--- Pure LuaU - NO DELAY, PERFECT TELEPORT, VISUAL INDICATORS
+-- Minesweeper Auto Solver with Rayfield UI - FIXED VERSION
+-- Based on shiziks-solver detection system
+-- Pure LuaU
 
 local player = game:GetService("Players").LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local TextChatService = game:GetService("TextChatService")
-local StarterGui = game:GetService("StarterGui")
 
 -- Load Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -16,7 +13,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Minesweeper Solver",
    LoadingTitle = "Minesweeper Auto Solver",
-   LoadingSubtitle = "by Shiziks System + Sweep Visuals",
+   LoadingSubtitle = "by Shiziks System",
    ConfigurationSaving = {
       Enabled = false
    },
@@ -28,52 +25,20 @@ local Window = Rayfield:CreateWindow({
 
 -- Variables
 local Config = {
-    -- Rage Mode
     AutoSolver = false,
     AutoFlag = false,
     AutoGuess = false,
     TeleportSpeed = 0.0001,
-    FreezeEnabled = false,
-    
-    -- Legit/Visual Mode
-    VisualEnabled = false,
-    VisualRange = 100,
-    VisualUpdateSpeed = 0.2,
-    ShowMines = true,
-    ShowSafe = true,
-    ShowNumbers = true,
-    FlagEnabled = false,
-    FlagSpeed = 0.05,
-    FlagRange = 25
+    FlagRange = 25,
+    FreezeCharacter = true
 }
 
--- State variables
 local neighborCache = {}
 local flaggedDebounce = {}
 local stopExecution = false
 local isGuessing = false
 local lastActionTime = 0
-local Controls = nil
-
--- Visual variables
-local visualState = { running = false }
-local visualCache = {}
-local lastSeenRun = {}
-local updateThrottle = 0
-local THROTTLE_INTERVAL = 0.05
-local guiCache = {}
-local partCache = {}
-
--- Try to get Controls
-pcall(function()
-    local playerScripts = player:FindFirstChild("PlayerScripts")
-    if playerScripts then
-        local playerModule = playerScripts:FindFirstChild("PlayerModule")
-        if playerModule then
-            Controls = require(playerModule):GetControls()
-        end
-    end
-end)
+local characterFrozen = false
 
 -- Helper Functions
 local function isCellOpen(part)
@@ -83,113 +48,60 @@ local function isCellOpen(part)
 end
 
 local function isAlreadyFlagged(part)
-    if not part then return false end
-    -- Cek berbagai kemungkinan flag
-    if part:FindFirstChild("Flag") then return true end
-    if part:FindFirstChild("BombFlag") then return true end
-    if part:FindFirstChild("FlagModel") then return true end
-    if part:FindFirstChild("Flagged") then return true end
-    
-    -- Cek attribute
-    local success, flagged = pcall(function()
-        return part:GetAttribute("Flagged")
-    end)
-    if success and flagged then return true end
-    
-    return false
+    return part:FindFirstChild("Flag") or part:FindFirstChild("BombFlag") or part:FindFirstChild("FlagModel")
 end
 
--- Get Parts Folder
-local function getPartsFolder()
-    local w = workspace
-    
-    -- Coba cari di Folder Flag
-    local flag = w:FindFirstChild("Flag")
-    if flag then
-        local parts = flag:FindFirstChild("Parts")
-        if parts and parts:IsA("Folder") then 
-            return parts 
-        end
-    end
-    
-    -- Coba cari folder Parts di mana saja
-    local parts = w:FindFirstChild("Parts", true)
-    if parts and parts:IsA("Folder") then 
-        return parts 
-    end
-    
-    -- Cari folder dengan nama Parts yang punya banyak part
-    local best, bestCount = nil, -1
-    for _, i in ipairs(w:GetDescendants()) do
-        if i:IsA("Folder") and i.Name == "Parts" then
-            local count = 0
-            for _, ch in ipairs(i:GetChildren()) do
-                if ch:IsA("BasePart") then 
-                    count = count + 1 
-                end
-            end
-            if count > bestCount then
-                best, bestCount = i, count
-            end
-        end
-    end
-    
-    return best
-end
-
--- Freeze Function
-local function updatePhysics()
-    if not Config.FreezeEnabled then return end
-    
+-- Freeze Character Function
+local function freezeCharacter(freeze)
     local char = player.Character
     if not char then return end
     
-    local shouldFreeze = (Config.AutoSolver and Config.FreezeEnabled)
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
     
-    for _, p in ipairs(char:GetDescendants()) do 
-        if p:IsA("BasePart") then 
-            p.Anchored = shouldFreeze
-            if shouldFreeze then
-                p.Velocity = Vector3.new(0, 0, 0)
-                p.RotVelocity = Vector3.new(0, 0, 0)
-            end
-        end 
-    end
-    
-    if Controls then
-        if shouldFreeze then 
-            pcall(function() 
-                if Controls.Disable then
-                    Controls:Disable() 
-                end
-            end)
-        else 
-            pcall(function() 
-                if Controls.Enable then
-                    Controls:Enable() 
-                end
-            end)
+    if freeze then
+        if humanoid then
+            humanoid.PlatformStand = true
+            humanoid.AutoRotate = false
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
         end
+        if root then
+            root.Velocity = Vector3.new(0, 0, 0)
+            root.RotVelocity = Vector3.new(0, 0, 0)
+        end
+        characterFrozen = true
+    else
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.AutoRotate = true
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
+        characterFrozen = false
     end
 end
 
--- PERFECT TELEPORT FUNCTION
+-- PERFECT TELEPORT FUNCTION - DI ATAS PART
 local function teleportTo(target)
     if stopExecution or not target or not target.Parent or isCellOpen(target) then return end
     
     local char = player.Character
-    if not char then return end
-    
-    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
+    
+    -- Freeze character if enabled
+    if Config.FreezeCharacter and not characterFrozen then
+        freezeCharacter(true)
+    end
     
     -- Hitung posisi di ATAS part
     local targetPos = target.Position
-    local targetSize = target.Size
+    local partHeight = target.Size.Y or 1
     
-    -- Bagian ATAS part + tinggi karakter
-    local partTopY = targetPos.Y + (targetSize.Y / 2)
-    local standHeight = 3 -- Tinggi karakter dari kaki ke root
+    -- Bagian ATAS part + offset untuk berdiri
+    local partTopY = targetPos.Y + (partHeight / 2)
+    local standHeight = 3 -- Tinggi karakter
     
     -- Posisi akhir: bagian ATAS part + offset
     local finalY = partTopY + standHeight
@@ -201,56 +113,58 @@ local function teleportTo(target)
         targetPos.Z
     )
     
-    -- Reset velocity
+    -- Stop momentum
     root.Velocity = Vector3.new(0, 0, 0)
     root.RotVelocity = Vector3.new(0, 0, 0)
+    
+    task.wait(Config.TeleportSpeed)
 end
 
 -- Flag Function
 local function flagTile(part)
     if not part or not part.Parent or isAlreadyFlagged(part) then return false end
     
-    if flaggedDebounce[part] and tick() - flaggedDebounce[part] < 0.3 then return false end
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    
+    -- Check range
+    if (part.Position - root.Position).Magnitude > Config.FlagRange then return false end
+    
+    -- Check debounce
+    if flaggedDebounce[part] and tick() - flaggedDebounce[part] < 1 then return false end
     
     local success = pcall(function()
-        -- Method 1: ClickDetector
+        -- Try ClickDetector first
         local cd = part:FindFirstChildOfClass("ClickDetector")
         if cd then
             fireclickdetector(cd)
             flaggedDebounce[part] = tick()
-            return true
+            return
         end
         
-        -- Method 2: RemoteEvent
+        -- Fallback to RemoteEvent
         local events = replicatedStorage:FindFirstChild("Events")
-        if events then
-            local flagEvents = events:FindFirstChild("FlagEvents")
-            if flagEvents then
-                local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
-                if placeFlag then
-                    placeFlag:FireServer(part)
-                    flaggedDebounce[part] = tick()
-                    return true
-                end
-            end
-        end
+        if not events then return end
         
-        -- Method 3: Coba fire touch interest
-        local touchInterest = part:FindFirstChildOfClass("TouchTransmitter")
-        if touchInterest then
-            firetouchinterest(player.Character and player.Character:FindFirstChild("HumanoidRootPart"), part, 0)
-            firetouchinterest(player.Character and player.Character:FindFirstChild("HumanoidRootPart"), part, 1)
-            flaggedDebounce[part] = tick()
-            return true
-        end
+        local flagEvents = events:FindFirstChild("FlagEvents")
+        if not flagEvents then return end
+        
+        local placeFlag = flagEvents:FindFirstChild("PlaceFlag")
+        if not placeFlag then return end
+        
+        placeFlag:FireServer(part)
+        flaggedDebounce[part] = tick()
     end)
     
     return success
 end
 
--- Get Solver Data untuk Rage Mode
+-- Get Solver Data
 local function getSolverData()
-    local folder = getPartsFolder()
+    local folder = workspace:FindFirstChild("Flag") and workspace.Flag:FindFirstChild("Parts")
+    if not folder then 
+        folder = workspace:FindFirstChild("Parts", true)
+    end
     if not folder then return {} end
     
     local numberData = {}
@@ -263,31 +177,24 @@ local function getSolverData()
         -- Get number from GUI
         local numberGui = cell:FindFirstChild("NumberGui")
         local label = numberGui and numberGui:FindFirstChildOfClass("TextLabel")
-        local val = 0
-        if label and label.Text then
-            val = tonumber(label.Text) or 0
-        end
+        local val = (label and tonumber(label.Text)) or 0
         
         -- Build neighbor cache
         if not neighborCache[cell] then
             local nbs = {}
             for _, n in ipairs(allParts) do
-                if n:IsA("BasePart") and n ~= cell then
-                    local dist = (n.Position - cell.Position).Magnitude
-                    if dist < (cell.Size.X * 1.8) then
-                        table.insert(nbs, n)
-                    end
+                if n:IsA("BasePart") and n ~= cell and (n.Position - cell.Position).Magnitude < (cell.Size.X * 1.8) then
+                    table.insert(nbs, n)
                 end
             end
             neighborCache[cell] = nbs
         end
         
         -- Count hidden and flagged neighbors
-        local hidden = {}
-        local mines = 0
+        local hidden, mines = {}, 0
         for _, n in ipairs(neighborCache[cell]) do
             if not isCellOpen(n) then
-                if isAlreadyFlagged(n) or n.Color == Color3.new(0, 0, 0) then
+                if n.Color == Color3.new(0, 0, 0) or isAlreadyFlagged(n) then
                     mines = mines + 1
                 else
                     table.insert(hidden, n)
@@ -307,307 +214,80 @@ local function getSolverData()
     return numberData
 end
 
--- ================ VISUAL SYSTEM ================
-
-local function getVisualFolder()
-    local parent = game:GetService("CoreGui")
-    local folder = parent:FindFirstChild("MinesweeperVisuals")
-    if not folder then
-        folder = Instance.new("Folder")
-        folder.Name = "MinesweeperVisuals"
-        folder.Parent = parent
-    end
-    return folder
-end
-
-local function getPartId(part)
-    return tostring(part:GetDebugId())
-end
-
-local function getNumberFromText(text)
-    if type(text) ~= "string" then return nil end
-    local num = text:match("(%d+)")
-    return num and tonumber(num) or nil
-end
-
-local function clampValue(val)
-    val = tonumber(val) or 0
-    if val < 0 then return 0
-    elseif val > 1 then return 1
-    else return val end
-end
-
-local function getNeighborCells(r, c, height, width)
-    local neighbors = {}
-    for dr = -1, 1 do
-        for dc = -1, 1 do
-            if not (dr == 0 and dc == 0) then
-                local nr, nc = r + dr, c + dc
-                if nr >= 1 and nr <= height and nc >= 1 and nc <= width then
-                    table.insert(neighbors, {nr, nc})
-                end
-            end
-        end
-    end
-    return neighbors
-end
-
--- Visual Update Function
-local function updateVisuals()
-    if not Config.VisualEnabled then return end
-    
-    local currentTime = tick()
-    if currentTime - updateThrottle < Config.VisualUpdateSpeed then
-        return
-    end
-    updateThrottle = currentTime
-    
-    local partsFolder = getPartsFolder()
-    if not partsFolder then return end
-    
-    local char = player.Character
-    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-    
-    -- Filter parts by range
-    local rangeSq = Config.VisualRange * Config.VisualRange
-    local visibleParts = {}
-    
-    for _, part in ipairs(partsFolder:GetChildren()) do
-        if part:IsA("BasePart") and part.Anchored ~= false then
-            
-            -- Check range
-            if root then
-                local distSq = (part.Position - root.Position).MagnitudeSquared
-                if distSq > rangeSq then
-                    -- Hide if out of range
-                    local partId = getPartId(part)
-                    local gui = guiCache[partId]
-                    if gui and gui.Parent then
-                        gui.Enabled = false
-                    end
-                    goto continue
-                end
-            end
-            
-            -- Get or create cache
-            local partId = getPartId(part)
-            local cache = partCache[partId]
-            if not cache then
-                local numberGui = part:FindFirstChild("NumberGui", true)
-                local textLabel = numberGui and (numberGui:FindFirstChildWhichIsA("TextLabel") or numberGui:FindFirstChild("TextLabel"))
-                
-                cache = {
-                    part = part,
-                    position = part.Position,
-                    size = part.Size,
-                    label = textLabel,
-                    flagged = isAlreadyFlagged(part),
-                    lastSeen = currentTime
-                }
-                partCache[partId] = cache
-            else
-                cache.position = part.Position
-                cache.size = part.Size
-                cache.lastSeen = currentTime
-                cache.flagged = isAlreadyFlagged(part)
-                
-                -- Try to get label if missing
-                if not cache.label then
-                    local numberGui = part:FindFirstChild("NumberGui", true)
-                    cache.label = numberGui and (numberGui:FindFirstChildWhichIsA("TextLabel") or numberGui:FindFirstChild("TextLabel"))
-                end
-            end
-            
-            table.insert(visibleParts, cache)
-            ::continue::
-        end
-    end
-    
-    if #visibleParts == 0 then return end
-    
-    -- Find reference part for grid
-    local refPart = nil
-    local minDist = math.huge
-    
-    for _, cache in ipairs(visibleParts) do
-        if cache.label and root then
-            local distSq = (cache.position - root.Position).MagnitudeSquared
-            if distSq < minDist then
-                minDist = distSq
-                refPart = cache
-            end
-        end
-    end
-    
-    if not refPart then
-        -- Hide all if no reference
-        local folder = getVisualFolder()
-        for _, gui in ipairs(folder:GetChildren()) do
-            gui.Enabled = false
-        end
-        return
-    end
-    
-    -- Simple grid mapping
-    local visualFolder = getVisualFolder()
-    local timestamp = currentTime
-    
-    for _, cache in ipairs(visibleParts) do
-        local part = cache.part
-        
-        -- Create or get GUI
-        local partId = getPartId(part)
-        local gui = guiCache[partId]
-        
-        if not gui or not gui.Parent then
-            gui = visualFolder:FindFirstChild(partId)
-            if not gui then
-                gui = Instance.new("SurfaceGui")
-                gui.Name = partId
-                gui.AlwaysOnTop = true
-                gui.LightInfluence = 0
-                gui.Face = Enum.NormalId.Top
-                gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-                gui.PixelsPerStud = 25
-                gui.Parent = visualFolder
-            end
-            guiCache[partId] = gui
-        end
-        
-        gui.Adornee = part
-        lastSeenRun[gui] = timestamp
-        
-        -- Determine what to show
-        local text = ""
-        local color = Color3.fromRGB(255, 255, 255)
-        
-        if cache.flagged and Config.ShowMines then
-            text = "💣"
-        elseif cache.label and Config.ShowNumbers then
-            local num = getNumberFromText(cache.label.Text)
-            if num then
-                text = tostring(num)
-            end
-        elseif not cache.label and not cache.flagged and Config.ShowSafe then
-            -- Simple safe detection (adjacent to 0)
-            -- In a full implementation, this would use actual logic
-            text = "?"
-        end
-        
-        -- Create or update label
-        local label = gui:FindFirstChild("ValueText")
-        if not label then
-            label = Instance.new("TextLabel")
-            label.Name = "ValueText"
-            label.Size = UDim2.fromScale(1, 1)
-            label.BackgroundTransparency = 1
-            label.TextSize = 60
-            label.Font = Enum.Font.Arcade
-            label.TextColor3 = Color3.fromRGB(255, 255, 255)
-            label.TextStrokeTransparency = 0
-            label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            label.Parent = gui
-        end
-        
-        if text ~= "" then
-            gui.Enabled = true
-            label.Visible = true
-            label.Text = text
-            label.TextColor3 = color
-        else
-            gui.Enabled = false
-        end
-    end
-    
-    -- Clean up old GUIs
-    for _, gui in ipairs(visualFolder:GetChildren()) do
-        if lastSeenRun[gui] ~= timestamp then
-            guiCache[gui.Name] = nil
-            gui:Destroy()
-        end
-    end
-    
-    -- Clean old part cache
-    for id, cache in pairs(partCache) do
-        if currentTime - (cache.lastSeen or 0) > 10 then
-            partCache[id] = nil
-        end
-    end
-end
-
--- Auto Flag dari visual
-local function autoFlagFromVisual()
-    if not Config.VisualEnabled or not Config.FlagEnabled then return end
-    
-    local partsFolder = getPartsFolder()
-    if not partsFolder then return end
-    
-    local char = player.Character
-    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-    if not root then return end
-    
-    local rangeSq = Config.VisualRange * Config.VisualRange
-    
-    for _, part in ipairs(partsFolder:GetChildren()) do
-        if part:IsA("BasePart") and not isAlreadyFlagged(part) then
-            -- Check range
-            local distSq = (part.Position - root.Position).MagnitudeSquared
-            if distSq <= rangeSq then
-                -- Check if it has bomb visual
-                local partId = getPartId(part)
-                local gui = guiCache[partId]
-                if gui and gui.Enabled then
-                    local label = gui:FindFirstChild("ValueText")
-                    if label and label:IsA("TextLabel") and label.Text == "💣" then
-                        -- This is a bomb candidate, flag it
-                        task.spawn(function()
-                            flagTile(part)
-                            task.wait(Config.FlagSpeed)
-                        end)
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Visual loop
-local function visualLoop()
-    visualState.running = true
-    while Config.VisualEnabled and visualState.running do
-        task.wait(Config.VisualUpdateSpeed)
-        pcall(updateVisuals)
-        if Config.FlagEnabled then
-            pcall(autoFlagFromVisual)
-        end
-    end
-    
-    -- Clean up on disable
-    local folder = getVisualFolder()
-    for _, gui in ipairs(folder:GetChildren()) do
-        gui:Destroy()
-    end
-    guiCache = {}
-    partCache = {}
-end
-
--- ================ RAGE MODE FUNCTIONS ================
-
 -- Main Detection Loop
 local function mainLoop()
     if stopExecution then return end
-    if not Config.AutoSolver then return end
+    if not Config.AutoSolver then 
+        if characterFrozen then freezeCharacter(false) end
+        return 
+    end
     
     local data = getSolverData()
-    local safeQueue = {}
-    local mineQueue = {}
-    local riskyCells = {}
+    local safeQueue, mineQueue, riskyCells = {}, {}, {}
     local foundAnything = false
     
-    -- Basic detection first
-    local basicSafe = {}
-    local basicMines = {}
+    -- Advanced subset detection
+    for i = 1, #data do
+        for j = 1, #data do
+            if i ~= j then
+                local d1, d2 = data[i], data[j]
+                if (d1.obj.Position - d2.obj.Position).Magnitude < 12 then
+                    local s1, s2 = d1.hidden, d2.hidden
+                    
+                    -- Check if s1 is subset of s2
+                    local isSubset = true
+                    for _, x in ipairs(s1) do
+                        local found = false
+                        for _, y in ipairs(s2) do
+                            if x == y then
+                                found = true
+                                break
+                            end
+                        end
+                        if not found then
+                            isSubset = false
+                            break
+                        end
+                    end
+                    
+                    if isSubset and #s2 > #s1 then
+                        local diffMines = d2.eVal - d1.eVal
+                        local diffCells = {}
+                        
+                        for _, x in ipairs(s2) do
+                            local inS1 = false
+                            for _, y in ipairs(s1) do
+                                if x == y then
+                                    inS1 = true
+                                    break
+                                end
+                            end
+                            if not inS1 then
+                                table.insert(diffCells, x)
+                            end
+                        end
+                        
+                        -- If difference is 0 mines, all are safe
+                        if diffMines == 0 then
+                            for _, n in ipairs(diffCells) do
+                                table.insert(safeQueue, n)
+                                foundAnything = true
+                            end
+                        -- If difference equals cells, all are mines
+                        elseif diffMines == #diffCells then
+                            for _, n in ipairs(diffCells) do
+                                table.insert(mineQueue, n)
+                                foundAnything = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
     
+    -- Basic detection
+    local basicSafe, basicMines = {}, {}
     for _, d in ipairs(data) do
         if #d.hidden > 0 then
             -- All hidden are mines
@@ -617,7 +297,7 @@ local function mainLoop()
                     foundAnything = true
                 end
             -- All hidden are safe
-            elseif d.eVal == 0 then
+            elseif d.eVal <= 0 then
                 for _, n in ipairs(d.hidden) do
                     table.insert(basicSafe, n)
                     foundAnything = true
@@ -626,71 +306,7 @@ local function mainLoop()
         end
     end
     
-    -- Advanced subset detection
-    for i = 1, #data do
-        for j = 1, #data do
-            if i ~= j then
-                local d1 = data[i]
-                local d2 = data[j]
-                
-                if d1.obj and d2.obj then
-                    local dist = (d1.obj.Position - d2.obj.Position).Magnitude
-                    if dist < 12 then
-                        local s1 = d1.hidden
-                        local s2 = d2.hidden
-                        
-                        -- Check if s1 is subset of s2
-                        local isSubset = true
-                        for _, x in ipairs(s1) do
-                            local found = false
-                            for _, y in ipairs(s2) do
-                                if x == y then
-                                    found = true
-                                    break
-                                end
-                            end
-                            if not found then
-                                isSubset = false
-                                break
-                            end
-                        end
-                        
-                        if isSubset and #s2 > #s1 then
-                            local diffMines = d2.eVal - d1.eVal
-                            local diffCells = {}
-                            
-                            for _, x in ipairs(s2) do
-                                local inS1 = false
-                                for _, y in ipairs(s1) do
-                                    if x == y then
-                                        inS1 = true
-                                        break
-                                    end
-                                end
-                                if not inS1 then
-                                    table.insert(diffCells, x)
-                                end
-                            end
-                            
-                            if diffMines == 0 then
-                                for _, n in ipairs(diffCells) do
-                                    table.insert(safeQueue, n)
-                                    foundAnything = true
-                                end
-                            elseif diffMines == #diffCells then
-                                for _, n in ipairs(diffCells) do
-                                    table.insert(mineQueue, n)
-                                    foundAnything = true
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Mark mines
+    -- Mark mines as black
     for _, m in ipairs(mineQueue) do
         if m and m:IsA("BasePart") then
             m.Color = Color3.new(0, 0, 0)
@@ -705,19 +321,12 @@ local function mainLoop()
     -- Auto Flag
     if Config.AutoFlag then
         local allMines = {}
-        for _, m in ipairs(mineQueue) do 
-            if m then allMines[m] = m end
-        end
-        for _, m in ipairs(basicMines) do 
-            if m then allMines[m] = m end
-        end
+        for _, m in ipairs(mineQueue) do table.insert(allMines, m) end
+        for _, m in ipairs(basicMines) do table.insert(allMines, m) end
         
-        for _, mine in pairs(allMines) do
-            if not stopExecution and Config.AutoSolver then
-                task.spawn(function()
-                    flagTile(mine)
-                    task.wait(0.01)
-                end)
+        for _, mine in ipairs(allMines) do
+            if not stopExecution then
+                flagTile(mine)
             end
         end
     end
@@ -730,11 +339,11 @@ local function mainLoop()
             if stopExecution or not Config.AutoSolver then break end
             if s and s:IsA("BasePart") and not isCellOpen(s) then
                 teleportTo(s)
-                task.wait(Config.TeleportSpeed)
             end
         end
-    -- Auto Guess
-    elseif Config.AutoGuess and not foundAnything and tick() - lastActionTime > 0.3 then
+    -- Auto Guess if enabled and nothing found
+    elseif Config.AutoGuess and not foundAnything and tick() - lastActionTime > 0.8 then
+        -- Build risk map
         for _, d in ipairs(data) do
             for _, n in ipairs(d.hidden) do
                 if n and n:IsA("BasePart") and n.Color ~= Color3.new(0, 0, 0) and not isAlreadyFlagged(n) then
@@ -743,8 +352,8 @@ local function mainLoop()
             end
         end
         
-        local best = nil
-        local maxWeight = -1
+        -- Find best guess (most common in risk analysis)
+        local best, maxWeight = nil, -1
         for cell, weight in pairs(riskyCells) do
             if weight > maxWeight then
                 maxWeight = weight
@@ -758,13 +367,23 @@ local function mainLoop()
             lastActionTime = tick()
         end
     end
+    
+    -- If nothing found, unfreeze character
+    if not foundAnything and #targetQueue == 0 and not Config.AutoGuess then
+        if characterFrozen then freezeCharacter(false) end
+    end
 end
 
 -- Auto Solver Loop
 local function autoSolverLoop()
     while Config.AutoSolver do
         task.wait(Config.TeleportSpeed)
-        if not Config.AutoSolver then break end
+        
+        if not Config.AutoSolver then 
+            if characterFrozen then freezeCharacter(false) end
+            break 
+        end
+        
         pcall(mainLoop)
     end
 end
@@ -776,6 +395,7 @@ local function handleDeath()
     isGuessing = false
     stopExecution = true
     neighborCache = {}
+    if characterFrozen then freezeCharacter(false) end
     
     task.wait(1)
     stopExecution = false
@@ -785,7 +405,7 @@ local function setupCharacter(char)
     if not char then return end
     stopExecution = false
     
-    local hum = char:WaitForChild("Humanoid", 5)
+    local hum = char:WaitForChild("Humanoid", 10)
     if hum then
         hum.Died:Connect(handleDeath)
     end
@@ -796,18 +416,12 @@ if player.Character then
 end
 player.CharacterAdded:Connect(setupCharacter)
 
--- ================ UI CREATION ================
-
 -- Create Tabs
-local RageTab = Window:CreateTab("Rage Mode", 4483362458)
-local LegitTab = Window:CreateTab("Legit Visuals", 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
--- ================ RAGE MODE TAB ================
-
-RageTab:CreateSection("Auto Solver Settings")
-
--- Auto Solver Toggle
-local AutoSolverToggle = RageTab:CreateToggle({
+-- Main Tab - Auto Solver
+local AutoSolverToggle = MainTab:CreateToggle({
    Name = "Auto Solver",
    CurrentValue = false,
    Flag = "AutoSolver",
@@ -815,23 +429,25 @@ local AutoSolverToggle = RageTab:CreateToggle({
        Config.AutoSolver = Value
        if Value then
            task.spawn(autoSolverLoop)
+       else
+           if characterFrozen then freezeCharacter(false) end
        end
    end,
 })
 
--- Auto Flag Toggle
-local AutoFlagToggle = RageTab:CreateToggle({
+-- Main Tab - Auto Flag
+local AutoFlagToggle = MainTab:CreateToggle({
    Name = "Auto Flag",
    CurrentValue = false,
-   Flag = "RageAutoFlag",
+   Flag = "AutoFlag",
    Callback = function(Value)
        Config.AutoFlag = Value
    end,
 })
 
--- Auto Guess Toggle
-local AutoGuessToggle = RageTab:CreateToggle({
-   Name = "Auto Guess (Risky)",
+-- Main Tab - Auto Guess
+local AutoGuessToggle = MainTab:CreateToggle({
+   Name = "Auto Guess",
    CurrentValue = false,
    Flag = "AutoGuess",
    Callback = function(Value)
@@ -839,13 +455,26 @@ local AutoGuessToggle = RageTab:CreateToggle({
    end,
 })
 
--- Teleport Speed Input
-RageTab:CreateParagraph({
-   Title = "Teleport Speed",
-   Content = "0.0001 = Super Fast | 0.01 = Normal | 0.1 = Slow"
+-- Settings Tab - Freeze Character
+local FreezeToggle = SettingsTab:CreateToggle({
+   Name = "Freeze Character",
+   CurrentValue = true,
+   Flag = "FreezeChar",
+   Callback = function(Value)
+       Config.FreezeCharacter = Value
+       if not Value and characterFrozen then
+           freezeCharacter(false)
+       end
+   end,
 })
 
-local TeleportSpeedInput = RageTab:CreateInput({
+-- Settings Tab - Teleport Speed (INPUT)
+SettingsTab:CreateParagraph({
+   Title = "Teleport Speed",
+   Content = "0.0001 = Super Fast | 0.001 = Fast | 0.01 = Normal"
+})
+
+local SpeedInput = SettingsTab:CreateInput({
    Name = "Teleport Speed (seconds)",
    PlaceholderText = "0.0001",
    RemoveTextAfterFocusLost = false,
@@ -857,19 +486,13 @@ local TeleportSpeedInput = RageTab:CreateInput({
    end,
 })
 
--- Freeze Toggle
-local FreezeToggle = RageTab:CreateToggle({
-   Name = "Freeze Character",
-   CurrentValue = false,
-   Flag = "FreezeEnabled",
-   Callback = function(Value)
-       Config.FreezeEnabled = Value
-       updatePhysics()
-   end,
+-- Settings Tab - Flag Range (INPUT)
+SettingsTab:CreateParagraph({
+   Title = "Flag Range",
+   Content = "25 = Default | 50 = Medium | 100 = Far"
 })
 
--- Flag Range Input
-local FlagRangeInput = RageTab:CreateInput({
+local FlagRangeInput = SettingsTab:CreateInput({
    Name = "Flag Range (studs)",
    PlaceholderText = "25",
    RemoveTextAfterFocusLost = false,
@@ -881,147 +504,23 @@ local FlagRangeInput = RageTab:CreateInput({
    end,
 })
 
-RageTab:CreateParagraph({
-   Title = "Rage Mode Info",
-   Content = "• Teleports to safe tiles\n• Marks mines in black\n• Auto flag detected mines\n• Auto guess as last resort"
-})
+-- Info Section
+MainTab:CreateSection("Features")
 
--- ================ LEGIT VISUALS TAB ================
-
-LegitTab:CreateSection("Visual Detection System")
-
--- Visual Enabled Toggle
-local VisualToggle = LegitTab:CreateToggle({
-   Name = "Enable Visuals",
-   CurrentValue = false,
-   Flag = "VisualEnabled",
-   Callback = function(Value)
-       Config.VisualEnabled = Value
-       if Value then
-           visualState.running = true
-           task.spawn(visualLoop)
-       else
-           visualState.running = false
-           -- Clean up visuals
-           local folder = getVisualFolder()
-           for _, gui in ipairs(folder:GetChildren()) do
-               gui:Destroy()
-           end
-           guiCache = {}
-           partCache = {}
-       end
-   end,
-})
-
--- Show Mines Toggle
-local ShowMinesToggle = LegitTab:CreateToggle({
-   Name = "Show Mines (💣)",
-   CurrentValue = true,
-   Flag = "ShowMines",
-   Callback = function(Value)
-       Config.ShowMines = Value
-   end,
-})
-
--- Show Safe Toggle
-local ShowSafeToggle = LegitTab:CreateToggle({
-   Name = "Show Safe (✓)",
-   CurrentValue = true,
-   Flag = "ShowSafe",
-   Callback = function(Value)
-       Config.ShowSafe = Value
-   end,
-})
-
--- Show Numbers Toggle
-local ShowNumbersToggle = LegitTab:CreateToggle({
-   Name = "Show Numbers",
-   CurrentValue = true,
-   Flag = "ShowNumbers",
-   Callback = function(Value)
-       Config.ShowNumbers = Value
-   end,
-})
-
-LegitTab:CreateSection("Range Settings")
-
--- Visual Range Input
-local VisualRangeInput = LegitTab:CreateInput({
-   Name = "Visual Range (studs)",
-   PlaceholderText = "100",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Value)
-       local num = tonumber(Value)
-       if num and num > 0 then
-           Config.VisualRange = math.max(10, math.min(500, num))
-       end
-   end,
-})
-
--- Update Speed Input
-local UpdateSpeedInput = LegitTab:CreateInput({
-   Name = "Update Speed (seconds)",
-   PlaceholderText = "0.2",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Value)
-       local num = tonumber(Value)
-       if num and num > 0 then
-           Config.VisualUpdateSpeed = math.max(0.05, math.min(1, num))
-       end
-   end,
-})
-
-LegitTab:CreateSection("Auto Flag")
-
--- Visual Auto Flag Toggle
-local VisualFlagToggle = LegitTab:CreateToggle({
-   Name = "Auto Flag from Visuals",
-   CurrentValue = false,
-   Flag = "VisualFlag",
-   Callback = function(Value)
-       Config.FlagEnabled = Value
-   end,
-})
-
--- Flag Speed Input
-local FlagSpeedInput = LegitTab:CreateInput({
-   Name = "Flag Speed (seconds)",
-   PlaceholderText = "0.05",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Value)
-       local num = tonumber(Value)
-       if num and num > 0 then
-           Config.FlagSpeed = math.max(0.01, math.min(0.5, num))
-       end
-   end,
-})
-
-LegitTab:CreateParagraph({
-   Title = "Visual Legend",
-   Content = "💣 = Potential Mine\nNumbers = Revealed tiles\n? = Unknown/Safe candidate"
+MainTab:CreateParagraph({
+   Title = "Fixed Version",
+   Content = "✓ Teleport DI ATAS part\n✓ Freeze character\n✓ 0.0001s super speed\n✓ Input fields (no slider)\n✓ No notifications"
 })
 
 -- Set default values
 task.spawn(function()
     task.wait(1)
     pcall(function()
-        if TeleportSpeedInput and TeleportSpeedInput.Set then
-            TeleportSpeedInput:Set("0.0001")
-        end
-        if VisualRangeInput and VisualRangeInput.Set then
-            VisualRangeInput:Set("100")
-        end
-        if UpdateSpeedInput and UpdateSpeedInput.Set then
-            UpdateSpeedInput:Set("0.2")
-        end
-        if FlagSpeedInput and FlagSpeedInput.Set then
-            FlagSpeedInput:Set("0.05")
+        if SpeedInput and SpeedInput.Set then
+            SpeedInput:Set("0.0001")
         end
         if FlagRangeInput and FlagRangeInput.Set then
             FlagRangeInput:Set("25")
         end
     end)
 end)
-
--- Success message
-print("Minesweeper Solver Loaded - Rage Mode + Legit Visuals")
