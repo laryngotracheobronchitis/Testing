@@ -8,7 +8,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "goorner",
    LoadingTitle = "Auto Solver minesweeper",
-   LoadingSubtitle = "inspired by deadshizik and made by yar",
+   LoadingSubtitle = "inspired by deadshizik and made by who?",
    ConfigurationSaving = {
       Enabled = false
    },
