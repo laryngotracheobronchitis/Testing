@@ -1,6 +1,6 @@
 -- Manual One-Tap Cyber Freeze (REAL LAG SYSTEM)
 -- CYBER ICE THEME with FFlag Toggle & Bloxstrap
--- UI: Stealing Lag Switch | Drag: Blyat System (FIXED DRAG FOR MOBILE)
+-- DRAG SYSTEM: EXACT SAMA SEPERTI BLYAT (SIMPLE & WORKS!)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -51,55 +51,9 @@ IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 IceButton.BackgroundTransparency = 0.3
 IceButton.BorderSizePixel = 0
 IceButton.Active = true
+IceButton.Draggable = true  -- EXACT SEPERTI BLYAT - HANYA 2 BARIS INI!
 IceButton.Visible = true
 IceButton.Parent = ScreenGui
-
--- Variabel untuk drag (dukungan mouse dan touch untuk mobile)
-local canDrag = true  -- Default: draggable aktif
-local dragging = false
-local dragInput
-local dragStart
-local startPos
-
--- Fungsi update posisi
-local function updateInput(input)
-    local delta = input.Position - dragStart
-    IceButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
--- Koneksi untuk InputBegan (mouse dan touch)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if not canDrag or dragging then return end
-    
-    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-        local guiUnderMouse = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
-        if guiUnderMouse[1] and guiUnderMouse[1]:IsDescendantOf(IceButton) then
-            dragging = true
-            dragInput = input
-            dragStart = input.Position
-            startPos = IceButton.Position
-            
-            local connection
-            connection = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    connection:Disconnect()
-                end
-            end)
-        end
-    end
-end)
-
--- Koneksi untuk InputChanged (mouse movement dan touch movement)
-UserInputService.InputChanged:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input == dragInput and dragging then
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateInput(input)
-        end
-    end
-end)
 
 -- Settings Button
 local SettingsButton = Instance.new("TextButton")
@@ -470,7 +424,7 @@ SizeBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 SizeBoxBorder.Thickness = 1
 SizeBoxBorder.Parent = SizeTextBox
 
--- Drag Toggle Section (SEPERTI BLYAT)
+-- Drag Toggle Section (EXACT SEPERTI BLYAT!)
 local DragSection = Instance.new("Frame")
 DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -20, 0, 25)
@@ -501,7 +455,7 @@ DragButtonBorder.Color = Color3.fromRGB(0, 200, 255)
 DragButtonBorder.Thickness = 1
 DragButtonBorder.Parent = DragToggleButton
 
--- FFlag Toggle Section (BARU!)
+-- FFlag Toggle Section
 local FflagSection = Instance.new("Frame")
 FflagSection.Name = "FflagSection"
 FflagSection.Size = UDim2.new(1, -20, 0, 25)
@@ -666,10 +620,10 @@ SettingsButton.Activated:Connect(function()
     end
 end)
 
--- Drag Toggle Handler (EXACT SEPERTI BLYAT - LANGSUNG TOGGLE!)
+-- Drag Toggle Handler (EXACT SEPERTI BLYAT!)
 DragToggleButton.Activated:Connect(function()
-    canDrag = not canDrag
-    if canDrag then
+    IceButton.Draggable = not IceButton.Draggable
+    if IceButton.Draggable then
         DragToggleButton.Text = "Unlocked"
         DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
         DragButtonBorder.Color = Color3.fromRGB(0, 200, 255)
@@ -680,7 +634,7 @@ DragToggleButton.Activated:Connect(function()
     end
 end)
 
--- FFlag Toggle Handler (EXACT SEPERTI BLYAT - LANGSUNG AKTIF!)
+-- FFlag Toggle Handler (EXACT SEPERTI BLYAT!)
 FflagToggleButton.Activated:Connect(function()
     fflagEnabled = not fflagEnabled
     if fflagEnabled then
@@ -696,7 +650,7 @@ FflagToggleButton.Activated:Connect(function()
     end
 end)
 
--- Bloxstrap Button Handler (SEPERTI BLYAT - DENGAN LOADING TEXT!)
+-- Bloxstrap Button Handler
 BloxstrapButton.Activated:Connect(function()
     BloxstrapButton.Text = "LOADING..."
     BloxstrapButton.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
@@ -811,7 +765,7 @@ task.spawn(function()
     end
 end)
 
--- Freeze Function (SEPERTI BLYAT - LOADING TEXT!)
+-- Freeze Function
 local function PerformFreeze()
     if IsFreezing then return end
     if tick() - LastFreezeTime < Cooldown then return end
