@@ -1,6 +1,6 @@
 -- Manual One-Tap Cyber Freeze (REAL LAG SYSTEM)
 -- CYBER ICE THEME with FFlag Toggle & Bloxstrap
--- UI: Lag_switch__5_ | DRAG: EXACT SEPERTI BLYAT!
+-- UI: Stealing Lag Switch | Drag: Blyat System (FIXED DRAG - SEPERTI BLYAT!)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -59,14 +59,15 @@ task.spawn(function()
     creditGui:Destroy()
 end)
 
--- Create CYBER ICE THEME GUI (EXACT SEPERTI BLYAT!)
-local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+-- Create CYBER ICE THEME GUI
+local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LagSwitchUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
 
--- Main Cyber Ice Container (EXACT STRUKTUR SEPERTI BLYAT!)
-local IceButton = Instance.new("Frame", ScreenGui)
+-- Main Cyber Ice Container
+local IceButton = Instance.new("Frame")
 IceButton.Name = "IceButton"
 IceButton.Size = UDim2.new(0, 200, 0, 80)
 IceButton.Position = UDim2.new(0, 10, 0, 120)
@@ -74,35 +75,9 @@ IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 IceButton.BackgroundTransparency = 0.3
 IceButton.BorderSizePixel = 0
 IceButton.Active = true
-IceButton.Draggable = true  -- DRAG SYSTEM DARI BLYAT!
+IceButton.Draggable = true  -- Langsung pake Draggable property seperti blyat!
 IceButton.Visible = true
-Instance.new("UICorner", IceButton).CornerRadius = UDim.new(0, 6)  -- EXACT SEPERTI BLYAT!
-
--- Settings Button
-local SettingsButton = Instance.new("TextButton")
-SettingsButton.Name = "SettingsButton"
-SettingsButton.Size = UDim2.new(0, 25, 0, 25)
-SettingsButton.Position = UDim2.new(1, -30, 0, 5)
-SettingsButton.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
-SettingsButton.BackgroundTransparency = 0.2
-SettingsButton.Text = "⚙"
-SettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
-SettingsButton.TextSize = 14
-SettingsButton.Font = Enum.Font.GothamBold
-SettingsButton.BorderSizePixel = 0
-SettingsButton.ZIndex = 10
-SettingsButton.Parent = IceButton
-
-local SettingsBorder = Instance.new("UIStroke")
-SettingsBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-SettingsBorder.Color = Color3.fromRGB(0, 200, 255)
-SettingsBorder.Thickness = 2
-SettingsBorder.Transparency = 0.1
-SettingsBorder.Parent = SettingsButton
-
-local SettingsCorner = Instance.new("UICorner")
-SettingsCorner.CornerRadius = UDim.new(0, 4)
-SettingsCorner.Parent = SettingsButton
+IceButton.Parent = ScreenGui
 
 -- Cyber Ice Border
 local CyberBorder = Instance.new("UIStroke")
@@ -236,29 +211,31 @@ LeftGlow.Thickness = 3
 LeftGlow.Transparency = 0.3
 LeftGlow.Parent = LineLeft
 
--- Border Flow Animation Function
-local function AnimateBorderFlow()
-    local duration = 4
-    
-    task.spawn(function()
-        while IceButton and IceButton.Parent do
-            TweenService:Create(LineTop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 2)}):Play()
-            task.wait(duration)
-            TweenService:Create(LineRight, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 2, 1, 0)}):Play()
-            task.wait(duration)
-            TweenService:Create(LineBottom, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 2)}):Play()
-            task.wait(duration)
-            TweenService:Create(LineLeft, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 2, 1, 0)}):Play()
-            task.wait(duration)
-            
-            LineTop.Size = UDim2.new(0, 0, 0, 2)
-            LineRight.Size = UDim2.new(0, 2, 0, 0)
-            LineBottom.Size = UDim2.new(0, 0, 0, 2)
-            LineLeft.Size = UDim2.new(0, 2, 0, 0)
-            task.wait(0.5)
-        end
-    end)
-end
+-- Settings Button
+local SettingsButton = Instance.new("TextButton")
+SettingsButton.Name = "SettingsButton"
+SettingsButton.Size = UDim2.new(0, 25, 0, 25)
+SettingsButton.Position = UDim2.new(1, -30, 0, 5)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
+SettingsButton.BackgroundTransparency = 0.2
+SettingsButton.Text = "⚙"
+SettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
+SettingsButton.TextSize = 14
+SettingsButton.Font = Enum.Font.GothamBold
+SettingsButton.BorderSizePixel = 0
+SettingsButton.ZIndex = 10
+SettingsButton.Parent = IceButton
+
+local SettingsBorder = Instance.new("UIStroke")
+SettingsBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+SettingsBorder.Color = Color3.fromRGB(0, 200, 255)
+SettingsBorder.Thickness = 2
+SettingsBorder.Transparency = 0.1
+SettingsBorder.Parent = SettingsButton
+
+local SettingsCorner = Instance.new("UICorner")
+SettingsCorner.CornerRadius = UDim.new(0, 4)
+SettingsCorner.Parent = SettingsButton
 
 -- Text Elements (CENTERED)
 local ButtonText = Instance.new("TextLabel")
@@ -447,7 +424,7 @@ SizeBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 SizeBoxBorder.Thickness = 1
 SizeBoxBorder.Parent = SizeTextBox
 
--- Drag Toggle Section
+-- Drag Toggle Section (SEPERTI BLYAT - dengan teks "drag")
 local DragSection = Instance.new("Frame")
 DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -20, 0, 25)
@@ -460,10 +437,10 @@ local DragToggleButton = Instance.new("TextButton")
 DragToggleButton.Name = "DragToggleButton"
 DragToggleButton.Size = UDim2.new(1, 0, 1, 0)
 DragToggleButton.Position = UDim2.new(0, 0, 0, 0)
-DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
 DragToggleButton.BackgroundTransparency = 0.2
 DragToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-DragToggleButton.Text = "DRAG: ON"
+DragToggleButton.Text = "drag"  -- Diubah jadi "drag" bukan unlocked/locked
 DragToggleButton.TextSize = 11
 DragToggleButton.Font = Enum.Font.SciFi
 DragToggleButton.ZIndex = 22
@@ -562,6 +539,30 @@ ApplyButtonBorder.Color = Color3.fromRGB(0, 255, 255)
 ApplyButtonBorder.Thickness = 2
 ApplyButtonBorder.Parent = ApplyButton
 
+-- Border Flow Animation Function
+local function AnimateBorderFlow()
+    local duration = 4
+    
+    task.spawn(function()
+        while IceButton and IceButton.Parent do
+            TweenService:Create(LineTop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 2)}):Play()
+            task.wait(duration)
+            TweenService:Create(LineRight, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 2, 1, 0)}):Play()
+            task.wait(duration)
+            TweenService:Create(LineBottom, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 2)}):Play()
+            task.wait(duration)
+            TweenService:Create(LineLeft, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 2, 1, 0)}):Play()
+            task.wait(duration)
+            
+            LineTop.Size = UDim2.new(0, 0, 0, 2)
+            LineRight.Size = UDim2.new(0, 2, 0, 0)
+            LineBottom.Size = UDim2.new(0, 0, 0, 2)
+            LineLeft.Size = UDim2.new(0, 2, 0, 0)
+            task.wait(0.5)
+        end
+    end)
+end
+
 -- Boot-Up Animation
 local function PlayBootAnimation()
     for i = 1, 3 do
@@ -643,21 +644,22 @@ SettingsButton.Activated:Connect(function()
     end
 end)
 
--- Drag Toggle Handler (EXACT SEPERTI BLYAT!)
+-- Drag Toggle Handler (SEPERTI BLYAT - langsung toggle Draggable property!)
 DragToggleButton.Activated:Connect(function()
-    IceButton.Draggable = not IceButton.Draggable
+    IceButton.Draggable = not IceButton.Draggable  -- Langsung toggle Draggable property
+    
     if IceButton.Draggable then
-        DragToggleButton.Text = "DRAG: ON"
-        DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        DragToggleButton.Text = "drag"  -- Tetap "drag" meskipun aktif
+        DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
         DragButtonBorder.Color = Color3.fromRGB(0, 200, 255)
     else
-        DragToggleButton.Text = "DRAG: OFF"
+        DragToggleButton.Text = "drag"  -- Tetap "drag" meskipun non-aktif
         DragToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
         DragButtonBorder.Color = Color3.fromRGB(255, 100, 100)
     end
 end)
 
--- FFlag Toggle Handler (EXACT SEPERTI BLYAT!)
+-- FFlag Toggle Handler
 FflagToggleButton.Activated:Connect(function()
     fflagEnabled = not fflagEnabled
     if fflagEnabled then
