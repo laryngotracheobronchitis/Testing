@@ -1,6 +1,6 @@
 -- Manual One-Tap Cyber Freeze (REAL LAG SYSTEM)
 -- CYBER ICE THEME with FFlag Toggle & Bloxstrap
--- UI: Stealing Lag Switch | Drag: Blyat System (FIXED DRAG - SEPERTI BLYAT!)
+-- UI: Stealing Lag Switch | Drag: Blyat System (FIXED DRAG - MOBILE READY!)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -18,6 +18,7 @@ local LastFreezeTime = 0
 local IsFreezing = false
 local SettingsOpen = false
 local fflagEnabled = false
+local dragEnabled = true  -- Status drag aktif/non-aktif (ON/OFF)
 
 -- Store original text
 local originalMainText = "CYBER FREEZE"
@@ -75,9 +76,100 @@ IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 IceButton.BackgroundTransparency = 0.3
 IceButton.BorderSizePixel = 0
 IceButton.Active = true
-IceButton.Draggable = true  -- Langsung pake Draggable property seperti blyat!
 IceButton.Visible = true
 IceButton.Parent = ScreenGui
+
+-- Variabel untuk drag manual (khusus mobile)
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+local dragConnection
+
+-- Fungsi update posisi
+local function updateDragPosition(input)
+    local delta = input.Position - dragStart
+    IceButton.Position = UDim2.new(
+        startPos.X.Scale, 
+        startPos.X.Offset + delta.X, 
+        startPos.Y.Scale, 
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+-- Fungsi untuk memulai drag
+local function startDrag(input)
+    if not dragEnabled or dragging then return end
+    
+    -- Cek apakah yang disentuh/klik adalah bagian dari IceButton (bukan settings button)
+    local objects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+    local canDrag = false
+    
+    for _, obj in ipairs(objects) do
+        if obj:IsDescendantOf(IceButton) and obj ~= SettingsButton and obj ~= SettingsPanel then
+            canDrag = true
+            break
+        end
+    end
+    
+    if canDrag then
+        dragging = true
+        dragInput = input
+        dragStart = input.Position
+        startPos = IceButton.Position
+        
+        -- Untuk mobile touch
+        if input.UserInputType == Enum.UserInputType.Touch then
+            -- Koneksi untuk touch movement
+            dragConnection = UserInputService.TouchMoved:Connect(function(touchInput)
+                if touchInput == input and dragging then
+                    updateDragPosition(touchInput)
+                end
+            end)
+            
+            -- Koneksi untuk touch end
+            UserInputService.TouchEnded:Connect(function(touchInput)
+                if touchInput == input then
+                    dragging = false
+                    if dragConnection then
+                        dragConnection:Disconnect()
+                        dragConnection = nil
+                    end
+                end
+            end)
+        else
+            -- Untuk mouse
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end
+end
+
+-- Koneksi untuk InputBegan (mouse dan touch)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
+    end
+end)
+
+-- Untuk mouse movement (desktop)
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if dragging and input == dragInput then
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateDragPosition(input)
+        end
+    end
+end)
 
 -- Cyber Ice Border
 local CyberBorder = Instance.new("UIStroke")
@@ -424,7 +516,7 @@ SizeBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 SizeBoxBorder.Thickness = 1
 SizeBoxBorder.Parent = SizeTextBox
 
--- Drag Toggle Section (SEPERTI BLYAT - dengan teks "drag")
+-- Drag Toggle Section (DRAG ON/OFF)
 local DragSection = Instance.new("Frame")
 DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -20, 0, 25)
@@ -437,10 +529,10 @@ local DragToggleButton = Instance.new("TextButton")
 DragToggleButton.Name = "DragToggleButton"
 DragToggleButton.Size = UDim2.new(1, 0, 1, 0)
 DragToggleButton.Position = UDim2.new(0, 0, 0, 0)
-DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 100)  -- Hijau untuk ON
 DragToggleButton.BackgroundTransparency = 0.2
 DragToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-DragToggleButton.Text = "drag"  -- Diubah jadi "drag" bukan unlocked/locked
+DragToggleButton.Text = "DRAG ON"  -- Default ON
 DragToggleButton.TextSize = 11
 DragToggleButton.Font = Enum.Font.SciFi
 DragToggleButton.ZIndex = 22
@@ -451,7 +543,7 @@ DragButtonCorner.CornerRadius = UDim.new(0, 4)
 DragButtonCorner.Parent = DragToggleButton
 
 local DragButtonBorder = Instance.new("UIStroke")
-DragButtonBorder.Color = Color3.fromRGB(0, 200, 255)
+DragButtonBorder.Color = Color3.fromRGB(0, 255, 200)
 DragButtonBorder.Thickness = 1
 DragButtonBorder.Parent = DragToggleButton
 
@@ -644,17 +736,17 @@ SettingsButton.Activated:Connect(function()
     end
 end)
 
--- Drag Toggle Handler (SEPERTI BLYAT - langsung toggle Draggable property!)
+-- Drag Toggle Handler (DRAG ON/OFF)
 DragToggleButton.Activated:Connect(function()
-    IceButton.Draggable = not IceButton.Draggable  -- Langsung toggle Draggable property
+    dragEnabled = not dragEnabled  -- Toggle status drag
     
-    if IceButton.Draggable then
-        DragToggleButton.Text = "drag"  -- Tetap "drag" meskipun aktif
-        DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-        DragButtonBorder.Color = Color3.fromRGB(0, 200, 255)
+    if dragEnabled then
+        DragToggleButton.Text = "DRAG ON"
+        DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 100)  -- Hijau
+        DragButtonBorder.Color = Color3.fromRGB(0, 255, 200)
     else
-        DragToggleButton.Text = "drag"  -- Tetap "drag" meskipun non-aktif
-        DragToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+        DragToggleButton.Text = "DRAG OFF"
+        DragToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)  -- Merah
         DragButtonBorder.Color = Color3.fromRGB(255, 100, 100)
     end
 end)
