@@ -1,62 +1,40 @@
-if getgenv().DaraHubExecuted then
+if getgenv().MM2HubExecuted then
  return
 end
-getgenv().DaraHubExecuted = true
---[[-------------------------------------------------------
- CONTROLLING THE UI EXAMPLE 
------------------------------------------------------------
+getgenv().MM2HubExecuted = true
+-- MM2Hub - Murder Mystery 2 Script
 
- _G.DarahubLibBtn.{Flag}.Visible = true
- _G.DarahubLibBtn.{Flag}:Set(true)
- _G.DarahubLibBtn.{Flag}:Destroy()
- _G.DarahubLibBtn.{Flag}:Destroy()
+
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+WindUI.TransparencyValue = 0.2
+WindUI:SetTheme("Dark")
+local Window = WindUI:CreateWindow({
+ NewElements = true,
+ Title = "MM2Hub | Murder Mystery 2",
+ Icon = "rbxassetid://137330250139083",
+  Folder = "MM2Hub",
+ Size = UDim2.fromOffset(580, 490),
+ Theme = "Dark",
+ HidePanelBackground = false,
+ Acrylic = false,
+ HideSearchBar = false,
+ SideBarWidth = 200,
+ OpenButton = {
+Enabled = false,
+Scale = 0
+ },
  
- 
- 
--- 1. Create a Button that starts INVISIBLE
-ButtonLib.Create:Button({
- Text = "SECRET BUTTON",
- Visible = false, -- Starts hidden
- Callback = function() print("You found me!") end
-}).Position = UDim2.new(0.5, -125, 0.2, 0)
-
--- 2. Create a Toggle
-ButtonLib.Create:Toggle({
- Text = "AUTO CARRY",
- Default = false,
- Visible = true,
- Callback = function(s) print("Carry is:", s) end
-}).Position = UDim2.new(0.5, -125, 0.4, 0)
-
-]]
-
-local ButtonLib = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Button-lib.lua"))()
-
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-
--- FluentUI handles transparency differently
--- WindUI.TransparencyValue = 0.2
--- WindUI:SetTheme("Dark")
-local Window = Fluent:CreateWindow({
-    Title = "Dara Hub | Murder Mystery 2",
-    SubTitle = "Made by: Pnsdg And Yomka",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = false,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
 })
--- Window:Tag({
- Title = "V1.1.1",
- Color = Color3.fromHex("#30ff6a")
-})
+pcall(updateWindowOpenState)
+Window:SetIconSize(48)
 executor = identifyexecutor()
 if type(executor) == "table" then
  for key, value in pairs(executor) do
 print(key .. ": " .. tostring(value))
  end
 elseif type(executor) == "string" then
- -- Window:Tag({
+ Window:Tag({
 Title = "" .. executor
  })
 else
@@ -119,46 +97,38 @@ return Color3.new(1,1,1)
  end
 end
 
--- Fluent uses tabs directly
+FeatureSection = Window:Section({ Title = "Features", Opened = true })
 
 Tabs = {
- Main = Window:AddTab({ Title = "Main", Icon = "layout-grid" }),
- Player = Window:AddTab({ Title = "Player", Icon = "user" }),
- Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
- Visuals = Window:AddTab({ Title = "Visuals", Icon = "camera" }),
- Esp = Window:AddTab({ Title = "Esp", Icon = "eye" }),
- Teleport = Window:AddTab({ Title = "Teleport", Icon = "navigation" }),
- Misc = Window:AddTab({ Title = "Misc", Icon = "star" }),
- Utility = Window:AddTab({ Title = "Utility", Icon = "wrench" }),
- Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
- info = Window:AddTab({ Title = "Info", Icon = "info" }),
- Others = Window:AddTab({ Title = "Others", Icon = "https://em-content.zobj.net/source/apple/419/pile-of-poo_1f4a9.png" })
+ Main = FeatureSection:Tab({ Title = "Main", Icon = "layout-grid" }),
+ Player = FeatureSection:Tab({ Title = "Player", Icon = "user" }),
+ Combat = FeatureSection:Tab({ Title = "Combat", Icon = "swords" }),
+ Visuals = FeatureSection:Tab({ Title = "Visuals", Icon = "camera" }),
+ Esp = FeatureSection:Tab({ Title = "Esp", Icon = "eye" }),
+ Teleport = FeatureSection:Tab({ Title = "Teleport", Icon = "navigation" }),
+ Misc = FeatureSection:Tab({ Title = "Misc", Icon = "star" }),
+ Utility = FeatureSection:Tab({ Title = "Utility", Icon = "wrench" }),
+ Settings = FeatureSection:Tab({ Title = "Settings", Icon = "settings" })
  
 }
-local socialsModule = loadstring(game:HttpGet("https://darahub.pages.dev/Module/info.lua"))()
 
-socialsModule(Tabs)
-local UniverseServerTools = loadstring(game:HttpGet("https://darahub.pages.dev/Module/UniverseServerTools.lua"))()
-
-UniverseServerTools(Tabs)
-
--- Window:OnOpen(function()
-game:GetService("CoreGui").Darahub.FloatingButton_Darahub.Visible = false
+Window:OnOpen(function()
+game:GetService("CoreGui").MM2Hub.FloatingButton_MM2Hub.Visible = false
 end)
--- Window:OnClose(function()
-    game:GetService("CoreGui").Darahub.FloatingButton_Darahub.Visible = true
+Window:OnClose(function()
+    game:GetService("CoreGui").MM2Hub.FloatingButton_MM2Hub.Visible = true
 end)
--- Window:OnDestroy(function()
-    game:GetService("CoreGui").Darahub.FloatingButton_Darahub:Destroy()
+Window:OnDestroy(function()
+    game:GetService("CoreGui").MM2Hub.FloatingButton_MM2Hub:Destroy()
 end)
-playerCountParagraph = Tabs.Main:AddParagraph({
+playerCountParagraph = Tabs.Main:Paragraph({
  Title = "Player Count",
- Description = "Waiting..."
+ Desc = "Waiting..."
 })
 
-ModelPlayerAntiBrokenServer = Tabs.Main:AddParagraph({
+ModelPlayerAntiBrokenServer = Tabs.Main:Paragraph({
  Title = "Player Model Server Status",
- Description = "Waiting..."
+ Desc = "Waiting..."
 })
 
 playerModelCheckConnection = RunService.Heartbeat:Connect(function()
@@ -172,16 +142,16 @@ playerModelCheckConnection = RunService.Heartbeat:Connect(function()
  end
  end
  
- playerCountParagraph:SetContent(playerCount .. " Online | Player Models Found: " .. modelCount)
+ playerCountParagraph:SetDesc(playerCount .. " Online | Player Models Found: " .. modelCount)
  
  if playerCount == modelCount and playerCount > 0 then
- ModelPlayerAntiBrokenServer:SetContent("Player Model Is Correct Definitely Playable")
+ ModelPlayerAntiBrokenServer:SetDesc("Player Model Is Correct Definitely Playable")
  else
- ModelPlayerAntiBrokenServer:SetContent("Unplayable Server Detected! Missing Player Model, Find a new server")
+ ModelPlayerAntiBrokenServer:SetDesc("Unplayable Server Detected! Missing Player Model, Find a new server")
  end
 end)
--- Tabs.Player:Section({ Title = "Player", TextSize = 40 })
--- Tabs.Player:Divider()
+Tabs.Player:Section({ Title = "Player", TextSize = 40 })
+Tabs.Player:Divider()
 
 character = nil
 humanoid = nil
@@ -212,17 +182,19 @@ player.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
  end
 end)
 
-InfiniteJumpToggle = Tabs.Player:AddToggle("InfiniteJumpToggle", {
+InfiniteJumpToggle = Tabs.Player:Toggle({
  Title = "Infinite Jump",
- Default = featureStates.InfiniteJump,
+Flag = "InfiniteJumpToggle",
+ Value = featureStates.InfiniteJump,
  Callback = function(state)
 featureStates.InfiniteJump = state
  end
 })
--- Tabs.Player:Space()
-SpeedToggle = Tabs.Player:AddToggle("SpeedToggle", {
+Tabs.Player:Space()
+SpeedToggle = Tabs.Player:Toggle({
  Title = "Speed Hack",
- Default = featureStates.SpeedHack,
+Flag = "SpeedToggle",
+ Value = featureStates.SpeedHack,
  Callback = function(state)
 featureStates.SpeedHack = state
 if state and humanoid then
@@ -233,10 +205,11 @@ end
  end
 })
 
-SpeedSlider = Tabs.Player:AddSlider("SpeedSlider", {
+SpeedSlider = Tabs.Player:Slider({
  Title = "Speed Value",
- Description = "Adjust walk speed",
- Default = { Min = 16, Max = 200, Default = featureStates.SpeedValue, Step = 1 },
+Flag = "SpeedSlider",
+ Desc = "Adjust walk speed",
+ Value = { Min = 16, Max = 200, Default = featureStates.SpeedValue, Step = 1 },
  Callback = function(value)
 featureStates.SpeedValue = value
 if featureStates.SpeedHack and humanoid then
@@ -277,10 +250,11 @@ end
  end
 end
 
--- Tabs.Player:Space()
-NoclipToggle = Tabs.Player:AddToggle("NoclipToggle", {
+Tabs.Player:Space()
+NoclipToggle = Tabs.Player:Toggle({
  Title = "Noclip",
- Default = featureStates.Noclip,
+Flag = "NoclipToggle",
+ Value = featureStates.Noclip,
  Callback = function(state)
 featureStates.Noclip = state
 if state then
@@ -348,10 +322,11 @@ direction = direction - Vector3.new(0, 1, 0)
  bodyGyro.CFrame = cameraCFrame
 end
 
--- Tabs.Player:Space()
-FlyToggle = Tabs.Player:AddToggle("FlyToggle", {
+Tabs.Player:Space()
+FlyToggle = Tabs.Player:Toggle({
  Title = "Fly",
- Default = featureStates.Fly,
+Flag = "FlyToggle",
+ Value = featureStates.Fly,
  Callback = function(state)
 featureStates.Fly = state
 if state then
@@ -367,11 +342,12 @@ end
  end
 })
 
--- Tabs.Player:Space()
-FlySpeedSlider = Tabs.Player:AddSlider("FlySpeedSlider", {
+Tabs.Player:Space()
+FlySpeedSlider = Tabs.Player:Slider({
  Title = "Fly Speed",
- Default = { Min = 1, Max = 200, Default = featureStates.FlySpeed, Step = 1 },
- Description = "Adjust fly speed",
+Flag = "FlySpeedSlider",
+ Value = { Min = 1, Max = 200, Default = featureStates.FlySpeed, Step = 1 },
+ Desc = "Adjust fly speed",
  Callback = function(value)
 featureStates.FlySpeed = value
  end
@@ -449,11 +425,12 @@ godModeConnection = nil
  end
 end
 
--- Tabs.Player:Space()
-GodModeToggle = Tabs.Player:AddToggle("GodModeToggle", {
+Tabs.Player:Space()
+GodModeToggle = Tabs.Player:Toggle({
  Title = "God Mode",
- Description = "Become invincible",
- Default = false,
+Flag = "GodModeToggle",
+ Desc = "Become invincible",
+ Value = false,
  Callback = function(state)
 godModeEnabled = state
 if state then
@@ -465,11 +442,12 @@ end
  end
 })
 
--- Tabs.Player:Space()
-GodModeMethodDropdown = Tabs.Player:AddDropdown("GodModeMethodDropdown", {
+Tabs.Player:Space()
+GodModeMethodDropdown = Tabs.Player:Dropdown({
  Title = "God Mode Method",
+Flag = "GodModeMethodDropdown",
  Values = {"Health Math.huge", "Humanoid Replacement (Very buggy)"},
- Default = "Health Math.huge",
+ Value = "Health Math.huge",
  MenuWidth = 400,
  Callback = function(value)
 godModeMethod = value
@@ -523,10 +501,11 @@ rootPart.CanCollide = false
  end
 end
 
--- Tabs.Player:Space()
-TPWALKToggle = Tabs.Player:AddToggle("TPWALKToggle", {
+Tabs.Player:Space()
+TPWALKToggle = Tabs.Player:Toggle({
  Title = "TP WALK",
- Default = featureStates.TPWALK,
+Flag = "TPWALKToggle",
+ Value = featureStates.TPWALK,
  Callback = function(state)
 featureStates.TPWALK = state
 if state then
@@ -537,10 +516,11 @@ end
  end
 })
 
-TPWALKSlider = Tabs.Player:AddSlider("TPWALKSlider", {
+TPWALKSlider = Tabs.Player:Slider({
  Title = "TPWALK VALUE",
- Description = "Adjust TPWALK speed",
- Default = { Min = 1, Max = 200, Default = featureStates.TpwalkValue, Step = 1 },
+Flag = "TPWALKSlider",
+ Desc = "Adjust TPWALK speed",
+ Value = { Min = 1, Max = 200, Default = featureStates.TpwalkValue, Step = 1 },
  Callback = function(value)
 featureStates.TpwalkValue = value
  end
@@ -583,10 +563,11 @@ humanoid.JumpHeight = 50
  end
 end
 
--- Tabs.Player:Space()
-JumpBoostToggle = Tabs.Player:AddToggle("JumpBoostToggle", {
+Tabs.Player:Space()
+JumpBoostToggle = Tabs.Player:Toggle({
  Title = "Jump Height",
- Default = featureStates.JumpBoost,
+Flag = "JumpBoostToggle",
+ Value = featureStates.JumpBoost,
  Callback = function(state)
 featureStates.JumpBoost = state
 if state then
@@ -597,10 +578,11 @@ end
  end
 })
 
-JumpBoostSlider = Tabs.Player:AddSlider("JumpBoostSlider", {
+JumpBoostSlider = Tabs.Player:Slider({
  Title = "Jump Power",
- Description = "Adjust jump height",
- Default = { Min = 1, Max = 200, Default = featureStates.JumpPower, Step = 1 },
+Flag = "JumpBoostSlider",
+ Desc = "Adjust jump height",
+ Value = { Min = 1, Max = 200, Default = featureStates.JumpPower, Step = 1 },
  Callback = function(value)
 featureStates.JumpPower = value
 if featureStates.JumpBoost then
@@ -612,18 +594,18 @@ end
  end
 })
 
--- Tabs.Player:Space()
-Tabs.Player:AddButton({
+Tabs.Player:Space()
+Tabs.Player:Button({
  Title = "Walk on Walls (must reset to stop)",
  Callback = function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/refs/heads/main/qwerty21.lua"))()
+print("Feature disabled - external dependency removed")
  end
 })
--- Tabs.Player:Space()
+Tabs.Player:Space()
 Tabs.Player:Toggle({
  Title = "Fake dead (lays)",
  Compact = true,
- Default = false,
+ Value = false,
  Callback = function(v)
 local char = game.Players.LocalPlayer.Character
 if not char then return end
@@ -1086,11 +1068,12 @@ LocalPlayer.CharacterAdded:Connect(function()
     handleCharacterRespawn()
 end)
 
--- Tabs.Combat:Section({ Title = "Aimbot Settings" })
+Tabs.Combat:Section({ Title = "Aimbot Settings" })
 
-AimbotToggle = Tabs.Combat:AddToggle("AimbotToggle", {
+AimbotToggle = Tabs.Combat:Toggle({
     Title = "Aimbot",
-    Default = false,
+    Flag = "AimbotToggle",
+    Value = false,
     Callback = function(state)
         AimbotEnabled = state
         if state then
@@ -1101,21 +1084,23 @@ AimbotToggle = Tabs.Combat:AddToggle("AimbotToggle", {
     end
 })
 
-AimPartDropdown = Tabs.Combat:AddDropdown("AimPartDropdown", {
+AimPartDropdown = Tabs.Combat:Dropdown({
     Title = "Aim Part",
-    Description = "Select which part to aim at",
+    Flag = "AimPartDropdown",
+    Desc = "Select which part to aim at",
     Values = { "Head", "Body", "Legs" },
-    Default = "Head",
+    Value = "Head",
     Callback = function(value)
         aimPart = value
     end
 })
 
-TargetFilterDropdown = Tabs.Combat:AddDropdown("TargetFilterDropdown", {
+TargetFilterDropdown = Tabs.Combat:Dropdown({
     Title = "Target Filter",
-    Description = "Select roles to target (none = everyone)",
+    Flag = "TargetFilterDropdown",
+    Desc = "Select roles to target (none = everyone)",
     Values = { "Murderers", "Sheriff", "Innocents" },
-    Default = {},
+    Value = {},
     Multi = true,
     AllowNone = true,
     Callback = function(values)
@@ -1123,56 +1108,62 @@ TargetFilterDropdown = Tabs.Combat:AddDropdown("TargetFilterDropdown", {
     end
 })
 
-SmoothnessSlider = Tabs.Combat:AddSlider("SmoothnessSlider", {
+SmoothnessSlider = Tabs.Combat:Slider({
     Title = "Smoothness",
-    Description = "Higher = smoother aim, Lower = snappier aim",
-    Default = { Min = 1, Max = 20, Default = 10, Step = 1 },
+    Flag = "SmoothnessSlider",
+    Desc = "Higher = smoother aim, Lower = snappier aim",
+    Value = { Min = 1, Max = 20, Default = 10, Step = 1 },
     Callback = function(value)
         smoothnessValue = value
     end
 })
 
-WallCheckToggle = Tabs.Combat:AddToggle("WallCheckToggle", {
+WallCheckToggle = Tabs.Combat:Toggle({
     Title = "Wall Check",
-    Default = false,
+    Flag = "WallCheckToggle",
+    Value = false,
     Callback = function(state)
         wallCheckEnabled = state
     end
 })
 
--- Tabs.Combat:Section({ Title = "FOV Settings" })
+Tabs.Combat:Section({ Title = "FOV Settings" })
 
-ShowFOVToggle = Tabs.Combat:AddToggle("ShowFOVToggle", {
+ShowFOVToggle = Tabs.Combat:Toggle({
     Title = "Show FOV Circle",
-    Default = false,
+    Flag = "ShowFOVToggle",
+    Value = false,
     Callback = function(state)
         ShowFOV = state
         updateFOVCircle()
     end
 })
 
-LockFOVToggle = Tabs.Combat:AddToggle("LockFOVToggle", {
+LockFOVToggle = Tabs.Combat:Toggle({
     Title = "Lock FOV On Middle Screen",
-    Default = true,
+    Flag = "LockFOVToggle",
+    Value = true,
     Callback = function(state)
         lockFOVToCenter = state
         updateFOVCircle()
     end
 })
 
-FOVRadiusSlider = Tabs.Combat:AddSlider("FOVRadiusSlider", {
+FOVRadiusSlider = Tabs.Combat:Slider({
     Title = "FOV Radius",
-    Description = "Size of the targeting area",
-    Default = { Min = 10, Max = 500, Default = 100, Step = 5 },
+    Flag = "FOVRadiusSlider",
+    Desc = "Size of the targeting area",
+    Value = { Min = 10, Max = 500, Default = 100, Step = 5 },
     Callback = function(value)
         fovRadius = value
         updateFOVCircle()
     end
 })
 
-FOVColorPicker = Tabs.Combat:AddColorpicker("FOVColorPicker", {
+FOVColorPicker = Tabs.Combat:Colorpicker({
     Title = "FOV Color",
-    Description = "FOV Circle Color",
+    Flag = "FOVColorPicker",
+    Desc = "FOV Circle Color",
     Default = Color3.fromRGB(0, 255, 0),
     Locked = false,
     Callback = function(color)
@@ -1181,17 +1172,18 @@ FOVColorPicker = Tabs.Combat:AddColorpicker("FOVColorPicker", {
     end
 })
 
-FOVThicknessSlider = Tabs.Combat:AddSlider("FOVThicknessSlider", {
+FOVThicknessSlider = Tabs.Combat:Slider({
     Title = "FOV Thickness",
-    Description = "Thickness of the FOV circle",
-    Default = { Min = 1, Max = 10, Default = 2, Step = 1 },
+    Flag = "FOVThicknessSlider",
+    Desc = "Thickness of the FOV circle",
+    Value = { Min = 1, Max = 10, Default = 2, Step = 1 },
     Callback = function(value)
         FOVThickness = value
         updateFOVCircle()
     end
 })
--- Tabs.Combat:Section({ Title = "Gun Combat", TextSize = 20 })
--- Tabs.Combat:Divider()
+Tabs.Combat:Section({ Title = "Gun Combat", TextSize = 20 })
+Tabs.Combat:Divider()
 local shotType = "Default"
 local autoShootEnabled = false
 local shootOffset = 0
@@ -1285,7 +1277,7 @@ end
 
 Tabs.Combat:Toggle({
  Title = "Auto Shoot Murderer",
- Default = false,
+ Value = false,
  Callback = function(state)
 autoShootEnabled = state
 if state then
@@ -1297,7 +1289,7 @@ end
 Tabs.Combat:Input({
  Title = "Shoot Position Offset",
  Placeholder = "0",
- Default = "0",
+ Value = "0",
  Callback = function(text)
 shootOffset = tonumber(text) or 0
  end
@@ -1306,13 +1298,13 @@ shootOffset = tonumber(text) or 0
 Tabs.Combat:Input({
  Title = "Offset-to-Ping Multiplier",
  Placeholder = "0",
- Default = "0",
+ Value = "0",
  Callback = function(text)
 pingMultiplier = tonumber(text) or 1
  end
 })
 
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
  Title = "Shoot Murderer",
  Callback = function()
 ShootMurderer()
@@ -1320,7 +1312,7 @@ ShootMurderer()
 })
 Tabs.Combat:Keybind({
  Title = "Shoot Murderer Keybind",
- Default = "E",
+ Value = "E",
  Callback = function(key)
 local keyCode = Enum.KeyCode[key]
 if keyCode then
@@ -1340,24 +1332,19 @@ connection:Disconnect()
 end
  end
 })
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
     Title = "Toggle Shoot Button",
-    Description = "Show/Hide Shoot button",
+    Desc = "Show/Hide Shoot button",
     Callback = function()
-        if _G.DarahubLibBtn and _G.DarahubLibBtn.SheriffBtn then
-            local currentVisibility = _G.DarahubLibBtn.SheriffBtn.Visible
-            _G.DarahubLibBtn.SheriffBtn.Visible = not currentVisibility
+        if _G.MM2HubLibBtn and _G.MM2HubLibBtn.SheriffBtn then
+            local currentVisibility = _G.MM2HubLibBtn.SheriffBtn.Visible
+            _G.MM2HubLibBtn.SheriffBtn.Visible = not currentVisibility
             
         else
             warn("Shoot button not found!")
         end
     end
 })
-ButtonLib.Create:Button({
- Text = "Shoot Murder",
- Visible = false,
- Callback = function() ShootMurderer() end
-}).Position = UDim2.new(0.5, -125, 0.2, 0)
 local murderTpEnabled = false
 local murderTpConnection = nil
 local tpOffset = Vector3.new(0, 15, 0)
@@ -1427,7 +1414,7 @@ end
 Tabs.Combat:Input({
  Title = "TP Offset (X Y Z)",
  Placeholder = "0 15 0",
- Default = "0 15 0",
+ Value = "0 15 0",
  Callback = function(text)
 tpOffset = parseOffsetInput(text)
  end
@@ -1435,7 +1422,7 @@ tpOffset = parseOffsetInput(text)
 
 Tabs.Combat:Toggle({
  Title = "Murder CFrame TP",
- Default = false,
+ Value = false,
  Callback = function(state)
 murderTpEnabled = state
 if state then
@@ -1489,7 +1476,7 @@ if (data.Role == "Murderer") then
 end
  end
  if (not murderer or not murderer.Character) then
-Fluent:Notify({Title = "Gun System", Content = "Murderer not found!", Icon = "x-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "Murderer not found!", Icon = "x-circle", Duration = 3})
 return false
  end
  local targetRoot = murderer.Character:FindFirstChild("HumanoidRootPart")
@@ -1500,7 +1487,7 @@ task.wait(0.1)
  end
  local gun = player.Character:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Gun")
  if not gun then
-Fluent:Notify({Title = "Gun System", Content = "No gun found!", Icon = "x-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "No gun found!", Icon = "x-circle", Duration = 3})
 return false
  end
  local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart")
@@ -1510,7 +1497,7 @@ return false
  local args = {[1] = 1, [2] = targetPart.Position, [3] = "AH2"}
  if (gun:FindFirstChild("KnifeLocal") and gun.KnifeLocal:FindFirstChild("CreateBeam")) then
 gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
-Fluent:Notify({Title = "Gun System", Content = "Successfully shot the murderer!", Icon = "check-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "Successfully shot the murderer!", Icon = "check-circle", Duration = 3})
 return true
  end
  return false
@@ -1530,7 +1517,7 @@ end
 
 local function collectAllGunDrops()
  if hasKnife() then
-Fluent:Notify({Title = "Gun System", Content = "You already have a knife!", Icon = "x-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "You already have a knife!", Icon = "x-circle", Duration = 3})
 return
  end
  
@@ -1538,7 +1525,7 @@ return
  ScanForGunDrops()
  
  if #GunSystem.ActiveGunDrops == 0 then
-Fluent:Notify({Title = "Gun System", Content = "No guns available on the map", Icon = "x-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "No guns available on the map", Icon = "x-circle", Duration = 3})
 return
  end
  
@@ -1551,12 +1538,12 @@ if gunDrop and gunDrop.Parent then
 end
  end
  
- Fluent:Notify({Title = "Gun System", Content = "Successfully collected all guns!", Icon = "check-circle", Duration = 3})
+ WindUI:Notify({Title = "Gun System", Content = "Successfully collected all guns!", Icon = "check-circle", Duration = 3})
 end
 
 local function ManualGrab()
  if hasKnife() then
-Fluent:Notify({Title = "Gun System", Content = "You already have a knife!", Icon = "x-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "You already have a knife!", Icon = "x-circle", Duration = 3})
 return false
  end
  
@@ -1565,7 +1552,7 @@ collectAllGunDrops()
  elseif GunSystem.Mode == "Grab & shoot murderer" then
 ScanForGunDrops()
 if (#GunSystem.ActiveGunDrops == 0) then
- Fluent:Notify({Title = "Gun System", Content = "No guns available on the map", Icon = "x-circle", Duration = 3})
+ WindUI:Notify({Title = "Gun System", Content = "No guns available on the map", Icon = "x-circle", Duration = 3})
  return false
 end
 
@@ -1591,7 +1578,7 @@ if (nearestGun and player.Character) then
  local prompt = nearestGun:FindFirstChildOfClass("ProximityPrompt")
  if prompt then
 fireproximityprompt(prompt)
-Fluent:Notify({Title = "Gun System", Content = "Successfully grabbed the gun!", Icon = "check-circle", Duration = 3})
+WindUI:Notify({Title = "Gun System", Content = "Successfully grabbed the gun!", Icon = "check-circle", Duration = 3})
 
 task.wait(0.5)
 ShootMurderer()
@@ -1692,7 +1679,7 @@ if otherPlayer ~= player then
  character.ChildAdded:Connect(function(child)
 if child.Name == "Gun" and GunSystem.NotifyGun then
  if not notifiedGunPickups[otherPlayer.Name] then
- Fluent:Notify({
+ WindUI:Notify({
 Title = "Gun System", 
 Content = otherPlayer.Name .. " took the gun!", 
 Icon = "alert-circle", 
@@ -1708,7 +1695,7 @@ end
  otherPlayer.Character.ChildAdded:Connect(function(child)
 if child.Name == "Gun" and GunSystem.NotifyGun then
  if not notifiedGunPickups[otherPlayer.Name] then
- Fluent:Notify({
+ WindUI:Notify({
 Title = "Gun System", 
 Content = otherPlayer.Name .. " took the gun!", 
 Icon = "alert-circle", 
@@ -1725,7 +1712,7 @@ end
  workspace.DescendantAdded:Connect(function(child)
 if child.Name == "GunDrop" and child:IsA("BasePart") and GunSystem.NotifyGun then
  if not notifiedGunSpawns[child] then
- Fluent:Notify({
+ WindUI:Notify({
 Title = "Gun System", 
 Content = "A gun has spawned!", 
 Icon = "target", 
@@ -1756,7 +1743,7 @@ end)
 
 Tabs.Combat:Toggle({
  Title = "Auto Grab Gun",
- Default = false,
+ Value = false,
  Callback = function(state)
 GunSystem.AutoGrabEnabled = state
 if state then
@@ -1765,7 +1752,7 @@ end
  end
 })
 
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
  Title = "Manual Grab Gun",
  Callback = function()
 ManualGrab()
@@ -1775,7 +1762,7 @@ ManualGrab()
 Tabs.Combat:Dropdown({
  Title = "Auto Grab Mode",
  Values = {"Grab only", "Grab & shoot murderer"},
- Default = "Grab only",
+ Value = "Grab only",
  Callback = function(value)
 GunSystem.Mode = value
  end
@@ -1783,7 +1770,7 @@ GunSystem.Mode = value
 
 Tabs.Combat:Toggle({
  Title = "Notify Gun",
- Default = false,
+ Value = false,
  Callback = function(state)
 GunSystem.NotifyGun = state
  end
@@ -1800,8 +1787,8 @@ coroutine.wrap(AutoGrabGun)()
  monitorGunEvents()
  resetGunNotifications()
 end)
--- Tabs.Combat:Section({ Title = "Knife Combat", TextSize = 20 })
--- Tabs.Combat:Divider()
+Tabs.Combat:Section({ Title = "Knife Combat", TextSize = 20 })
+Tabs.Combat:Divider()
 
 KnifeCombat = {
  killMode = "Kill Aura",
@@ -1986,12 +1973,12 @@ KnifeCombat.throwKnifeConnection = nil
  end
 end
 
--- Tabs.Combat:Section({ Title = "Thrown Knife", TextSize = 16 })
+Tabs.Combat:Section({ Title = "Thrown Knife", TextSize = 16 })
 
 Tabs.Combat:Toggle({
  Title = "Auto Throw Knife",
- Description = "Automatically throw knife at nearby players",
- Default = false,
+ Desc = "Automatically throw knife at nearby players",
+ Value = false,
  Callback = function(state)
 KnifeCombat.autoThrowKnife = state
 if state then
@@ -2006,9 +1993,9 @@ end
  end
 })
 
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
  Title = "Manual Throw Knife",
- Description = "Throw knife at nearest player",
+ Desc = "Throw knife at nearest player",
  Icon = "target",
  Callback = function()
 if KnifeCombat.findMurderer() == player then
@@ -2016,28 +2003,19 @@ if KnifeCombat.findMurderer() == player then
 end
  end
 })
-ButtonLib.Create:Button({
- Text = "THROW KNIFE",
- Visible = false,
- Callback = function()
-if KnifeCombat.findMurderer() == player then
- KnifeCombat.throwKnife()
-end
- end
-}).Position = UDim2.new(0.5, -125, 0.3, 0)
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
  Title = "Toggle Throw Knife Button",
- Description = "Show/Hide throw knife button",
+ Desc = "Show/Hide throw knife button",
  Callback = function()
-if _G.DarahubLibBtn and _G.DarahubLibBtn.ThrowKnifeBtn then
- _G.DarahubLibBtn.ThrowKnifeBtn.Visible = not _G.DarahubLibBtn.ThrowKnifeBtn.Visible
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.ThrowKnifeBtn then
+ _G.MM2HubLibBtn.ThrowKnifeBtn.Visible = not _G.MM2HubLibBtn.ThrowKnifeBtn.Visible
 end
  end
 })
 Tabs.Combat:Keybind({
  Title = "Throw Knife Keybind",
- Description = "Keybind to throw knife",
- Default = "T",
+ Desc = "Keybind to throw knife",
+ Value = "T",
  Callback = function(key)
 local keyCode = Enum.KeyCode[key]
 if keyCode then
@@ -2063,7 +2041,7 @@ end
 Tabs.Combat:Dropdown({
  Title = "Wall Check For Thrown Knife",
  Values = {"Manual Throw Knife", "Auto Throw Knife"},
- Default = {},
+ Value = {},
  Multi = true,
  AllowNone = true,
  Callback = function(values)
@@ -2283,10 +2261,11 @@ KnifeCombat.killConnection = nil
  end
  KnifeCombat.unanchorPlayers()
 end
--- Tabs.Combat:Section({ Title = "Auto Kill", TextSize = 16 })
-AutoKillToggle = Tabs.Combat:AddToggle("AutoKillToggle", {
+Tabs.Combat:Section({ Title = "Auto Kill", TextSize = 16 })
+AutoKillToggle = Tabs.Combat:Toggle({
  Title = "Auto Kill",
- Default = false,
+ Flag = "AutoKillToggle",
+ Value = false,
  Callback = function(state)
 KnifeCombat.autoKillEnabled = state
 if state then
@@ -2297,29 +2276,32 @@ end
  end
 })
 
-AutoEquipKnifeToggle = Tabs.Combat:AddToggle("AutoEquipKnifeToggle", {
+AutoEquipKnifeToggle = Tabs.Combat:Toggle({
  Title = "Auto Equip Knife",
- Default = false,
+ Flag = "AutoEquipKnifeToggle",
+ Value = false,
  Callback = function(state)
 KnifeCombat.autoEquipKnife = state
 KnifeCombat.originalEquipState = state
  end
 })
 
-KillModeDropdown = Tabs.Combat:AddDropdown("KillModeDropdown", {
+KillModeDropdown = Tabs.Combat:Dropdown({
  Title = "Kill Mode",
+ Flag = "KillModeDropdown",
  Values = {"Kill Aura", "Kill Nearby", "Kill All"},
- Default = "Kill Aura",
+ Value = "Kill Aura",
  Callback = function(value)
 KnifeCombat.killMode = value
 KnifeCombat.unanchorPlayers()
  end
 })
 
-KillAuraSlider = Tabs.Combat:AddSlider("KillAuraSlider", {
+KillAuraSlider = Tabs.Combat:Slider({
  Title = "Knife Kill Aura Rage",
- Description = "Adjust kill aura radius",
- Default = { Min = 1, Max = 200, Default = 10, Step = 1 },
+ Flag = "KillAuraSlider",
+ Desc = "Adjust kill aura radius",
+ Value = { Min = 1, Max = 200, Default = 10, Step = 1 },
  Callback = function(value)
 KnifeCombat.killAuraRadius = tonumber(value)
 if KnifeCombat.auraCircle then
@@ -2328,18 +2310,19 @@ end
  end
 })
 
-ShowAuraToggle = Tabs.Combat:AddToggle("ShowAuraToggle", {
+ShowAuraToggle = Tabs.Combat:Toggle({
  Title = "Show Aura Circle",
- Default = false,
+ Flag = "ShowAuraToggle",
+ Value = false,
  Callback = function(state)
 KnifeCombat.showAuraCircle = state
 KnifeCombat.createAuraCircle()
  end
 })
 
-Tabs.Combat:AddButton({
+Tabs.Combat:Button({
  Title = "Kill All",
- Description = "Teleport and kill all players",
+ Desc = "Teleport and kill all players",
  Icon = "target",
  Callback = function()
 if KnifeCombat.findMurderer() ~= player then return end
@@ -2372,15 +2355,16 @@ if (knife and knife:FindFirstChild("Stab")) then
 end
  end
 })
--- Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
- -- Tabs.Visuals:Divider()
+Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
+ Tabs.Visuals:Divider()
  local cameraStretchConnection
 local function setupCameraStretch()
  cameraStretchConnection = nil
  local stretchHorizontal = 0.80
  local stretchVertical = 0.80
- CameraStretchToggle = Tabs.Visuals:AddToggle("CameraStretchToggle", {
+ CameraStretchToggle = Tabs.Visuals:Toggle({
 Title = "Camera Stretch",
+Flag = "CameraStretchToggle",
 Value = false,
 Callback = function(state)
  if state then
@@ -2398,8 +2382,9 @@ cameraStretchConnection = nil
 end
  })
 
- CameraStretchHorizontalInput = Tabs.Visuals:AddInput("CameraStretchHorizontalInput", {
+ CameraStretchHorizontalInput = Tabs.Visuals:Input({
 Title = "Camera Stretch Horizontal",
+Flag = "CameraStretchHorizontalInput",
 Placeholder = "0.80",
 Numeric = true,
 Value = tostring(stretchHorizontal),
@@ -2418,8 +2403,9 @@ end)
 end
  })
 
- CameraStretchVerticalInput = Tabs.Visuals:AddInput("CameraStretchVerticalInput", {
+ CameraStretchVerticalInput = Tabs.Visuals:Input({
 Title = "Camera Stretch Vertical",
+Flag = "CameraStretchVerticalInput",
 Placeholder = "0.80",
 Numeric = true,
 Value = tostring(stretchVertical),
@@ -2438,11 +2424,12 @@ end)
 end
  })
 end
--- Tabs.Visuals:Space()
-	 FullBrightToggle = Tabs.Visuals:AddToggle("FullBrightToggle", {
+Tabs.Visuals:Space()
+	 FullBrightToggle = Tabs.Visuals:Toggle({
  Title = "Full Bright",
- Description = "Ya Like drinking Night Vision while mining in da cave and sceard of creeper blow you up dawg?",
- Default = false,
+Flag = "FullBrightToggle",
+ Desc = "Ya Like drinking Night Vision while mining in da cave and sceard of creeper blow you up dawg?",
+ Value = false,
  Callback = function(state)
 featureStates.FullBright = state
 if state then
@@ -2513,10 +2500,11 @@ else
 end
  end
 })
--- Tabs.Visuals:Space()
-FOVSlider = Tabs.Visuals:AddSlider("FOVSlider", {
+Tabs.Visuals:Space()
+FOVSlider = Tabs.Visuals:Slider({
  Title = "Field of View",
- Default = { Min = 1, Max = 120, Default = originalFOV, Step = 1 },
+Flag = "FOVSlider",
+ Value = { Min = 1, Max = 120, Default = originalFOV, Step = 1 },
  Callback = function(value)
 workspace.CurrentCamera.FieldOfView = tonumber(value)
  end
@@ -2875,11 +2863,12 @@ roundTimerLabel = nil
  currentVictoryPlayer = nil
 end
 
--- Tabs.Visuals:Space()
-RoundTimerToggle = Tabs.Visuals:AddToggle("RoundTimerToggle", {
+Tabs.Visuals:Space()
+RoundTimerToggle = Tabs.Visuals:Toggle({
  Title = "Round Timer Display",
- Description = "Show round timer in top middle of screen",
- Default = false,
+ Flag = "RoundTimerToggle",
+ Desc = "Show round timer in top middle of screen",
+ Value = false,
  Callback = function(state)
 roundTimerEnabled = state
 if state then
@@ -2896,7 +2885,7 @@ stopRoundTimer()
  end
 end)
 
--- Tabs.Visuals:Space()
+Tabs.Visuals:Space()
 setupCameraStretch()
 innocentEspElements = {}
 murderEspElements = {}
@@ -3649,7 +3638,7 @@ end
 end)
 local xRay = false
 
--- Tabs.Visuals:Space()
+Tabs.Visuals:Space()
 Tabs.Visuals:Toggle({
  Title = "X-ray Vision",
  Compact = true,
@@ -3663,14 +3652,14 @@ end
  end
 })
 Footsteps_Removed = false
--- Tabs.Visuals:Space()
-Tabs.Visuals:AddButton({
+Tabs.Visuals:Space()
+Tabs.Visuals:Button({
 Title = "Remove Footsteps",
 Callback = function()
 Footsteps_Removed = true while wait() do if Footsteps_Removed then if workspace:FindFirstChild("Footsteps") then workspace.Footsteps:Destroy() end end end end
 })
--- Tabs.Visuals:Space()
-Tabs.Visuals:AddButton({
+Tabs.Visuals:Space()
+Tabs.Visuals:Button({
  Title = "Shit Render", 
  Callback = function()
 Lighting = game:GetService("Lighting")
@@ -3730,18 +3719,18 @@ end
 local WeaponOwnedRange = { min = 1, max = 100000 }
 
 
--- Tabs.Visuals:Section({ Title = "Weapon Visuals", Description = "" })
+Tabs.Visuals:Section({ Title = "Weapon Visuals", Desc = "" })
 
 Tabs.Visuals:Paragraph({
  Title = "VISUAL WARNING",
- Description = "ALL items are in fact visual and not real you do not get to keep any of the items after rejoining the game they are only for show and do not actually exist ",
+ Desc = "ALL items are in fact visual and not real you do not get to keep any of the items after rejoining the game they are only for show and do not actually exist ",
  Image = "eye"
 })
 
 
 Tabs.Visuals:Slider({
  Title = "Min",
- Default = {Min = 1, Max = 100000, Default = 1},
+ Value = {Min = 1, Max = 100000, Default = 1},
  Compact = true,
  Callback = function(value) WeaponOwnedRange.min = value end
 })
@@ -3749,13 +3738,13 @@ Tabs.Visuals:Slider({
 
 Tabs.Visuals:Slider({
  Title = "Max",
- Default = {Min = 1, Max = 100000, Default = 150},
+ Value = {Min = 1, Max = 100000, Default = 150},
  Compact = true,
  Callback = function(value) WeaponOwnedRange.max = value end
 })
 
 
-Tabs.Visuals:AddButton({
+Tabs.Visuals:Button({
  Title = "spawn random Godlys (if they don’t spawn reset ",
  Compact = true,
  Callback = function()
@@ -3768,12 +3757,12 @@ end
 game:GetService("RunService"):BindToRenderStep("InventoryUpdate", 0, function()
  PlayerData.Weapons.Owned = newOwned
 end)
-Fluent:Notify({ Title = "Visuals Enabled", Content = "Fake counts activated!", Duration = 2 })
+WindUI:Notify({ Title = "Visuals Enabled", Content = "Fake counts activated!", Duration = 2 })
  end
 })
 
 
--- Tabs.Visuals:Section({ Title = "Item Spawner", Description = "" })
+Tabs.Visuals:Section({ Title = "Item Spawner", Desc = "" })
 
 
 Tabs.Visuals:Input({
@@ -3783,15 +3772,15 @@ Tabs.Visuals:Input({
  Callback = function(inputText)
 if inputText and inputText ~= "" then
  spawnWeapon(inputText)
- Fluent:Notify({ Title = "Weapon Spawned", Content = inputText.." added!", Duration = 2 })
+ WindUI:Notify({ Title = "Weapon Spawned", Content = inputText.." added!", Duration = 2 })
 end
  end
 })
--- Tabs.Visuals:Section({ Title = "weapon dupe ", Description = "" })
+Tabs.Visuals:Section({ Title = "weapon dupe ", Desc = "" })
 
 
 
--- Tabs.Visuals:Section({ Title = "Duplication Options", Description = "Select amount to duplicate by and choose a specific item to duplicate." })
+Tabs.Visuals:Section({ Title = "Duplication Options", Desc = "Select amount to duplicate by and choose a specific item to duplicate." })
 
 Tabs.Visuals:Input({
  Title = "Duplication Multiplier",
@@ -3801,9 +3790,9 @@ Tabs.Visuals:Input({
 local multiplier = tonumber(inputText)
 if multiplier and multiplier > 0 then
  _G.DupeMultiplier = multiplier
- Fluent:Notify({ Title = "Multiplier Set", Content = "Duplication multiplier set to x" .. multiplier, Duration = 2 })
+ WindUI:Notify({ Title = "Multiplier Set", Content = "Duplication multiplier set to x" .. multiplier, Duration = 2 })
 else
- Fluent:Notify({ Title = "Invalid Multiplier", Content = "Please enter a valid multiplier (greater than 0).", Duration = 2 })
+ WindUI:Notify({ Title = "Invalid Multiplier", Content = "Please enter a valid multiplier (greater than 0).", Duration = 2 })
 end
  end
 })
@@ -3814,11 +3803,11 @@ Tabs.Visuals:Input({
  Compact = true,
  Callback = function(inputText)
 _G.DupeSpecificItem = inputText
-Fluent:Notify({ Title = "Item Set", Content = "Specific item set to duplicate: " .. inputText, Duration = 2 })
+WindUI:Notify({ Title = "Item Set", Content = "Specific item set to duplicate: " .. inputText, Duration = 2 })
  end
 })
 
-Tabs.Visuals:AddButton({
+Tabs.Visuals:Button({
  Title = "Duplicate Inventory",
  Compact = true,
  Callback = function()
@@ -3873,59 +3862,65 @@ end
 
 VisualDupe()
 
-Fluent:Notify({ Title = "Inventory Visual Duplication", Content = "Your inventory has been visually duplicated!", Duration = 2 })
+WindUI:Notify({ Title = "Inventory Visual Duplication", Content = "Your inventory has been visually duplicated!", Duration = 2 })
  end
 })
--- Tabs.Esp:Section({ Title = "Innocent ESP" })
+Tabs.Esp:Section({ Title = "Innocent ESP" })
 
-InnocentNameESPToggle = Tabs.Esp:AddToggle("InnocentNameESPToggle", {
+InnocentNameESPToggle = Tabs.Esp:Toggle({
  Title = "Innocent Name ESP",
- Default = false,
+Flag = "InnocentNameESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.InnocentESP.names = state
 managePlayerESPConnection()
  end
 })
 
-InnocentBoxESPToggle = Tabs.Esp:AddToggle("InnocentBoxESPToggle", {
+InnocentBoxESPToggle = Tabs.Esp:Toggle({
  Title = "Innocent Box ESP",
- Default = false,
+Flag = "InnocentBoxESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.InnocentESP.boxes = state
 managePlayerESPConnection()
  end
 })
 
-InnocentBoxTypeDropdown = Tabs.Esp:AddDropdown("InnocentBoxTypeDropdown", {
+InnocentBoxTypeDropdown = Tabs.Esp:Dropdown({
  Title = "Innocent Box Type",
+Flag = "InnocentBoxTypeDropdown",
  Values = {"2D", "3D"},
- Default = "2D",
+ Value = "2D",
  Callback = function(value)
 featureStates.InnocentESP.boxType = value
  end
 })
 
-InnocentTracerToggle = Tabs.Esp:AddToggle("InnocentTracerToggle", {
+InnocentTracerToggle = Tabs.Esp:Toggle({
  Title = "Innocent Tracer",
- Default = false,
+Flag = "InnocentTracerToggle",
+ Value = false,
  Callback = function(state)
 featureStates.InnocentESP.tracers = state
 managePlayerESPConnection()
  end
 })
 
-InnocentDistanceESPToggle = Tabs.Esp:AddToggle("InnocentDistanceESPToggle", {
+InnocentDistanceESPToggle = Tabs.Esp:Toggle({
  Title = "Innocent Distance ESP",
- Default = false,
+Flag = "InnocentDistanceESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.InnocentESP.distance = state
 managePlayerESPConnection()
  end
 })
 
-InnocentHighlightsToggle = Tabs.Esp:AddToggle("InnocentHighlightsToggle", {
+InnocentHighlightsToggle = Tabs.Esp:Toggle({
  Title = "Innocent Highlights",
- Default = false,
+Flag = "InnocentHighlightsToggle",
+ Value = false,
  Callback = function(state)
 featureStates.InnocentHighlights = state
 manageHighlightsConnection()
@@ -3933,56 +3928,62 @@ refreshHighlights()
  end
 })
 
--- Tabs.Esp:Section({ Title = "Murder ESP" })
+Tabs.Esp:Section({ Title = "Murder ESP" })
 
-MurderNameESPToggle = Tabs.Esp:AddToggle("MurderNameESPToggle", {
+MurderNameESPToggle = Tabs.Esp:Toggle({
  Title = "Murder Name ESP",
- Default = false,
+Flag = "MurderNameESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.MurderESP.names = state
 managePlayerESPConnection()
  end
 })
 
-MurderBoxESPToggle = Tabs.Esp:AddToggle("MurderBoxESPToggle", {
+MurderBoxESPToggle = Tabs.Esp:Toggle({
  Title = "Murder Box ESP",
- Default = false,
+Flag = "MurderBoxESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.MurderESP.boxes = state
 managePlayerESPConnection()
  end
 })
 
-MurderBoxTypeDropdown = Tabs.Esp:AddDropdown("MurderBoxTypeDropdown", {
+MurderBoxTypeDropdown = Tabs.Esp:Dropdown({
  Title = "Murder Box Type",
+Flag = "MurderBoxTypeDropdown",
  Values = {"2D", "3D"},
- Default = "2D",
+ Value = "2D",
  Callback = function(value)
 featureStates.MurderESP.boxType = value
  end
 })
 
-MurderTracerToggle = Tabs.Esp:AddToggle("MurderTracerToggle", {
+MurderTracerToggle = Tabs.Esp:Toggle({
  Title = "Murder Tracer",
- Default = false,
+Flag = "MurderTracerToggle",
+ Value = false,
  Callback = function(state)
 featureStates.MurderESP.tracers = state
 managePlayerESPConnection()
  end
 })
 
-MurderDistanceESPToggle = Tabs.Esp:AddToggle("MurderDistanceESPToggle", {
+MurderDistanceESPToggle = Tabs.Esp:Toggle({
  Title = "Murder Distance ESP",
- Default = false,
+Flag = "MurderDistanceESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.MurderESP.distance = state
 managePlayerESPConnection()
  end
 })
 
-MurderHighlightsToggle = Tabs.Esp:AddToggle("MurderHighlightsToggle", {
+MurderHighlightsToggle = Tabs.Esp:Toggle({
  Title = "Murder Highlights",
- Default = false,
+Flag = "MurderHighlightsToggle",
+ Value = false,
  Callback = function(state)
 featureStates.MurderHighlights = state
 manageHighlightsConnection()
@@ -3990,168 +3991,186 @@ refreshHighlights()
  end
 })
 
--- Tabs.Esp:Section({ Title = "Hero/Sheriff ESP" })
+Tabs.Esp:Section({ Title = "Hero/Sheriff ESP" })
 
-HeroSheriffNameESPToggle = Tabs.Esp:AddToggle("HeroSheriffNameESPToggle", {
+HeroSheriffNameESPToggle = Tabs.Esp:Toggle({
  Title = "Hero/Sheriff Name ESP",
- Default = false,
+Flag = "HeroSheriffNameESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.HeroSheriffESP.names = state
 managePlayerESPConnection()
  end
 })
 
-HeroSheriffBoxESPToggle = Tabs.Esp:AddToggle("HeroSheriffBoxESPToggle", {
+HeroSheriffBoxESPToggle = Tabs.Esp:Toggle({
  Title = "Hero/Sheriff Box ESP",
- Default = false,
+Flag = "HeroSheriffBoxESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.HeroSheriffESP.boxes = state
 managePlayerESPConnection()
  end
 })
 
-HeroSheriffBoxTypeDropdown = Tabs.Esp:AddDropdown("HeroSheriffBoxTypeDropdown", {
+HeroSheriffBoxTypeDropdown = Tabs.Esp:Dropdown({
  Title = "Hero/Sheriff Box Type",
+Flag = "HeroSheriffBoxTypeDropdown",
  Values = {"2D", "3D"},
- Default = "2D",
+ Value = "2D",
  Callback = function(value)
 featureStates.HeroSheriffESP.boxType = value
  end
 })
 
-HeroSheriffTracerToggle = Tabs.Esp:AddToggle("HeroSheriffTracerToggle", {
+HeroSheriffTracerToggle = Tabs.Esp:Toggle({
  Title = "Hero/Sheriff Tracer",
- Default = false,
+Flag = "HeroSheriffTracerToggle",
+ Value = false,
  Callback = function(state)
 featureStates.HeroSheriffESP.tracers = state
 managePlayerESPConnection()
  end
 })
 
-HeroSheriffDistanceESPToggle = Tabs.Esp:AddToggle("HeroSheriffDistanceESPToggle", {
+HeroSheriffDistanceESPToggle = Tabs.Esp:Toggle({
  Title = "Hero/Sheriff Distance ESP",
- Default = false,
+Flag = "HeroSheriffDistanceESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.HeroSheriffESP.distance = state
 managePlayerESPConnection()
  end
 })
 
-SheriffHeroHighlightsToggle = Tabs.Esp:AddToggle("SheriffHeroHighlightsToggle", {
+SheriffHeroHighlightsToggle = Tabs.Esp:Toggle({
  Title = "Sheriff/Hero Highlights",
- Default = false,
+Flag = "SheriffHeroHighlightsToggle",
+ Value = false,
  Callback = function(state)
 featureStates.SheriffHeroHighlights = state
 manageHighlightsConnection()
 refreshHighlights()
  end
 })
--- Tabs.Esp:Section({ Title = "Gun ESP" })
+Tabs.Esp:Section({ Title = "Gun ESP" })
 
-GunNameESPToggle = Tabs.Esp:AddToggle("GunNameESPToggle", {
+GunNameESPToggle = Tabs.Esp:Toggle({
  Title = "Gun ESP",
- Default = false,
+Flag = "GunNameESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.GunESP.names = state
 manageGunESPConnection()
  end
 })
 
-GunBoxESPToggle = Tabs.Esp:AddToggle("GunBoxESPToggle", {
+GunBoxESPToggle = Tabs.Esp:Toggle({
  Title = "Gun Box ESP",
- Default = false,
+Flag = "GunBoxESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.GunESP.boxes = state
 manageGunESPConnection()
  end
 })
 
-GunBoxTypeDropdown = Tabs.Esp:AddDropdown("GunBoxTypeDropdown", {
+GunBoxTypeDropdown = Tabs.Esp:Dropdown({
  Title = "Gun Box Type",
+Flag = "GunBoxTypeDropdown",
  Values = {"2D", "3D"},
- Default = "3D",
+ Value = "3D",
  Callback = function(value)
 featureStates.GunESP.boxType = value
  end
 })
 
-GunTracerToggle = Tabs.Esp:AddToggle("GunTracerToggle", {
+GunTracerToggle = Tabs.Esp:Toggle({
  Title = "Gun Tracer",
- Default = false,
+Flag = "GunTracerToggle",
+ Value = false,
  Callback = function(state)
 featureStates.GunESP.tracers = state
 manageGunESPConnection()
  end
 })
 
-GunDistanceESPToggle = Tabs.Esp:AddToggle("GunDistanceESPToggle", {
+GunDistanceESPToggle = Tabs.Esp:Toggle({
  Title = "Gun Distance ESP",
- Default = false,
+Flag = "GunDistanceESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.GunESP.distance = state
 manageGunESPConnection()
  end
 })
 
-GunHighlightsToggle = Tabs.Esp:AddToggle("GunHighlightsToggle", {
+GunHighlightsToggle = Tabs.Esp:Toggle({
  Title = "Gun Highlights",
- Default = false,
+Flag = "GunHighlightsToggle",
+ Value = false,
  Callback = function(state)
 featureStates.GunHighlights = state
 manageHighlightsConnection()
 refreshHighlights()
  end
 })
--- Tabs.Esp:Section({ Title = "Coin ESP" })
+Tabs.Esp:Section({ Title = "Coin ESP" })
 
-CoinNameESPToggle = Tabs.Esp:AddToggle("CoinNameESPToggle", {
+CoinNameESPToggle = Tabs.Esp:Toggle({
  Title = "Coin ESP",
- Default = false,
+Flag = "CoinNameESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.CoinESP.names = state
 manageCoinESPConnection()
  end
 })
 
-CoinBoxESPToggle = Tabs.Esp:AddToggle("CoinBoxESPToggle", {
+CoinBoxESPToggle = Tabs.Esp:Toggle({
  Title = "Coin Box ESP",
- Default = false,
+Flag = "CoinBoxESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.CoinESP.boxes = state
 manageCoinESPConnection()
  end
 })
 
-CoinBoxTypeDropdown = Tabs.Esp:AddDropdown("CoinBoxTypeDropdown", {
+CoinBoxTypeDropdown = Tabs.Esp:Dropdown({
  Title = "Coin Box Type",
+Flag = "CoinBoxTypeDropdown",
  Values = {"2D", "3D"},
- Default = "3D",
+ Value = "3D",
  Callback = function(value)
 featureStates.CoinESP.boxType = value
  end
 })
 
-CoinTracerToggle = Tabs.Esp:AddToggle("CoinTracerToggle", {
+CoinTracerToggle = Tabs.Esp:Toggle({
  Title = "Coin Tracer",
- Default = false,
+Flag = "CoinTracerToggle",
+ Value = false,
  Callback = function(state)
 featureStates.CoinESP.tracers = state
 manageCoinESPConnection()
  end
 })
 
-CoinDistanceESPToggle = Tabs.Esp:AddToggle("CoinDistanceESPToggle", {
+CoinDistanceESPToggle = Tabs.Esp:Toggle({
  Title = "Coin Distance ESP",
- Default = false,
+Flag = "CoinDistanceESPToggle",
+ Value = false,
  Callback = function(state)
 featureStates.CoinESP.distance = state
 manageCoinESPConnection()
  end
 })
 
-CoinHighlightsToggle = Tabs.Esp:AddToggle("CoinHighlightsToggle", {
+CoinHighlightsToggle = Tabs.Esp:Toggle({
  Title = "Coin Highlights",
- Default = false,
+Flag = "CoinHighlightsToggle",
+ Value = false,
  Callback = function(state)
 featureStates.CoinHighlights = state
 manageHighlightsConnection()
@@ -4161,8 +4180,8 @@ refreshHighlights()
 
 
 
--- Tabs.Teleport:Section({ Title = "Teleport", TextSize = 20 })
--- Tabs.Teleport:Divider()
+Tabs.Teleport:Section({ Title = "Teleport", TextSize = 20 })
+Tabs.Teleport:Divider()
 
 function GetPlayerList()
  local playerList = {"Select a player"}
@@ -4174,10 +4193,11 @@ end
  return playerList
 end
 
-TeleportPlayerDropdown = Tabs.Teleport:AddDropdown("TeleportPlayerDropdown", {
+TeleportPlayerDropdown = Tabs.Teleport:Dropdown({
  Title = "Select Player",
+Flag = "TeleportPlayerDropdown",
  Values = GetPlayerList(),
- Default = "Select a player",
+ Value = "Select a player",
  Callback = function(value)
 selectedPlayerName = value
  end
@@ -4186,10 +4206,10 @@ selectedPlayerName = value
 function UpdatePlayerList()
  TeleportPlayerDropdown:Refresh(GetPlayerList(), "Select a player")
 end
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Player",
- Description = "Teleport to the selected player",
+ Desc = "Teleport to the selected player",
  Icon = "user",
  Callback = function()
 if selectedPlayerName and selectedPlayerName ~= "Select a player" then
@@ -4205,10 +4225,10 @@ end
 })
 
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Random Player",
- Description = "Teleport to a random player in the server",
+ Desc = "Teleport to a random player in the server",
  Icon = "users",
  Callback = function()
 otherPlayers = {}
@@ -4336,10 +4356,10 @@ return
  humanoidRootPart.CFrame = randomSpawn.CFrame + Vector3.new(0, 3, 0)
 end
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Innocent",
- Description = "Teleport to a random innocent player",
+ Desc = "Teleport to a random innocent player",
  Icon = "user",
  Callback = function()
 murderer = FindMurderer()
@@ -4365,8 +4385,8 @@ end
  end
 })
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Murderer",
  Icon = "user-x",
  Callback = function()
@@ -4380,8 +4400,8 @@ end
 })
 
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Sheriff",
  Icon = "user-check",
  Callback = function()
@@ -4396,9 +4416,9 @@ end
 
 
 
--- Tabs.Teleport:Space()
+Tabs.Teleport:Space()
 
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Button({
  Title = "Teleport to Dropped Gun",
  Icon = "target",
  Callback = function()
@@ -4410,8 +4430,8 @@ if gun and gun:IsA("Part") then
 end
  end
 })
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Coin",
  Icon = "dollar-sign",
  Callback = function()
@@ -4420,8 +4440,8 @@ TeleportToCoin()
 })
 
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Map",
  Icon = "map",
  Callback = function()
@@ -4430,8 +4450,8 @@ TeleportToMap()
 })
 
 
--- Tabs.Teleport:Space()
-Tabs.Teleport:AddButton({
+Tabs.Teleport:Space()
+Tabs.Teleport:Button({
  Title = "Teleport to Lobby",
  Icon = "home",
  Callback = function()
@@ -4453,8 +4473,8 @@ player.CharacterAdded:Connect(function(newCharacter)
  rootPart = character:WaitForChild("HumanoidRootPart", 5)
 end)
 
--- Tabs.Misc:Section({ Title = "Misc", TextSize = 40 })
--- Tabs.Misc:Divider()
+Tabs.Misc:Section({ Title = "Misc", TextSize = 40 })
+Tabs.Misc:Divider()
 
 AntiAFKConnection = nil
 
@@ -4473,9 +4493,10 @@ AntiAFKConnection = nil
  end
 end
 
-AntiAFKToggle = Tabs.Misc:AddToggle("AntiAFKToggle", {
+AntiAFKToggle = Tabs.Misc:Toggle({
  Title = "Anti AFK",
- Default = featureStates.AntiAFK,
+Flag = "AntiAFKToggle",
+ Value = featureStates.AntiAFK,
  Callback = function(state)
 featureStates.AntiAFK = state
 if state then
@@ -4485,8 +4506,8 @@ else
 end
  end
 })
--- Tabs.Misc:Section({ Title = "Auto Farm", TextSize = 20 })
--- Tabs.Misc:Divider()
+Tabs.Misc:Section({ Title = "Auto Farm", TextSize = 20 })
+Tabs.Misc:Divider()
 
 local AutoFarm = {
  Enabled = false,
@@ -4623,7 +4644,7 @@ end
 
 Tabs.Misc:Toggle({
  Title = "Enable AutoFarm",
- Default = false,
+ Value = false,
  Callback = function(state)
 AutoFarm.Enabled = state
 if state then
@@ -4638,7 +4659,7 @@ end
 Tabs.Misc:Dropdown({
  Title = "Movement Mode",
  Values = {"Teleport", "Smooth", "Walk"},
- Default = "Teleport",
+ Value = "Teleport",
  Callback = function(mode)
 AutoFarm.Mode = mode
  end
@@ -4646,7 +4667,7 @@ AutoFarm.Mode = mode
 
 Tabs.Misc:Slider({
  Title = "Teleport Delay (sec)",
- Default = {Min = 0, Max = 1, Default = 0, Step = 0.1},
+ Value = {Min = 0, Max = 1, Default = 0, Step = 0.1},
  Callback = function(value)
 AutoFarm.TeleportDelay = value
  end
@@ -4654,7 +4675,7 @@ AutoFarm.TeleportDelay = value
 
 Tabs.Misc:Slider({
  Title = "Smooth Move Speed",
- Default = {Min = 20, Max = 200, Default = 50},
+ Value = {Min = 20, Max = 200, Default = 50},
  Callback = function(value)
 AutoFarm.MoveSpeed = value
  end
@@ -4663,7 +4684,7 @@ AutoFarm.MoveSpeed = value
 Tabs.Misc:Slider({
  Title = "Check Interval (sec)",
  Step = 0.1,
- Default = {Min = 0.1, Max = 2, Default = 0.5},
+ Value = {Min = 0.1, Max = 2, Default = 0.5},
  Callback = function(value)
 AutoFarm.CoinCheckInterval = value
  end
@@ -4704,9 +4725,10 @@ ExpFarmConnection = nil
  end
 end
 
-ExpFarmToggle = Tabs.Misc:AddToggle("ExpFarmToggle", {
+ExpFarmToggle = Tabs.Misc:Toggle({
  Title = "Exp Farm",
- Default = false,
+Flag = "ExpFarmToggle",
+ Value = false,
  Callback = function(state)
 ExpFarm = state
 if state then
@@ -4754,8 +4776,8 @@ end
  return nil, nil
 end
 
--- Tabs.Misc:Section({ Title = "Role Revealer", TextSize = 20 })
--- Tabs.Misc:Divider()
+Tabs.Misc:Section({ Title = "Role Revealer", TextSize = 20 })
+Tabs.Misc:Divider()
 
 local function findMurderer()
  for _, plr in ipairs(Players:GetPlayers()) do
@@ -4790,9 +4812,9 @@ end
  return nil
 end
 
-Tabs.Misc:AddButton({
+Tabs.Misc:Button({
  Title = "Reveal Murderer",
- Description = "Reveal murderer in chat",
+ Desc = "Reveal murderer in chat",
  Icon = "user-x",
  Callback = function()
 local textchannels = game:GetService("TextChatService"):WaitForChild("TextChannels"):GetChildren()
@@ -4800,19 +4822,19 @@ for _, textchannel in ipairs(textchannels) do
  if textchannel.Name == "RBXSystem" then continue end
  local murd = findMurderer()
  if murd then
- local message = string.format("%s Is Murderer | Script Used: Dara Hub", murd.Name)
+ local message = string.format("%s Is Murderer | Script Used: MM2Hub", murd.Name)
  textchannel:SendAsync(message)
  else
- local message = "No Murderer Found | Script Used: Dara Hub"
+ local message = "No Murderer Found | Script Used: MM2Hub"
  textchannel:SendAsync(message)
  end
 end
  end
 })
 
-Tabs.Misc:AddButton({
+Tabs.Misc:Button({
  Title = "Reveal Sheriff/Hero",
- Description = "Reveal sheriff or hero in chat",
+ Desc = "Reveal sheriff or hero in chat",
  Icon = "user-check",
  Callback = function()
 local textchannels = game:GetService("TextChatService"):WaitForChild("TextChannels"):GetChildren()
@@ -4821,30 +4843,29 @@ for _, textchannel in ipairs(textchannels) do
  local sher = findSheriff()
  local hero = findHero()
  if sher then 
- local message = string.format("%s Is Sheriff | Script Used: Dara Hub", sher.Name)
+ local message = string.format("%s Is Sheriff | Script Used: MM2Hub", sher.Name)
  textchannel:SendAsync(message)
  elseif hero then
- local message = string.format("%s Is Hero | Script Used: Dara Hub", hero.Name)
+ local message = string.format("%s Is Hero | Script Used: MM2Hub", hero.Name)
  textchannel:SendAsync(message)
  else
- local message = "No Sheriff/Hero Found | Script Used: Dara Hub"
+ local message = "No Sheriff/Hero Found | Script Used: MM2Hub"
  textchannel:SendAsync(message)
  end
 end
  end
 })
-Tabs.Misc:AddButton({
+Tabs.Misc:Button({
  Title = "Trade Helper",
  Compact = true,
  Callback = function()
-loadstring(game:HttpGet("https://pastebin.com/raw/8LDyigix"))()
-Fluent:Notify({ Title = "Trade Helper", Content = "Script loaded!", Duration = 3 })
+WindUI:Notify({ Title = "Trade Helper", Content = "Feature disabled - external dependency removed", Duration = 3 })
  end
 })
--- Tabs.Utility:Space()
-Tabs.Utility:AddButton({
+Tabs.Utility:Space()
+Tabs.Utility:Button({
  Title = "Unlock all emote and toy",
- Description = "The toy is useless so don't mind it if it's not working",
+ Desc = "The toy is useless so don't mind it if it's not working",
  Callback = function()
  -- MM2 All Emotes Unlocker (2025) Script
 --[[ ((Don't use this if you hate overlapping bug
@@ -5172,7 +5193,7 @@ end)
 })
 local emoteInputValue = ""
 
--- Tabs.Utility:Space()
+Tabs.Utility:Space()
 Tabs.Utility:Input({
  Title = "Emote Name",
  Placeholder = "Enter emote name",
@@ -5181,7 +5202,7 @@ emoteInputValue = emoteName
  end
 })
 
-Tabs.Utility:AddButton({
+Tabs.Utility:Button({
  Title = "Play Emote By Name",
  Callback = function()
 if emoteInputValue and emoteInputValue ~= "" then
@@ -5237,10 +5258,11 @@ end
  end
 end
 
--- Tabs.Utility:Space()
-TouchFlingToggle = Tabs.Utility:AddToggle("TouchFlingToggle", {
+Tabs.Utility:Space()
+TouchFlingToggle = Tabs.Utility:Toggle({
  Title = "Touch Fling",
- Default = false,
+Flag = "TouchFlingToggle",
+ Value = false,
  Callback = function(state)
 hiddenfling = state
 if state then
@@ -5275,8 +5297,8 @@ end
  end
 })
 
--- Tabs.Utility:Space()
-Tabs.Utility:AddButton({
+Tabs.Utility:Space()
+Tabs.Utility:Button({
  Title = "Fling Tool",
  Icon = "rbxassetid://3836615692",
  Callback = function()
@@ -5292,7 +5314,7 @@ local ParentModel = ParentModel
 local Iterator, Table, Key = pairs(ParentModel:GetChildren())
 while true do
  local Value
- Key, Default = Iterator(Table, Key)
+ Key, Value = Iterator(Table, Key)
  if Key == nil then
  break
  end
@@ -5942,9 +5964,10 @@ end
 
 local flingInputValue = ""
 
--- Tabs.Utility:Space()
-FlingInput = Tabs.Utility:AddInput("FlingInput", {
+Tabs.Utility:Space()
+FlingInput = Tabs.Utility:Input({
  Title = "Fling Target",
+Flag = "FlingInput",
  Placeholder = "nickname, all, nonfriends, murder, sheriff",
  Callback = function(value)
 flingInputValue = value
@@ -5952,10 +5975,11 @@ currentInput = string.lower(value)
  end
 })
 
-FlingModeDropdown = Tabs.Utility:AddDropdown("FlingModeDropdown", {
+FlingModeDropdown = Tabs.Utility:Dropdown({
  Title = "Fling Mode",
+Flag = "FlingModeDropdown",
  Values = {"SkidFling", "Shhhlol", "Yeet"},
- Default = "SkidFling",
+ Value = "SkidFling",
  Callback = function(value)
 if value == "SkidFling" then
  flingMode = 1
@@ -5967,9 +5991,10 @@ end
  end
 })
 
-FlingToggle = Tabs.Utility:AddToggle("FlingToggle", {
+FlingToggle = Tabs.Utility:Toggle({
  Title = "Fling Players",
- Default = false,
+Flag = "FlingToggle",
+ Value = false,
  Callback = function(state)
 flingActive = state
 
@@ -5978,7 +6003,7 @@ if flingActive then
  local players = getPlayers(currentInput)
  
  if #players == 0 then
- Fluent:Notify({
+ WindUI:Notify({
 Title = "Fling Target",
 Content = "Invalid Input: " .. currentInput,
 Duration = 3
@@ -5993,7 +6018,7 @@ Duration = 3
  addPlayerToProcessed(player)
  end
  
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Fling Target",
  Content = "Flinging " .. #players .. " players",
  Duration = 3
@@ -6006,11 +6031,11 @@ end
  end
 })
 
-Tabs.Utility:AddButton({
+Tabs.Utility:Button({
  Title = "Fling Murderer",
  Callback = function()
 if flingActive then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Fling Target",
  Content = "Stop current fling first",
  Duration = 2
@@ -6022,7 +6047,7 @@ currentInput = "murder"
 local players = getPlayers(currentInput)
 
 if #players == 0 then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Fling Target",
  Content = "No alive murderer found",
  Duration = 3
@@ -6036,7 +6061,7 @@ for _, player in ipairs(players) do
  addPlayerToProcessed(player)
 end
 
-Fluent:Notify({
+WindUI:Notify({
  Title = "Fling Target",
  Content = "Flinging murderer: " .. players[1].Name .. " for 10 seconds",
  Duration = 3
@@ -6060,11 +6085,11 @@ coroutine.wrap(flingPlayers)()
  end
 })
 
-Tabs.Utility:AddButton({
+Tabs.Utility:Button({
  Title = "Fling Sheriff/Hero",
  Callback = function()
 if flingActive then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Fling Target",
  Content = "Stop current fling first",
  Duration = 2
@@ -6076,7 +6101,7 @@ currentInput = "sheriff"
 local players = getPlayers(currentInput)
 
 if #players == 0 then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Fling Target",
  Content = "No alive sheriff or hero found",
  Duration = 3
@@ -6098,7 +6123,7 @@ for i, player in ipairs(players) do
  end
 end
 
-Fluent:Notify({
+WindUI:Notify({
  Title = "Fling Target",
  Content = "Flinging: " .. targetNames .. " for 10 seconds",
  Duration = 3
@@ -6173,10 +6198,10 @@ local function disableAntiVoid()
  antiVoidActive = false
 end
 
--- Tabs.Utility:Space()
+Tabs.Utility:Space()
 Tabs.Utility:Toggle({
  Title = "Anti Void Damage",
- Default = false,
+ Value = false,
  Callback = function(state)
 if state then
  enableAntiVoid()
@@ -6218,11 +6243,12 @@ positionConnection = nil
  savedPosition = nil
 end
 
--- Tabs.Utility:Space()
-InfinitePositionToggle = Tabs.Utility:AddToggle("InfinitePositionToggle", {
+Tabs.Utility:Space()
+InfinitePositionToggle = Tabs.Utility:Toggle({
  Title = "Infinite Position Lock",
- Description = "Lock your position in place",
- Default = false,
+Flag = "InfinitePositionToggle",
+ Desc = "Lock your position in place",
+ Value = false,
  Callback = function(state)
 infinitePositionEnabled = state
 if state then
@@ -6239,9 +6265,10 @@ end
  end
 })
 
--- Tabs.Utility:Space()
-TimeChangerInput = Tabs.Utility:AddInput("TimeChangerInput", {
+Tabs.Utility:Space()
+TimeChangerInput = Tabs.Utility:Input({
  Title = "Set Time (HH:MM)",
+Flag = "TimeChangerInput",
  Placeholder = "12:00",
  Callback = function(value)
 value = value:gsub("^%s*(.-)%s*$", "%1")
@@ -6284,33 +6311,30 @@ unloadLagSystem()
  end
 end
 
-ButtonLib.Create:Button({
- Text = "Lag Switch",
- Visible = false,
- Callback = function() isLagActive = task.spawn(function()local d=getgenv().lagDuration or 0.5;local s=tick();while tick()-s<d do local a=math.random(1,1e6)*math.random(1,1e6);a=a/math.random(1,1e4)end;return false end)() end
-}).Position = UDim2.new(0.5, -125, 0.2, 0)
 
--- Tabs.Utility:Space()
+Tabs.Utility:Space()
 
-LagSwitchToggle = Tabs.Utility:AddToggle("LagSwitchToggle", {
+LagSwitchToggle = Tabs.Utility:Toggle({
  Title = "Lag Switch",
+ Flag = "LagSwitchToggle",
  Icon = "zap",
- Default = false,
+ Value = false,
  Callback = function(state)
 getgenv().lagSwitchEnabled = state
 
-if _G.DarahubLibBtn and _G.DarahubLibBtn.LagSwitch then
- _G.DarahubLibBtn.LagSwitch.Visible = state
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.LagSwitch then
+ _G.MM2HubLibBtn.LagSwitch.Visible = state
 end
 
 checkLagState()
  end
 })
 
-LagDurationInput = Tabs.Utility:AddInput("LagDurationInput", {
+LagDurationInput = Tabs.Utility:Input({
  Title = "Lag Duration (seconds)",
+ Flag = "LagDurationInput",
  Placeholder = "0.5",
- Default = tostring(getgenv().lagDuration),
+ Value = tostring(getgenv().lagDuration),
  NumbersOnly = true,
  Callback = function(text)
 local n = tonumber(text)
@@ -6332,43 +6356,36 @@ local CustomGravity = false
 local GravityValue = originalGameGravity
 local ShowGravityButton = false
 
--- Tabs.Utility:Space()
+Tabs.Utility:Space()
 
- GravityToggle = Tabs.Utility:AddToggle("GravityToggle", {
+ GravityToggle = Tabs.Utility:Toggle({
  Title = "Custom Gravity",
- Default = false,
+ Flag = "GravityToggle",
+ Value = false,
  Callback = function(state)
 CustomGravity = state
 workspace.Gravity = state and GravityValue or originalGameGravity
  end
 })
 
-ButtonLib.Create:Toggle({
- Text = "Gravity",
- Default = false,
- Visible = false,
- Callback = function(s) 
-if GravityToggle then
- GravityToggle:Set(s)
-end
- end
-}).Position = UDim2.new(0.5, -125, 0.4, 0)
 
- ShowGravityButtonToggle = Tabs.Utility:AddToggle("ShowGravityButtonToggle", {
+ ShowGravityButtonToggle = Tabs.Utility:Toggle({
  Title = "Show Gravity Button",
- Default = false,
+ Flag = "ShowGravityButton",
+ Value = false,
  Callback = function(state)
 ShowGravityButton = state
-if _G.DarahubLibBtn and _G.DarahubLibBtn.GravityToggle then
- _G.DarahubLibBtn.GravityToggle.Visible = state
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.GravityToggle then
+ _G.MM2HubLibBtn.GravityToggle.Visible = state
 end
  end
 })
 
- GravityInput = Tabs.Utility:AddInput("GravityInput", {
+ GravityInput = Tabs.Utility:Input({
  Title = "Gravity Value",
+ Flag = "GravityInput",
  Placeholder = tostring(originalGameGravity),
- Default = tostring(GravityValue),
+ Value = tostring(GravityValue),
  Callback = function(text)
 local num = tonumber(text)
 if num then
@@ -6389,11 +6406,12 @@ Gravity = Gravity or {
  GravityValue = workspace.Gravity
 }
 
--- Tabs.Utility:Space()
-NoRenderToggle = Tabs.Utility:AddToggle("NoRenderToggle", {
+Tabs.Utility:Space()
+NoRenderToggle = Tabs.Utility:Toggle({
  Title = "No Render",
- Description = "Disable 3D rendering for performance",
- Default = false,
+Flag = "NoRenderToggle",
+ Desc = "Disable 3D rendering for performance",
+ Value = false,
  Callback = function(state)
 featureStates.NoRender = state
 game:GetService("RunService"):Set3dRenderingEnabled(not state)
@@ -6421,10 +6439,11 @@ end
  end
 })
 
--- Tabs.Utility:Space()
-NoRenderColorPicker = Tabs.Utility:AddColorpicker("NoRenderColorPicker", {
+Tabs.Utility:Space()
+NoRenderColorPicker = Tabs.Utility:Colorpicker({
  Title = "No Render Color",
- Description = "Choose background color when No Render is enabled",
+Flag = "NoRenderColorPicker",
+ Desc = "Choose background color when No Render is enabled",
  Default = Color3.fromRGB(0, 0, 0),
  Transparency = 0,
  Callback = function(color)
@@ -6443,8 +6462,8 @@ end
 })
 featureStates.RemoveTextures = false
 
--- Tabs.Utility:Space()
-RemoveTexturesButton = Tabs.Utility:AddButton({
+Tabs.Utility:Space()
+RemoveTexturesButton = Tabs.Utility:Button({
  Title = "Remove Textures",
  Callback = function()
 for _, part in ipairs(workspace:GetDescendants()) do
@@ -6470,10 +6489,10 @@ game:GetService("RunService"):Set3dRenderingEnabled(true)
  end
 end)
 
--- Tabs.Utility:Space()
-LowQualityButton = Tabs.Utility:AddButton({
+Tabs.Utility:Space()
+LowQualityButton = Tabs.Utility:Button({
  Title = "Low Quality",
- Description = "Disable textures, effects, and optimize graphics",
+ Desc = "Disable textures, effects, and optimize graphics",
  Callback = function()
 local ToDisable = {
  Textures = true,
@@ -6581,10 +6600,11 @@ end
  end
 end
 
--- Tabs.Utility:Space()
-AntiFlingToggle = Tabs.Utility:AddToggle("AntiFlingToggle", {
+Tabs.Utility:Space()
+AntiFlingToggle = Tabs.Utility:Toggle({
  Title = "Disable Player Collisions",
- Default = false,
+Flag = "AntiFlingToggle",
+ Value = false,
  Callback = function(state)
 antiFlingEnabled = state
 if state then
@@ -6672,7 +6692,7 @@ UpdateHitboxes()
 end)
 
 
--- Tabs.Utility:Space()
+Tabs.Utility:Space()
 Tabs.Utility:Toggle(
  {
 Title = "Show Hitboxes",
@@ -6759,6 +6779,7 @@ end
 function vu30()
 toggleElement = ButtonLib.Create:Toggle({
 Text = "INVISIBLE",
+Flag = "InvisibleToggle",
 Default = false,
 Visible = false,
 Callback = function(state)
@@ -6804,8 +6825,8 @@ v31[1] = vu5:GetMouse().KeyDown:Connect(function(p33)
  if p33 == "i" then
 vu9 = not vu9
 
-if _G.DarahubLibBtn and _G.DarahubLibBtn.InvisibleToggle then
- _G.DarahubLibBtn.InvisibleToggle:Set(vu9)
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.InvisibleToggle then
+ _G.MM2HubLibBtn.InvisibleToggle:Set(vu9)
 end
 
 v34, v35, v36 = pairs(vu10)
@@ -6844,25 +6865,26 @@ end)
 vu5.CharacterAdded:Connect(function()
  vu9 = false
  
- if _G.DarahubLibBtn and _G.DarahubLibBtn.InvisibleToggle then
-_G.DarahubLibBtn.InvisibleToggle:Set(false)
+ if _G.MM2HubLibBtn and _G.MM2HubLibBtn.InvisibleToggle then
+_G.MM2HubLibBtn.InvisibleToggle:Set(false)
  end
  
  vu16()
 end)
 
--- Tabs.Utility:Space()
-InvisibleGuiToggle = Tabs.Utility:AddToggle("InvisibleGuiToggle", {
+Tabs.Utility:Space()
+InvisibleGuiToggle = Tabs.Utility:Toggle({
  Title = "Invisible GUI",
- Default = false,
+ Flag = "InvisibleGuiToggle",
+ Value = false,
  Callback = function(state)
-if _G.DarahubLibBtn and _G.DarahubLibBtn.InvisibleToggle then
- _G.DarahubLibBtn.InvisibleToggle.Visible = state
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.InvisibleToggle then
+ _G.MM2HubLibBtn.InvisibleToggle.Visible = state
 end
  end
 })
--- Tabs.Settings:Section({ Title = "Config Manager", TextSize = 20 })
--- Tabs.Settings:Divider()
+Tabs.Settings:Section({ Title = "Config Manager", TextSize = 20 })
+Tabs.Settings:Divider()
 
 -- Services
 local ConfigManager = Window.ConfigManager
@@ -6901,7 +6923,7 @@ end
 end
 
 local function loadAutoLoadSettings()
- local autoLoadFile = "Darahub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)/AutoLoad.json"
+ local autoLoadFile = "MM2Hub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)/AutoLoad.json"
  
  if FileExists(autoLoadFile) then
 local content = ReadFile(autoLoadFile)
@@ -6925,15 +6947,15 @@ end
 end
 
 local function saveAutoLoadSettings()
- local autoLoadFile = "Darahub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)/AutoLoad.json"
+ local autoLoadFile = "MM2Hub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)/AutoLoad.json"
  
  local success = WriteFile(autoLoadFile, "")
  if not success then
 if makefolder then
- pcall(function() makefolder("Darahub") end)
- pcall(function() makefolder("Darahub/AutoLoad") end)
- pcall(function() makefolder("Darahub/AutoLoad/Game") end)
- pcall(function() makefolder("Darahub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)") end)
+ pcall(function() makefolder("MM2Hub") end)
+ pcall(function() makefolder("MM2Hub/AutoLoad") end)
+ pcall(function() makefolder("MM2Hub/AutoLoad/Game") end)
+ pcall(function() makefolder("MM2Hub/AutoLoad/Game/Murder-Mystery-2(Normal-Mode)") end)
 end
  end
  
@@ -6953,13 +6975,14 @@ end
 
 loadAutoLoadSettings()
 
-local ConfigNameInput = Tabs.Settings:AddInput("ConfigNameInput", {
+local ConfigNameInput = Tabs.Settings:Input({
  Title = "Config Name",
-
- Description = "Name for your config file",
+Flag = "ConfigNameInput",
+ Flag = "ConfigNameInput",
+ Desc = "Name for your config file",
  Icon = "file-cog",
  Placeholder = "default",
- Default = CurrentConfigName,
+ Value = CurrentConfigName,
  Callback = function(value)
 if value ~= "" then
  CurrentConfigName = value
@@ -6967,18 +6990,19 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-local AutoLoadToggle = Tabs.Settings:AddToggle("AutoLoadToggle", {
+local AutoLoadToggle = Tabs.Settings:Toggle({
  Title = "Auto Load",
-
- Description = "Automatically load this config when script starts",
- Default = AutoLoadEnabled,
+Flag = "AutoLoadToggle",
+ Flag = "AutoLoadToggle",
+ Desc = "Automatically load this config when script starts",
+ Value = AutoLoadEnabled,
  Callback = function(state)
 AutoLoadEnabled = state
 if state then
  AutoLoadConfig = CurrentConfigName
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Auto-Load",
  Content = "Config '" .. CurrentConfigName .. "' will load automatically on startup",
  Duration = 3
@@ -6988,11 +7012,12 @@ saveAutoLoadSettings()
  end
 })
 
-local AutoSaveToggle = Tabs.Settings:AddToggle("AutoSaveToggle", {
+local AutoSaveToggle = Tabs.Settings:Toggle({
  Title = "Auto Save",
-
- Description = "Automatically save changes to config every second",
- Default = AutoSaveEnabled,
+Flag = "AutoSaveToggle",
+ Flag = "AutoSaveToggle",
+ Desc = "Automatically save changes to config every second",
+ Value = AutoSaveEnabled,
  Callback = function(state)
 AutoSaveEnabled = state
 
@@ -7003,7 +7028,7 @@ if AutoSaveConnection then
 end
 
 if state then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Auto-Save",
  Content = "Config will save automatically every second",
  Duration = 2
@@ -7020,7 +7045,7 @@ end)
  task.wait(1) -- Save every second
  end)
 else
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Auto-Save",
  Content = "Auto-save disabled",
  Duration = 2
@@ -7029,7 +7054,7 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
 local function refreshConfigList()
  local allConfigs = ConfigManager:AllConfigs() or {}
@@ -7055,12 +7080,13 @@ ConfigListDropdown:Refresh(allConfigs, defaultValue)
  end
 end
 
-ConfigListDropdown = Tabs.Settings:AddDropdown("ConfigListDropdown", {
+ConfigListDropdown = Tabs.Settings:Dropdown({
  Title = "Existing Configs",
-
- Description = "Select from saved configs",
+Flag = "ConfigListDropdown",
+ Flag = "ConfigListDropdown",
+ Desc = "Select from saved configs",
  Values = {"default"},
- Default = "default",
+ Value = "default",
  Callback = function(value)
 CurrentConfigName = value
 ConfigNameInput:Set(value)
@@ -7072,7 +7098,7 @@ end
 
 local config = ConfigManager:GetConfig(value)
 if config then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Config Selected",
  Content = "Config '" .. value .. "' selected",
  Duration = 2
@@ -7081,15 +7107,15 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-local SaveConfigButton = Tabs.Settings:AddButton({
+local SaveConfigButton = Tabs.Settings:Button({
  Title = "Save Config",
- Description = "Save current settings to config",
+ Desc = "Save current settings to config",
  Icon = "save",
  Callback = function()
 if CurrentConfigName == "" then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Please enter a config name",
  Duration = 3
@@ -7101,7 +7127,7 @@ Window.CurrentConfig = ConfigManager:Config(CurrentConfigName)
 
 local success = Window.CurrentConfig:Save()
 if success then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Config Saved",
  Content = "Config '" .. CurrentConfigName .. "' saved successfully",
  Duration = 3
@@ -7115,7 +7141,7 @@ if success then
  task.wait(0.5)
  refreshConfigList()
 else
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Failed to save config",
  Duration = 3
@@ -7124,15 +7150,15 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-local LoadConfigButton = Tabs.Settings:AddButton({
+local LoadConfigButton = Tabs.Settings:Button({
  Title = "Load Config",
- Description = "Load settings from selected config",
+ Desc = "Load settings from selected config",
  Icon = "folder-open",
  Callback = function()
 if CurrentConfigName == "" then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Please enter a config name",
  Duration = 3
@@ -7144,7 +7170,7 @@ Window.CurrentConfig = ConfigManager:CreateConfig(CurrentConfigName)
 
 local success = Window.CurrentConfig:Load()
 if success then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Config Loaded",
  Content = "Config '" .. CurrentConfigName .. "' loaded successfully",
  Duration = 3
@@ -7155,7 +7181,7 @@ if success then
  saveAutoLoadSettings()
  end
 else
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Config '" .. CurrentConfigName .. "' not found or empty",
  Duration = 3
@@ -7164,16 +7190,16 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-local DeleteConfigButton = Tabs.Settings:AddButton({
+local DeleteConfigButton = Tabs.Settings:Button({
  Title = "Delete Config",
- Description = "Delete selected config",
+ Desc = "Delete selected config",
  Icon = "trash-2",
  Color = Color3.fromHex("#ff4830"),
  Callback = function()
 if CurrentConfigName == "default" then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Cannot delete default config",
  Duration = 3
@@ -7183,7 +7209,7 @@ end
 
 local success = ConfigManager:DeleteConfig(CurrentConfigName)
 if success then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Config Deleted",
  Content = "Config '" .. CurrentConfigName .. "' deleted",
  Duration = 3
@@ -7200,7 +7226,7 @@ if success then
  task.wait(0.5)
  refreshConfigList()
 else
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Error",
  Content = "Failed to delete config or config doesn't exist",
  Duration = 3
@@ -7209,15 +7235,15 @@ end
  end
 })
 
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-local RefreshConfigButton = Tabs.Settings:AddButton({
+local RefreshConfigButton = Tabs.Settings:Button({
  Title = "Refresh Config List",
- Description = "Update the list of available configs",
+ Desc = "Update the list of available configs",
  Icon = "refresh-cw",
  Callback = function()
 refreshConfigList()
-Fluent:Notify({
+WindUI:Notify({
  Title = "Config List Refreshed",
  Content = "Config list updated",
  Duration = 2
@@ -7240,7 +7266,7 @@ task.wait(1)
 Window.CurrentConfig = ConfigManager:Config(CurrentConfigName)
 
 if Window.CurrentConfig:Load() then
- Fluent:Notify({
+ WindUI:Notify({
  Title = "Auto-Loaded",
  Content = "Config '" .. CurrentConfigName .. "' loaded automatically",
  Duration = 3
@@ -7271,40 +7297,40 @@ end
 Tabs.Settings:Dropdown({
  Title = "Select Theme",
  Values = {"Dark", "Light", "Blue", "Red", "Green", "Purple"},
- Default = "Dark",
+ Value = "Dark",
  Callback = function(value)
--- WindUI:SetTheme(value)
+WindUI:SetTheme(value)
  end
 })
 
 Tabs.Settings:Slider({
  Title = "Window Transparency",
- Default = { Min = 0, Max = 1, Default = 0.2, Step = 0.1 },
+ Value = { Min = 0, Max = 1, Default = 0.2, Step = 0.1 },
  Callback = function(value)
--- FluentUI handles transparency differently
--- WindUI.TransparencyValue = value
+WindUI.TransparencyValue = value
  end
 })
- -- Tabs.Settings:Section({ Title = "Keybinds" })
+ Tabs.Settings:Section({ Title = "Keybinds" })
 Tabs.Settings:Keybind({
+Flag = "Keybind",
 Title = "Keybind",
-Description = "Keybind to open ui",
+Desc = "Keybind to open ui",
 Value = "RightControl",
 Callback = function(RightControl)
- -- Window:SetToggleKey(Enum.KeyCode[RightControl])
+ Window:SetToggleKey(Enum.KeyCode[RightControl])
 end
  })
- -- Tabs.Settings:Space()
+ Tabs.Settings:Space()
 
 Tabs.Settings:Keybind({
  Title = "Invisible Toggle",
- Description = "Keybind to toggle invisible mode",
- Default = "I",
+ Desc = "Keybind to toggle invisible mode",
+ Value = "I",
  Callback = function(v)
 vu9 = not vu9
 
-if _G.DarahubLibBtn and _G.DarahubLibBtn.InvisibleToggle then
- _G.DarahubLibBtn.InvisibleToggle:Set(vu9)
+if _G.MM2HubLibBtn and _G.MM2HubLibBtn.InvisibleToggle then
+ _G.MM2HubLibBtn.InvisibleToggle:Set(vu9)
 end
 
 for _, part in pairs(vu10) do
@@ -7313,10 +7339,11 @@ end
  end
 })
 
-LagSwitchKeybind = Tabs.Settings:AddKeybind("LagSwitchKeybind", {
+LagSwitchKeybind = Tabs.Settings:Keybind({
  Title = "Trigger Lag Switch",
- Description = "Keybind to trigger lag switch",
- Default = "L",
+ Desc = "Keybind to trigger lag switch",
+ Value = "L",
+ Flag = "LagSwitchKeybind",
  Callback = function(v)
 if getgenv().lagSwitchEnabled and not isLagActive then
  isLagActive = true
@@ -7332,37 +7359,38 @@ a = a / math.random(1, 10000)
 end
  end
 })
--- Tabs.Settings:Space()
+Tabs.Settings:Space()
 
-GravityKeybind = Tabs.Settings:AddKeybind("GravityKeybind", {
+GravityKeybind = Tabs.Settings:Keybind({
  Title = "Toggle Gravity",
- Description = "Keybind to toggle custom gravity",
- Default = "J",
+ Desc = "Keybind to toggle custom gravity",
+ Value = "J",
+ Flag = "GravityKeybind",
  Callback = function(v)
 GravityToggle:Set(not GravityToggle.Value)
  end
 })
 do
  local CoreGui = game:GetService("CoreGui")
- local DarahubFolder = CoreGui:FindFirstChild("Darahub")
+ local MM2HubFolder = CoreGui:FindFirstChild("MM2Hub")
 
- if DarahubFolder and Tabs and Tabs.Settings then
--- Tabs.Settings:Section({
+ if MM2HubFolder and Tabs and Tabs.Settings then
+Tabs.Settings:Section({
  Title = "GUI Size"
 })
 local defaultScales = {}
 
-for _, Element in pairs(DarahubFolder:GetChildren()) do
+for _, Element in pairs(MM2HubFolder:GetChildren()) do
  if Element:IsA("Frame") and Element:FindFirstChild("UIScale") then
  defaultScales[Element.Name] = Element.UIScale.Scale
  end
 end
 
-Tabs.Settings:AddButton({
+Tabs.Settings:Button({
  Title = "Reset All Scales",
 Description = "Reverts all buttons to their startup scale values",
 Callback = function()
-for _, Element in pairs(DarahubFolder:GetChildren()) do
+for _, Element in pairs(MM2HubFolder:GetChildren()) do
 if Element:IsA("Frame") and Element:FindFirstChild("UIScale") then
 local original = defaultScales[Element.Name] or 1
 Element.UIScale.Scale = original
@@ -7371,13 +7399,13 @@ end
 end
 })
 
-for _, Element in pairs(DarahubFolder:GetChildren()) do
+for _, Element in pairs(MM2HubFolder:GetChildren()) do
 if Element:IsA("Frame") and Element:FindFirstChild("UIScale") then
 local currentScale = tonumber(Element.UIScale.Scale) or 1
 
 Tabs.Settings:Slider({
 Title = Element.Name .. " Scale",
-Description = "Adjust GUI scale",
+Desc = "Adjust GUI scale",
 Flag = "Scale_Slider_" .. Element.Name,
 Step = 0.01,
 Value = {
@@ -7395,6 +7423,3 @@ end
 end
 end
 end
-local UniverseScriptsStuff = loadstring(game:HttpGet("https://darahub.pages.dev/Module/More-Scripts.Lua"))()
-
-UniverseScriptsStuff(Tabs)
