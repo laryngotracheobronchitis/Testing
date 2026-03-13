@@ -35,30 +35,6 @@ if PlayerGui:FindFirstChild("LagSwitchUI") then
     PlayerGui.LagSwitchUI:Destroy()
 end
 
--- Display credit
-local creditGui = Instance.new("ScreenGui")
-creditGui.Name = "CreditGUI"
-creditGui.ResetOnSpawn = false
-creditGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-creditGui.Parent = PlayerGui
-
-local creditLabel = Instance.new("TextLabel")
-creditLabel.Size = UDim2.new(0, 300, 0, 50)
-creditLabel.Position = UDim2.new(0.5, -150, 0.5, -25)
-creditLabel.BackgroundTransparency = 1
-creditLabel.Text = "by yar"
-creditLabel.TextColor3 = Color3.new(1, 1, 1)
-creditLabel.TextScaled = true
-creditLabel.Font = Enum.Font.SciFi
-creditLabel.TextStrokeTransparency = 0.5
-creditLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-creditLabel.Parent = creditGui
-
-task.spawn(function()
-    task.wait(2)
-    creditGui:Destroy()
-end)
-
 -- Create CYBER ICE THEME GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LagSwitchUI"
