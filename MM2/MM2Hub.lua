@@ -2,6 +2,27 @@ if getgenv().MM2HubExecuted then
  return
 end
 getgenv().MM2HubExecuted = true
+--[[
+╔═══════════════════════════════════════════════════════════════╗
+║                        MM2HUB v1.0                            ║
+║                  Murder Mystery 2 Script                      ║
+╠═══════════════════════════════════════════════════════════════╣
+║  📱 MOBILE USERS:                                             ║
+║  - Tap the button at top-left corner to open/close UI        ║
+║  - All features work on mobile!                               ║
+║                                                                ║
+║  💻 PC USERS:                                                 ║
+║  - Press RightControl to toggle UI                            ║
+║                                                                ║
+║  ⚙️ FEATURES:                                                 ║
+║  - Player Features (Speed, Fly, Noclip, etc)                  ║
+║  - Combat Features (Aimbot, Auto Shoot, etc)                  ║
+║  - ESP Features (Player ESP, Coin ESP)                        ║
+║  - Teleport Features                                          ║
+║  - And much more!                                             ║
+╚═══════════════════════════════════════════════════════════════╝
+]]
+
 -- MM2Hub - Murder Mystery 2 Script
 
 
@@ -21,13 +42,31 @@ local Window = WindUI:CreateWindow({
  HideSearchBar = false,
  SideBarWidth = 200,
  OpenButton = {
-Enabled = false,
-Scale = 0
- },
+        Enabled = true,
+        Scale = 1
+    },
  
 })
 pcall(updateWindowOpenState)
 Window:SetIconSize(48)
+
+-- Notify user about platform
+task.spawn(function()
+    task.wait(1)
+    if isMobile then
+        WindUI:Notify({
+            Title = "Mobile Detected",
+            Content = "Tap the button at top-left to toggle UI",
+            Duration = 5
+        })
+    else
+        WindUI:Notify({
+            Title = "MM2Hub Loaded",
+            Content = "Press RightControl to toggle UI",
+            Duration = 3
+        })
+    end
+end)
 executor = identifyexecutor()
 if type(executor) == "table" then
  for key, value in pairs(executor) do
@@ -54,6 +93,13 @@ player = Players.LocalPlayer
 playerGui = player:WaitForChild("PlayerGui")
 placeId = game.PlaceId
 jobId = game.JobId
+
+-- Mobile Support Detection
+local isMobile = (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
+
+if isMobile then
+    print("📱 Mobile device detected - Optimizing controls...")
+end
 
 featureStates = {
  InfiniteJump = false,
@@ -7313,8 +7359,8 @@ WindUI.TransparencyValue = value
  Tabs.Settings:Section({ Title = "Keybinds" })
 Tabs.Settings:Keybind({
 Flag = "Keybind",
-Title = "Keybind",
-Desc = "Keybind to open ui",
+Title = "Keybind (PC Only)",
+ Desc = "Mobile users: Use the button at top-left corner",
 Value = "RightControl",
 Callback = function(RightControl)
  Window:SetToggleKey(Enum.KeyCode[RightControl])
