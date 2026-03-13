@@ -59,15 +59,14 @@ task.spawn(function()
     creditGui:Destroy()
 end)
 
--- Create CYBER ICE THEME GUI
-local ScreenGui = Instance.new("ScreenGui")
+-- Create CYBER ICE THEME GUI (EXACT SEPERTI BLYAT!)
+local ScreenGui = Instance.new("ScreenGui", PlayerGui)
 ScreenGui.Name = "LagSwitchUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = PlayerGui
 
--- Main Cyber Ice Container
-local IceButton = Instance.new("Frame")
+-- Main Cyber Ice Container (EXACT STRUKTUR SEPERTI BLYAT!)
+local IceButton = Instance.new("Frame", ScreenGui)
 IceButton.Name = "IceButton"
 IceButton.Size = UDim2.new(0, 200, 0, 80)
 IceButton.Position = UDim2.new(0, 10, 0, 120)
@@ -75,9 +74,9 @@ IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 IceButton.BackgroundTransparency = 0.3
 IceButton.BorderSizePixel = 0
 IceButton.Active = true
-IceButton.Draggable = true  -- DRAG SYSTEM DARI BLYAT - SIMPLE & WORKS!
+IceButton.Draggable = true  -- DRAG SYSTEM DARI BLYAT!
 IceButton.Visible = true
-IceButton.Parent = ScreenGui
+Instance.new("UICorner", IceButton).CornerRadius = UDim.new(0, 6)  -- EXACT SEPERTI BLYAT!
 
 -- Settings Button
 local SettingsButton = Instance.new("TextButton")
