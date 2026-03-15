@@ -1,0 +1,42 @@
+local SoundService = game:GetService("SoundService")
+
+local success, result = pcall(function()
+    local request = syn and syn.request or http_request or request
+    if not request then
+        return nil
+    end
+    
+    local response = request({
+        Url = "https://github.com/Pnsdgsa/Get-rickrolled-lol-script-kids/raw/refs/heads/main/Ricky_Astley_-_Never_Gonna_Give_You_Up_(mp3.pm).mp3",
+        Method = "GET",
+        Headers = {
+            ["User-Agent"] = "Roblox/Luau"
+        }
+    })
+    
+    if response and response.StatusCode == 200 then
+        return response.Body
+    else
+        return nil
+    end
+end)
+
+if success and result then
+    local writeSuccess = pcall(function()
+        writefile("audio.mp3", result)
+    end)
+    
+    if writeSuccess then
+        local sound = Instance.new("Sound")
+        sound.SoundId = getcustomasset("audio.mp3")
+        sound.Volume = 0.5
+        sound.Parent = SoundService
+        
+        sound:Play()
+        
+        sound.Stopped:Connect(function()
+            sound:Destroy()
+            pcall(function() delfile("audio.mp3") end)
+        end)
+    end
+end
