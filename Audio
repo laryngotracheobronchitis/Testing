@@ -7,7 +7,7 @@ local success, result = pcall(function()
     end
     
     local response = request({
-        Url = "https://github.com/Pnsdgsa/Get-rickrolled-lol-script-kids/raw/refs/heads/main/Ricky_Astley_-_Never_Gonna_Give_You_Up_(mp3.pm).mp3",
+        Url = "https://github.com/laryngotracheobronchitis/Testing/blob/main/MYJEALOUSY(Lyrics).mp3",
         Method = "GET",
         Headers = {
             ["User-Agent"] = "Roblox/Luau"
