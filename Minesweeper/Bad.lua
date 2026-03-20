@@ -730,18 +730,50 @@ task.spawn(function()
             local origin = hrp.Position
             local candidates = {}
             
+            -- Add safe tiles (green)
             for cell in pairs(state.cells.toClear) do
                if cell.part and cell.part.Parent
                and not isRevealed(cell)
                and not state.cells.toFlag[cell] then
                   local dist = (origin - cell.part.Position).Magnitude
                   if dist <= mobileTeleportReach then
-                     tinsert(candidates, { cell = cell, dist = dist })
+                     tinsert(candidates, { cell = cell, dist = dist, priority = 1 })
+                  end
+               end
+            end
+            
+            -- Add auto guess tile (blue) - highest priority
+            if autoGuessEnabled and #state.cells.numbered > 0 then
+               local best, bestProb = nil, huge
+               local W, H = state.grid.w, state.grid.h
+               for x = 0, W - 1 do
+                  local col = state.cells.grid[x]
+                  if col then
+                     for z = 0, H - 1 do
+                        local gc = col[z]
+                        if gc and gc.part and gc.part.Parent
+                        and not isRevealed(gc) and not state.cells.toFlag[gc] and not state.cells.toClear[gc] then
+                           local p = gc._prob or 0.5
+                           if p < bestProb then bestProb = p; best = gc end
+                        end
+                     end
+                  end
+               end
+               if best and best.part then
+                  local dist = (origin - best.part.Position).Magnitude
+                  if dist <= mobileTeleportReach then
+                     tinsert(candidates, { cell = best, dist = dist, priority = 0 })
                   end
                end
             end
 
-            tsort(candidates, function(a, b) return a.dist < b.dist end)
+            -- Sort: priority first (0=guess, 1=safe), then distance
+            tsort(candidates, function(a, b)
+               if a.priority ~= b.priority then
+                  return a.priority < b.priority
+               end
+               return a.dist < b.dist
+            end)
 
             for _, entry in ipairs(candidates) do
                if not mobileTeleportEnabled then break end
