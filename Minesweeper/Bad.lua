@@ -6,7 +6,7 @@ local Window = Rayfield:CreateWindow({
    Name = "Minesweeper",
    Icon = "monitor",
    LoadingTitle = "Minesweeper",
-   LoadingSubtitle = "by timmy",
+   LoadingSubtitle = "by unknown",
    ShowText = "Minesweeper",
    Theme = "DarkBlue",
    DisableRayfieldPrompts = false,
@@ -14,7 +14,7 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = false,
       FolderName = nil,
-      FileName = "MinesweeperTimmy"
+      FileName = "idk"
    },
    Discord = {
       Enabled = false,
