@@ -1,4 +1,4 @@
--- Minesweeper by timmy (Mobile Enhanced)
+-- Minesweeper by timmy
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -98,7 +98,6 @@ AutoTab:CreateSlider({
    end,
 })
 
--- ── PC Revealer Tab ───────────────────────────────────────────────
 local RevealSection = RevealTab:CreateSection("Tiles Revealer")
 
 local touchTilesEnabled = false
@@ -151,7 +150,7 @@ RevealTab:CreateToggle({
                local safeparts = {}
                for cell in pairs(state.cells.toClear) do
                   if cell.part and cell.part.Parent
-                  and not isRevealed(cell)
+                  and cell.state ~= "number"
                   and not state.cells.toFlag[cell] then
                      local dist = (origin - cell.part.Position).Magnitude
                      if dist <= revealReach then
@@ -618,27 +617,26 @@ local function processQueue()
    local numberedDirty = false
    local i = 1
    while i <= #batch do
-      local limit = min(i + BATCH_SIZE - 1, #batch)
+      local limit = math.min(i + BATCH_SIZE - 1, #batch)
       for j = i, limit do
          local c = batch[j]
          if c and c.part and c.state ~= "number" and c.state ~= "flagged" then
-            if hasF(c.part) then
-               c.covered = true
-               c.state = "flagged"
-            else
-               local ng = c._ng or c.part:FindFirstChild(S_NumberGui)
-               if ng then
-                  c._ng = ng
-                  local lbl = ng:FindFirstChild(S_TextLabel)
-                  if lbl then
-                     c._tl = lbl
-                     local t = lbl.Text
-                     if t == "" or tonumber(t) then
-                        c.number  = tonumber(t) or 0
-                        c.covered = false
-                        c.state   = "number"
-                        numberedDirty = true
-                     end
+            local ng = c._ng or c.part:FindFirstChild(S_NumberGui)
+            if ng then
+               if not c._ng then c._ng = ng end
+               local lbl = c._tl or ng:FindFirstChild(S_TextLabel)
+               if lbl and not c._tl then c._tl = lbl end
+               if lbl then
+                  local t = lbl.Text
+                  if t == "" or tonumber(t) then
+                     c.number  = tonumber(t) or 0
+                     c.covered = false
+                     c.state   = "number"
+                     state.cells.toClear[c] = nil
+                     state.cells.toFlag[c]  = nil
+                     if c.hlPart then c.hlPart.Enabled = false end
+                     hlActive[c] = nil
+                     numberedDirty = true
                   end
                end
             end
@@ -650,13 +648,20 @@ local function processQueue()
 
    if numberedDirty then
       local numbered = {}
+      local grid = state.cells.grid
       for x = 0, state.grid.w - 1 do
-         local col = state.cells.grid[x]
+         local col = grid[x]
          if col then
             for z = 0, state.grid.h - 1 do
                local c = col[z]
                if c and c.state == "number" then
                   tinsert(numbered, c)
+                  state.cells.toClear[c] = nil
+                  state.cells.toFlag[c]  = nil
+                  if c.hlPart then
+                     c.hlPart.Enabled = false
+                     hlActive[c] = nil
+                  end
                end
             end
          end
@@ -686,7 +691,7 @@ local function updateL()
          for _, t in ipairs(c.neigh) do
             if fS[t] then
                flg = flg + 1
-            elseif not sS[t] and not isRevealed(t) then
+            elseif not sS[t] and t.state ~= "number" and t.covered ~= false then
                unk[#unk+1] = t
             end
          end
@@ -719,6 +724,68 @@ task.spawn(function()
    if ok and remote then FlagRemote = remote end
 end)
 
+-- ── Solver loop ───────────────────────────────────────────────────
+task.spawn(function()
+   while true do
+      task.wait(0.1)
+
+      if cachedB and not cachedB.Parent then
+         cachedB = nil
+         state.lastPartCount  = -1
+         state.grid.w         = 0
+         state.grid.h         = 0
+         state.cells.grid     = {}
+         state.cells.numbered = {}
+         state.cells.toFlag   = {}
+         state.cells.toClear  = {}
+         autoFlaggedSet       = {}
+         hlActive             = {}
+         changeQueue          = {}
+         queueSet             = {}
+         solverDirty          = false
+         lastSolveTime        = 0
+         for _, conn in pairs(signalConns) do conn:Disconnect() end
+         signalConns = {}
+      end
+
+      if solverEnabled or autoGuessEnabled or autoFlagToggle then
+         local folder = scanB()
+         if folder then
+            local pc = #folder:GetChildren()
+            local needRebuild = state.grid.w == 0 or pc ~= state.lastPartCount
+            if needRebuild then
+               state.lastPartCount = pc
+               for _, conn in pairs(signalConns) do conn:Disconnect() end
+               signalConns  = {}
+               changeQueue  = {}
+               queueSet     = {}
+               hlActive     = {}
+               state.cells.toFlag   = {}
+               state.cells.toClear  = {}
+               state.cells.numbered = {}
+               autoFlaggedSet       = {}
+               solverDirty          = false
+               lastSolveTime        = 0
+               pcall(rebuildG, folder)
+               task.wait()
+            end
+
+            local now = tick()
+            if state.grid.w > 0 then
+               if solverDirty and (now - lastSolveTime) >= SOLVE_COOLDOWN then
+                  solverDirty   = false
+                  lastSolveTime = now
+                  pcall(processQueue)
+                  task.wait()
+                  pcall(updateL)
+               end
+               pcall(updateH)
+            end
+         end
+      end
+   end
+end)
+
 -- ── Mobile Teleport Revealer Loop ─────────────────────────────────
 task.spawn(function()
    while true do
@@ -733,7 +800,7 @@ task.spawn(function()
             -- Add safe tiles (green)
             for cell in pairs(state.cells.toClear) do
                if cell.part and cell.part.Parent
-               and not isRevealed(cell)
+               and cell.state ~= "number"
                and not state.cells.toFlag[cell] then
                   local dist = (origin - cell.part.Position).Magnitude
                   if dist <= mobileTeleportReach then
@@ -752,7 +819,8 @@ task.spawn(function()
                      for z = 0, H - 1 do
                         local gc = col[z]
                         if gc and gc.part and gc.part.Parent
-                        and not isRevealed(gc) and not state.cells.toFlag[gc] and not state.cells.toClear[gc] then
+                        and gc.state ~= "number" and gc.covered ~= false
+                        and not state.cells.toFlag[gc] and not state.cells.toClear[gc] then
                            local p = gc._prob or 0.5
                            if p < bestProb then bestProb = p; best = gc end
                         end
@@ -792,73 +860,11 @@ task.spawn(function()
                      actualDelay = actualDelay * 0.5
                   end
                   
-                  task.wait(max(actualDelay, 0.01))
+                  task.wait(math.max(actualDelay, 0.01))
                end
             end
          else
             task.wait(0.5)
-         end
-      end
-   end
-end)
-
--- ── Solver loop ───────────────────────────────────────────────────
-task.spawn(function()
-   while true do
-      task.wait(0.1)
-
-      if cachedB and not cachedB.Parent then
-         cachedB = nil
-         state.lastPartCount  = -1
-         state.grid.w         = 0
-         state.grid.h         = 0
-         state.cells.grid     = {}
-         state.cells.numbered = {}
-         state.cells.toFlag   = {}
-         state.cells.toClear  = {}
-         autoFlaggedSet       = {}
-         hlActive             = {}
-         changeQueue          = {}
-         queueSet             = {}
-         solverDirty          = false
-         lastSolveTime        = 0
-         for _, conn in pairs(signalConns) do conn:Disconnect() end
-         signalConns = {}
-      end
-
-      if solverEnabled or autoGuessEnabled or autoFlagToggle or touchTilesEnabled or mobileTeleportEnabled then
-         local folder = scanB()
-         if folder then
-            local pc = #folder:GetChildren()
-            local needRebuild = state.grid.w == 0 or pc ~= state.lastPartCount
-            if needRebuild then
-               state.lastPartCount = pc
-               for _, conn in pairs(signalConns) do conn:Disconnect() end
-               signalConns  = {}
-               changeQueue  = {}
-               queueSet     = {}
-               hlActive     = {}
-               state.cells.toFlag   = {}
-               state.cells.toClear  = {}
-               state.cells.numbered = {}
-               autoFlaggedSet       = {}
-               solverDirty          = false
-               lastSolveTime        = 0
-               pcall(rebuildG, folder)
-               task.wait()
-            end
-
-            local now = tick()
-            if state.grid.w > 0 then
-               if solverDirty and (now - lastSolveTime) >= SOLVE_COOLDOWN then
-                  solverDirty   = false
-                  lastSolveTime = now
-                  pcall(processQueue)
-                  task.wait()
-                  pcall(updateL)
-               end
-               pcall(updateH)
-            end
          end
       end
    end
@@ -899,7 +905,7 @@ task.spawn(function()
                   pcall(function()
                      FlagRemote:FireServer(cell.part, token, true)
                   end)
-                  task.wait(max(flagDelay, 0.05))
+                  task.wait(math.max(flagDelay, 0.05))
                   if not hasF(cell.part) then
                      autoFlaggedSet[cell] = nil
                   end
