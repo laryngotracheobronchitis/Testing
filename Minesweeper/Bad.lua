@@ -241,35 +241,6 @@ local MobileInfoSection = MobileTab:CreateSection("Info")
 MobileTab:CreateLabel("Auto Guess ON: Delay x0.5")
 MobileTab:CreateLabel("Auto Guess OFF: Normal delay")
 
-local DebugSection = MobileTab:CreateSection("Auto Flag Debug")
-local debugTokenLabel = MobileTab:CreateLabel("Token: Checking...")
-local debugRemoteLabel = MobileTab:CreateLabel("Remote: Checking...")
-local debugMinesLabel = MobileTab:CreateLabel("Mines Found: 0")
-
-task.spawn(function()
-   while true do
-      task.wait(1)
-      local token = getToken()
-      if token then
-         debugTokenLabel:Set("Token: Found (" .. string.sub(token, 1, 8) .. "...)")
-      else
-         debugTokenLabel:Set("Token: NOT FOUND - Click a tile first!")
-      end
-      
-      if FlagRemote then
-         debugRemoteLabel:Set("Remote: Found")
-      else
-         debugRemoteLabel:Set("Remote: NOT FOUND")
-      end
-      
-      local mineCount = 0
-      for _ in pairs(state.cells.toFlag) do
-         mineCount = mineCount + 1
-      end
-      debugMinesLabel:Set("Mines Found: " .. mineCount)
-   end
-end)
-
 -- ── Services ──────────────────────────────────────────────────────
 local Players = game:GetService("Players")
 local lp      = Players.LocalPlayer
@@ -816,6 +787,8 @@ task.spawn(function()
 end)
 
 -- ── Mobile Teleport Revealer Loop ─────────────────────────────────
+local revealedTiles = {}
+
 task.spawn(function()
    while true do
       task.wait(0.05)
@@ -831,7 +804,8 @@ task.spawn(function()
             for cell in pairs(state.cells.toClear) do
                if cell.part and cell.part.Parent
                and cell.state ~= "number"
-               and not state.cells.toFlag[cell] then
+               and not state.cells.toFlag[cell]
+               and not revealedTiles[cell.part] then
                   local dist = (origin - cell.part.Position).Magnitude
                   if dist <= mobileTeleportReach then
                      tinsert(safeTiles, { cell = cell, dist = dist })
@@ -853,7 +827,8 @@ task.spawn(function()
                         local gc = col[z]
                         if gc and gc.part and gc.part.Parent
                         and gc.state ~= "number" and gc.covered ~= false
-                        and not state.cells.toFlag[gc] and not state.cells.toClear[gc] then
+                        and not state.cells.toFlag[gc] and not state.cells.toClear[gc]
+                        and not revealedTiles[gc.part] then
                            local p = gc._prob or 0.5
                            if p < bestProb then bestProb = p; best = gc end
                         end
@@ -872,7 +847,9 @@ task.spawn(function()
             for _, entry in ipairs(safeTiles) do
                if not mobileTeleportEnabled then break end
                local cell = entry.cell
-               if cell.part and cell.part.Parent then
+               if cell.part and cell.part.Parent and not revealedTiles[cell.part] then
+                  revealedTiles[cell.part] = true
+                  
                   local tilePos = cell.part.Position
                   local tileSize = cell.part.Size
                   hrp.CFrame = CFrame.new(
@@ -887,13 +864,16 @@ task.spawn(function()
                   end
                   
                   task.wait(math.max(actualDelay, 0.01))
+                  task.wait(0.2)
                end
             end
             
             -- Only teleport to guess tile if NO safe tiles were available
             if #safeTiles == 0 and guessTile and mobileTeleportEnabled then
                local cell = guessTile.cell
-               if cell.part and cell.part.Parent then
+               if cell.part and cell.part.Parent and not revealedTiles[cell.part] then
+                  revealedTiles[cell.part] = true
+                  
                   local tilePos = cell.part.Position
                   local tileSize = cell.part.Size
                   hrp.CFrame = CFrame.new(
@@ -908,11 +888,14 @@ task.spawn(function()
                   end
                   
                   task.wait(math.max(actualDelay, 0.01))
+                  task.wait(0.2)
                end
             end
          else
             task.wait(0.5)
          end
+      else
+         revealedTiles = {}
       end
    end
 end)
