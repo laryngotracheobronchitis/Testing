@@ -1,4 +1,4 @@
--- Minesweeper by timmy
+-- Minesweeper by timmy (Mobile Enhanced)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -98,6 +98,7 @@ AutoTab:CreateSlider({
    end,
 })
 
+-- ── PC Revealer Tab ───────────────────────────────────────────────
 local RevealSection = RevealTab:CreateSection("Tiles Revealer")
 
 local touchTilesEnabled = false
@@ -150,7 +151,7 @@ RevealTab:CreateToggle({
                local safeparts = {}
                for cell in pairs(state.cells.toClear) do
                   if cell.part and cell.part.Parent
-                  and cell.state ~= "number"
+                  and not isRevealed(cell)
                   and not state.cells.toFlag[cell] then
                      local dist = (origin - cell.part.Position).Magnitude
                      if dist <= revealReach then
@@ -617,26 +618,27 @@ local function processQueue()
    local numberedDirty = false
    local i = 1
    while i <= #batch do
-      local limit = math.min(i + BATCH_SIZE - 1, #batch)
+      local limit = min(i + BATCH_SIZE - 1, #batch)
       for j = i, limit do
          local c = batch[j]
          if c and c.part and c.state ~= "number" and c.state ~= "flagged" then
-            local ng = c._ng or c.part:FindFirstChild(S_NumberGui)
-            if ng then
-               if not c._ng then c._ng = ng end
-               local lbl = c._tl or ng:FindFirstChild(S_TextLabel)
-               if lbl and not c._tl then c._tl = lbl end
-               if lbl then
-                  local t = lbl.Text
-                  if t == "" or tonumber(t) then
-                     c.number  = tonumber(t) or 0
-                     c.covered = false
-                     c.state   = "number"
-                     state.cells.toClear[c] = nil
-                     state.cells.toFlag[c]  = nil
-                     if c.hlPart then c.hlPart.Enabled = false end
-                     hlActive[c] = nil
-                     numberedDirty = true
+            if hasF(c.part) then
+               c.covered = true
+               c.state = "flagged"
+            else
+               local ng = c._ng or c.part:FindFirstChild(S_NumberGui)
+               if ng then
+                  c._ng = ng
+                  local lbl = ng:FindFirstChild(S_TextLabel)
+                  if lbl then
+                     c._tl = lbl
+                     local t = lbl.Text
+                     if t == "" or tonumber(t) then
+                        c.number  = tonumber(t) or 0
+                        c.covered = false
+                        c.state   = "number"
+                        numberedDirty = true
+                     end
                   end
                end
             end
@@ -648,20 +650,13 @@ local function processQueue()
 
    if numberedDirty then
       local numbered = {}
-      local grid = state.cells.grid
       for x = 0, state.grid.w - 1 do
-         local col = grid[x]
+         local col = state.cells.grid[x]
          if col then
             for z = 0, state.grid.h - 1 do
                local c = col[z]
                if c and c.state == "number" then
                   tinsert(numbered, c)
-                  state.cells.toClear[c] = nil
-                  state.cells.toFlag[c]  = nil
-                  if c.hlPart then
-                     c.hlPart.Enabled = false
-                     hlActive[c] = nil
-                  end
                end
             end
          end
@@ -691,7 +686,7 @@ local function updateL()
          for _, t in ipairs(c.neigh) do
             if fS[t] then
                flg = flg + 1
-            elseif not sS[t] and t.state ~= "number" and t.covered ~= false then
+            elseif not sS[t] and not isRevealed(t) then
                unk[#unk+1] = t
             end
          end
@@ -724,6 +719,112 @@ task.spawn(function()
    if ok and remote then FlagRemote = remote end
 end)
 
+-- ── Mobile Teleport Revealer Loop ─────────────────────────────────
+task.spawn(function()
+   while true do
+      task.wait(0.05)
+      if mobileTeleportEnabled then
+         local char = lp.Character
+         local hrp  = char and char:FindFirstChild(S_HRP)
+         if hrp then
+            local origin = hrp.Position
+            local safeTiles = {}
+            local guessTile = nil
+            
+            -- Collect safe tiles (green)
+            for cell in pairs(state.cells.toClear) do
+               if cell.part and cell.part.Parent
+               and not isRevealed(cell)
+               and not state.cells.toFlag[cell] then
+                  local dist = (origin - cell.part.Position).Magnitude
+                  if dist <= mobileTeleportReach then
+                     tinsert(safeTiles, { cell = cell, dist = dist })
+                  end
+               end
+            end
+
+            tsort(safeTiles, function(a, b) return a.dist < b.dist end)
+
+            -- If NO safe tiles and Auto Guess enabled, find guess tile (blue)
+            if #safeTiles == 0 and autoGuessEnabled and #state.cells.numbered > 0 then
+               local best, bestProb = nil, huge
+               local W, H = state.grid.w, state.grid.h
+               for x = 0, W - 1 do
+                  local col = state.cells.grid[x]
+                  if col then
+                     for z = 0, H - 1 do
+                        local gc = col[z]
+                        if gc and gc.part and gc.part.Parent
+                        and not isRevealed(gc) 
+                        and not state.cells.toFlag[gc] 
+                        and not state.cells.toClear[gc] then
+                           local p = gc._prob or 0.5
+                           if p < bestProb then 
+                              bestProb = p
+                              best = gc 
+                           end
+                        end
+                     end
+                  end
+               end
+               
+               if best and best.part then
+                  local dist = (origin - best.part.Position).Magnitude
+                  if dist <= mobileTeleportReach then
+                     guessTile = { cell = best, dist = dist }
+                  end
+               end
+            end
+
+            -- Teleport to safe tiles first
+            for _, entry in ipairs(safeTiles) do
+               if not mobileTeleportEnabled then break end
+               local cell = entry.cell
+               if cell.part and cell.part.Parent then
+                  local tilePos = cell.part.Position
+                  local tileSize = cell.part.Size
+                  hrp.CFrame = CFrame.new(
+                     tilePos.X,
+                     tilePos.Y + tileSize.Y/2 + 2,
+                     tilePos.Z
+                  )
+                  
+                  local actualDelay = mobileTeleportDelay
+                  if autoGuessEnabled then
+                     actualDelay = actualDelay * 0.5
+                  end
+                  
+                  task.wait(max(actualDelay, 0.01))
+               end
+            end
+            
+            -- Only teleport to guess tile if NO safe tiles
+            if #safeTiles == 0 and guessTile and mobileTeleportEnabled then
+               local cell = guessTile.cell
+               if cell.part and cell.part.Parent then
+                  local tilePos = cell.part.Position
+                  local tileSize = cell.part.Size
+                  hrp.CFrame = CFrame.new(
+                     tilePos.X,
+                     tilePos.Y + tileSize.Y/2 + 2,
+                     tilePos.Z
+                  )
+                  
+                  local actualDelay = mobileTeleportDelay
+                  if autoGuessEnabled then
+                     actualDelay = actualDelay * 0.5
+                  end
+                  
+                  task.wait(max(actualDelay, 0.01))
+               end
+            end
+         else
+            task.wait(0.5)
+         end
+      end
+   end
+end)
+
 -- ── Solver loop ───────────────────────────────────────────────────
 task.spawn(function()
    while true do
@@ -748,7 +849,7 @@ task.spawn(function()
          signalConns = {}
       end
 
-      if solverEnabled or autoGuessEnabled or autoFlagToggle then
+      if solverEnabled or autoGuessEnabled or autoFlagToggle or touchTilesEnabled or mobileTeleportEnabled then
          local folder = scanB()
          if folder then
             local pc = #folder:GetChildren()
@@ -782,120 +883,6 @@ task.spawn(function()
                pcall(updateH)
             end
          end
-      end
-   end
-end)
-
--- ── Mobile Teleport Revealer Loop ─────────────────────────────────
-local revealedTiles = {}
-
-task.spawn(function()
-   while true do
-      task.wait(0.05)
-      if mobileTeleportEnabled then
-         local char = lp.Character
-         local hrp  = char and char:FindFirstChild(S_HRP)
-         if hrp then
-            local origin = hrp.Position
-            local safeTiles = {}
-            local guessTile = nil
-            
-            -- Collect safe tiles (green) FIRST
-            for cell in pairs(state.cells.toClear) do
-               if cell.part and cell.part.Parent
-               and cell.state ~= "number"
-               and not state.cells.toFlag[cell]
-               and not revealedTiles[cell.part] then
-                  local dist = (origin - cell.part.Position).Magnitude
-                  if dist <= mobileTeleportReach then
-                     tinsert(safeTiles, { cell = cell, dist = dist })
-                  end
-               end
-            end
-            
-            -- Sort safe tiles by distance
-            tsort(safeTiles, function(a, b) return a.dist < b.dist end)
-            
-            -- If NO safe tiles and Auto Guess enabled, find guess tile
-            if #safeTiles == 0 and autoGuessEnabled and #state.cells.numbered > 0 then
-               local best, bestProb = nil, huge
-               local W, H = state.grid.w, state.grid.h
-               for x = 0, W - 1 do
-                  local col = state.cells.grid[x]
-                  if col then
-                     for z = 0, H - 1 do
-                        local gc = col[z]
-                        if gc and gc.part and gc.part.Parent
-                        and gc.state ~= "number" and gc.covered ~= false
-                        and not state.cells.toFlag[gc] and not state.cells.toClear[gc]
-                        and not revealedTiles[gc.part] then
-                           local p = gc._prob or 0.5
-                           if p < bestProb then bestProb = p; best = gc end
-                        end
-                     end
-                  end
-               end
-               if best and best.part then
-                  local dist = (origin - best.part.Position).Magnitude
-                  if dist <= mobileTeleportReach then
-                     guessTile = { cell = best, dist = dist }
-                  end
-               end
-            end
-
-            -- Teleport to safe tiles first
-            for _, entry in ipairs(safeTiles) do
-               if not mobileTeleportEnabled then break end
-               local cell = entry.cell
-               if cell.part and cell.part.Parent and not revealedTiles[cell.part] then
-                  revealedTiles[cell.part] = true
-                  
-                  local tilePos = cell.part.Position
-                  local tileSize = cell.part.Size
-                  hrp.CFrame = CFrame.new(
-                     tilePos.X,
-                     tilePos.Y + tileSize.Y/2 + 2,
-                     tilePos.Z
-                  )
-                  
-                  local actualDelay = mobileTeleportDelay
-                  if autoGuessEnabled then
-                     actualDelay = actualDelay * 0.5
-                  end
-                  
-                  task.wait(math.max(actualDelay, 0.01))
-                  task.wait(0.2)
-               end
-            end
-            
-            -- Only teleport to guess tile if NO safe tiles were available
-            if #safeTiles == 0 and guessTile and mobileTeleportEnabled then
-               local cell = guessTile.cell
-               if cell.part and cell.part.Parent and not revealedTiles[cell.part] then
-                  revealedTiles[cell.part] = true
-                  
-                  local tilePos = cell.part.Position
-                  local tileSize = cell.part.Size
-                  hrp.CFrame = CFrame.new(
-                     tilePos.X,
-                     tilePos.Y + tileSize.Y/2 + 2,
-                     tilePos.Z
-                  )
-                  
-                  local actualDelay = mobileTeleportDelay
-                  if autoGuessEnabled then
-                     actualDelay = actualDelay * 0.5
-                  end
-                  
-                  task.wait(math.max(actualDelay, 0.01))
-                  task.wait(0.2)
-               end
-            end
-         else
-            task.wait(0.5)
-         end
-      else
-         revealedTiles = {}
       end
    end
 end)
@@ -935,7 +922,7 @@ task.spawn(function()
                   pcall(function()
                      FlagRemote:FireServer(cell.part, token, true)
                   end)
-                  task.wait(math.max(flagDelay, 0.05))
+                  task.wait(max(flagDelay, 0.05))
                   if not hasF(cell.part) then
                      autoFlaggedSet[cell] = nil
                   end
