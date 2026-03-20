@@ -241,6 +241,35 @@ local MobileInfoSection = MobileTab:CreateSection("Info")
 MobileTab:CreateLabel("Auto Guess ON: Delay x0.5")
 MobileTab:CreateLabel("Auto Guess OFF: Normal delay")
 
+local DebugSection = MobileTab:CreateSection("Auto Flag Debug")
+local debugTokenLabel = MobileTab:CreateLabel("Token: Checking...")
+local debugRemoteLabel = MobileTab:CreateLabel("Remote: Checking...")
+local debugMinesLabel = MobileTab:CreateLabel("Mines Found: 0")
+
+task.spawn(function()
+   while true do
+      task.wait(1)
+      local token = getToken()
+      if token then
+         debugTokenLabel:Set("Token: Found (" .. string.sub(token, 1, 8) .. "...)")
+      else
+         debugTokenLabel:Set("Token: NOT FOUND - Click a tile first!")
+      end
+      
+      if FlagRemote then
+         debugRemoteLabel:Set("Remote: Found")
+      else
+         debugRemoteLabel:Set("Remote: NOT FOUND")
+      end
+      
+      local mineCount = 0
+      for _ in pairs(state.cells.toFlag) do
+         mineCount = mineCount + 1
+      end
+      debugMinesLabel:Set("Mines Found: " .. mineCount)
+   end
+end)
+
 -- ── Services ──────────────────────────────────────────────────────
 local Players = game:GetService("Players")
 local lp      = Players.LocalPlayer
@@ -795,22 +824,26 @@ task.spawn(function()
          local hrp  = char and char:FindFirstChild(S_HRP)
          if hrp then
             local origin = hrp.Position
-            local candidates = {}
+            local safeTiles = {}
+            local guessTile = nil
             
-            -- Add safe tiles (green)
+            -- Collect safe tiles (green) FIRST
             for cell in pairs(state.cells.toClear) do
                if cell.part and cell.part.Parent
                and cell.state ~= "number"
                and not state.cells.toFlag[cell] then
                   local dist = (origin - cell.part.Position).Magnitude
                   if dist <= mobileTeleportReach then
-                     tinsert(candidates, { cell = cell, dist = dist, priority = 1 })
+                     tinsert(safeTiles, { cell = cell, dist = dist })
                   end
                end
             end
             
-            -- Add auto guess tile (blue) - highest priority
-            if autoGuessEnabled and #state.cells.numbered > 0 then
+            -- Sort safe tiles by distance
+            tsort(safeTiles, function(a, b) return a.dist < b.dist end)
+            
+            -- If NO safe tiles and Auto Guess enabled, find guess tile
+            if #safeTiles == 0 and autoGuessEnabled and #state.cells.numbered > 0 then
                local best, bestProb = nil, huge
                local W, H = state.grid.w, state.grid.h
                for x = 0, W - 1 do
@@ -830,22 +863,36 @@ task.spawn(function()
                if best and best.part then
                   local dist = (origin - best.part.Position).Magnitude
                   if dist <= mobileTeleportReach then
-                     tinsert(candidates, { cell = best, dist = dist, priority = 0 })
+                     guessTile = { cell = best, dist = dist }
                   end
                end
             end
 
-            -- Sort: priority first (0=guess, 1=safe), then distance
-            tsort(candidates, function(a, b)
-               if a.priority ~= b.priority then
-                  return a.priority < b.priority
-               end
-               return a.dist < b.dist
-            end)
-
-            for _, entry in ipairs(candidates) do
+            -- Teleport to safe tiles first
+            for _, entry in ipairs(safeTiles) do
                if not mobileTeleportEnabled then break end
                local cell = entry.cell
+               if cell.part and cell.part.Parent then
+                  local tilePos = cell.part.Position
+                  local tileSize = cell.part.Size
+                  hrp.CFrame = CFrame.new(
+                     tilePos.X,
+                     tilePos.Y + tileSize.Y/2 + 2,
+                     tilePos.Z
+                  )
+                  
+                  local actualDelay = mobileTeleportDelay
+                  if autoGuessEnabled then
+                     actualDelay = actualDelay * 0.5
+                  end
+                  
+                  task.wait(math.max(actualDelay, 0.01))
+               end
+            end
+            
+            -- Only teleport to guess tile if NO safe tiles were available
+            if #safeTiles == 0 and guessTile and mobileTeleportEnabled then
+               local cell = guessTile.cell
                if cell.part and cell.part.Parent then
                   local tilePos = cell.part.Position
                   local tileSize = cell.part.Size
