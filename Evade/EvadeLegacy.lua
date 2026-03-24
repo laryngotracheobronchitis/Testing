@@ -40,6 +40,7 @@ Tabs = {}
 Tabs.Player = Window:Tab({ Title = "Player", Icon = "user" })
 Tabs.Auto = Window:Tab({ Title = "Auto", Icon = "zap" })
 Tabs.Main = Window:Tab({ Title = "Main", Icon = "home" })
+Tabs.Settings = Window:Tab({ Title = "Settings", Icon = "settings" })
 
 -- ============= CORE VARIABLES =============
 RealSpeed = 1500
@@ -627,6 +628,18 @@ if n then
 MaxSpeed = n
 reapplyModifications()
 end
+end
+})
+
+-- ============= SETTINGS =============
+Tabs.Settings:Section({ Title = "Keybinds" })
+Tabs.Settings:Keybind({
+Flag = "WinKeybind",
+Title = "Windows Keybind",
+Desc = "Keybind to open ui",
+Value = "RightControl",
+Callback = function(RightControl)
+Window:SetToggleKey(Enum.KeyCode[RightControl])
 end
 })
 
