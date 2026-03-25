@@ -23,8 +23,11 @@ Window = WindUI:CreateWindow({
     HideSearchBar = false,
     SideBarWidth = 180,
     OpenButton = {
+        Title = "Open UI",
         Enabled = false,
-        Scale = 0
+        Scale = 0,
+        Draggable = true,
+        OnlyMobile = false,
     },
 })
 
@@ -692,7 +695,7 @@ JumpCooldownInput = Tabs.Auto:Input({
     end
 })
 
--- ============= SETTINGS =============
+-- ============= SETTINGS (only Show/Hide UI) =============
 Tabs.Settings:Section({ Title = "UI Settings" })
 
 Tabs.Settings:Toggle({
