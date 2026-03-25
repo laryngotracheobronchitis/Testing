@@ -48,6 +48,13 @@ bhopHoldFeature = false
 jumpCooldown = 0.7
 autoJumpType = "Bounce"
 
+accelerationMethod = "Acceleration"
+groundFriction = -0.5
+AutoAccelerationEnabled = false
+MaxAcceleration = 3
+MinAcceleration = -1
+MaxSpeed = 70
+
 player = game:GetService("Players").LocalPlayer
 RunService = game:GetService("RunService")
 UserInputService = game:GetService("UserInputService")
@@ -61,6 +68,7 @@ GROUND_CHECK_DISTANCE = 3.5
 MAX_SLOPE_ANGLE = 45
 
 movementModule = nil
+originalApplyFriction = nil
 
 function IsOnGround()
     if not Character or not HumanoidRootPart or not Humanoid then return false end
@@ -146,6 +154,75 @@ function setupBhopJumpBtn()
     end)
 end
 
+function getCurrentSpeed()
+    if HumanoidRootPart then
+        return (HumanoidRootPart.Velocity * Vector3.new(1, 0, 1)).Magnitude
+    end
+    return 0
+end
+
+function reapplyModifications()
+    if not movementModule then return end
+
+    if not originalApplyFriction then
+        originalApplyFriction = movementModule.ApplyFriction
+    end
+
+    local isBhopActive = autoJumpEnabled or bhopHoldActive
+
+    if accelerationMethod == "No Acceleration" or not isBhopActive then
+        movementModule.ApplyFriction = originalApplyFriction
+        return
+    end
+
+    if AutoAccelerationEnabled and isBhopActive then
+        movementModule.ApplyFriction = function(self, friction, dt)
+            local currentSpeed = getCurrentSpeed()
+            local speedFraction = math.clamp((currentSpeed - 16) / (MaxSpeed - 16), 0, 1)
+            local dynamicAccel = MinAcceleration + (MaxAcceleration - MinAcceleration) * speedFraction
+            originalApplyFriction(self, dynamicAccel, dt)
+        end
+    elseif accelerationMethod == "Ground Acceleration" then
+        movementModule.ApplyFriction = function(self, friction, dt)
+            if IsOnGround() then
+                originalApplyFriction(self, groundFriction, dt)
+            else
+                originalApplyFriction(self, friction, dt)
+            end
+        end
+    elseif accelerationMethod == "Acceleration" then
+        movementModule.ApplyFriction = function(self, friction, dt)
+            originalApplyFriction(self, groundFriction, dt)
+        end
+    end
+end
+
+function setupModuleWatcher(character)
+    local movement = character:WaitForChild("Movement", 5)
+    if not movement then return end
+
+    local function applyToModule()
+        local success, module = pcall(require, movement)
+        if success and module then
+            movementModule = module
+            reapplyModifications()
+        end
+    end
+
+    applyToModule()
+
+    spawn(function()
+        while character and character.Parent do
+            wait(1)
+            local success, module = pcall(require, movement)
+            if success and module and module ~= movementModule then
+                movementModule = module
+                reapplyModifications()
+            end
+        end
+    end)
+end
+
 function setupCharacter(character)
     Character = character
     Humanoid = character:WaitForChild("Humanoid", 5)
@@ -191,6 +268,8 @@ function setupCharacter(character)
         end
     end
 
+    setupModuleWatcher(character)
+
     -- Jump Cap (NO particle effects, NO sound)
     local jumps = 0
     local jumpTick = tick()
@@ -217,6 +296,7 @@ function setupCharacter(character)
     end)
 
     setupBhopJumpBtn()
+    checkBhopState()
 
     task.wait(0.5)
 
@@ -241,12 +321,13 @@ end
 
 player.CharacterAdded:Connect(setupCharacter)
 
--- ============= EMOTE MACRO =============
-Tabs.Main:Section({Title="Emote Crouch",TextSize=20})
+-- ============= EMOTE MACRO WITH UNCROUCH =============
+Tabs.Main:Section({Title="Emote Crouch", TextSize=20})
 Tabs.Main:Divider()
 
 local p = game:GetService("Players").LocalPlayer
 local emoteData = {}
+local uncrouchEnabled = true
 
 function scanEmotes()
     for i=1,8 do
@@ -332,6 +413,12 @@ function triggerRandomEmote()
     end
 end
 
+function uncrouch()
+    if uncrouchEnabled then
+        player.PlayerScripts.Events.KeybindUsed:Fire("Crouch", false)
+    end
+end
+
 ButtonLib.Create:Button({
     Text = "Emote Crouch",
     Flag = "EmoteCrouch",
@@ -353,6 +440,26 @@ EmoteCrouchToggle = Tabs.Main:Toggle({
         end
     end
 })
+
+ShowUncrouchButtonToggle = Tabs.Main:Toggle({
+    Title = "Show Uncrouch Button",
+    Flag = "ShowUncrouchButton",
+    Value = false,
+    Callback = function(state)
+        if _G.DarahubLibBtn and _G.DarahubLibBtn.UncrouchButton then
+            _G.DarahubLibBtn.UncrouchButton.Visible = state
+        end
+    end
+})
+
+ButtonLib.Create:Button({
+    Text = "Uncrouch",
+    Flag = "UncrouchButton",
+    Visible = false,
+    Callback = function()
+        uncrouch()
+    end
+}).Position = UDim2.new(0.5, -125, 0.45, 0)
 
 -- ============= PLAYER SETTINGS =============
 Tabs.Player:Section({ Title = "Player Settings", TextSize = 40 })
@@ -431,6 +538,7 @@ BhopToggle = Tabs.Auto:Toggle({
     Callback = function(state)
         autoJumpEnabled = state
         checkBhopState()
+        reapplyModifications()
     end
 })
 
@@ -443,6 +551,7 @@ BhopHoldToggle = Tabs.Auto:Toggle({
         if not state then
             bhopHoldActive = false
             checkBhopState()
+            reapplyModifications()
         end
     end
 })
@@ -469,6 +578,95 @@ ButtonLib.Create:Toggle({
         end
     end
 }).Position = UDim2.new(0.5, -125, 0.4, 0)
+
+Tabs.Auto:Space()
+Tabs.Auto:Section({Title="Bhop Acceleration"})
+
+AccelerationDropdown = Tabs.Auto:Dropdown({
+    Title = "Bhop Mode",
+    Flag = "AccelerationDropdown",
+    Values = {"No Acceleration", "Ground Acceleration", "Acceleration"},
+    Value = "Acceleration",
+    Callback = function(value)
+        accelerationMethod = value
+        reapplyModifications()
+    end
+})
+
+AccelerationInput = Tabs.Auto:Input({
+    Title = "Bhop Acceleration (Negative Only)",
+    Flag = "AccelerationInput",
+    Placeholder = "-0.2",
+    Numeric = true,
+    Value = "-0.2",
+    Callback = function(value)
+        local n = tonumber(value)
+        if n then
+            groundFriction = n
+            reapplyModifications()
+        end
+    end
+})
+
+Tabs.Auto:Section({Title="Auto Acceleration (Legit)"})
+
+AutoAccelerationToggle = Tabs.Auto:Toggle({
+    Title = "Auto Acceleration (Legit)",
+    Flag = "AutoAccelerationToggle",
+    Value = false,
+    Callback = function(state)
+        AutoAccelerationEnabled = state
+        reapplyModifications()
+    end
+})
+
+MaxAccelerationInput = Tabs.Auto:Input({
+    Title = "Max Acceleration",
+    Flag = "MaxAccelerationInput",
+    Placeholder = "3",
+    Numeric = true,
+    Value = "3",
+    Callback = function(value)
+        local n = tonumber(value)
+        if n then
+            MaxAcceleration = n
+            reapplyModifications()
+        end
+    end
+})
+
+MinAccelerationInput = Tabs.Auto:Input({
+    Title = "Min Acceleration",
+    Flag = "MinAccelerationInput",
+    Placeholder = "-1",
+    Numeric = true,
+    Value = "-1",
+    Callback = function(value)
+        local n = tonumber(value)
+        if n then
+            MinAcceleration = n
+            reapplyModifications()
+        end
+    end
+})
+
+MaxSpeedInput = Tabs.Auto:Input({
+    Title = "Max Speed",
+    Flag = "MaxSpeedInput",
+    Placeholder = "70",
+    Numeric = true,
+    Value = "70",
+    Callback = function(value)
+        local n = tonumber(value)
+        if n then
+            MaxSpeed = n
+            reapplyModifications()
+        end
+    end
+})
+
+Tabs.Auto:Space()
+Tabs.Auto:Section({Title="Jump Settings"})
 
 AutoJumpTypeDropdown = Tabs.Auto:Dropdown({
     Title = "Auto Jump Mode",
@@ -527,6 +725,16 @@ Tabs.Settings:Keybind({
 
 Tabs.Settings:Space()
 
+UncrouchKeybind = Tabs.Settings:Keybind({
+    Title = "Uncrouch Keybind",
+    Desc = "Press to uncrouch",
+    Value = "",
+    Flag = "UncrouchKeybind",
+    Callback = function()
+        uncrouch()
+    end
+})
+
 EmoteCrouchKeybind = Tabs.Settings:Keybind({
     Title = "Trigger Random Emote",
     Desc = "Keybind to trigger random emote with crouch",
@@ -541,6 +749,6 @@ EmoteCrouchKeybind = Tabs.Settings:Keybind({
 
 WindUI:Notify({
     Title = "Evade Legacy",
-    Content = "Script loaded! Features: Speed, Jump Cap, Air Acceleration, Air Strafe, Auto Jump, Emote Macro",
+    Content = "Script loaded! Features: Speed, Jump Cap, Air Strafe, Auto Jump (with Acceleration), Emote Macro",
     Duration = 4
 })
