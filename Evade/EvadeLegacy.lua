@@ -23,11 +23,8 @@ Window = WindUI:CreateWindow({
     HideSearchBar = false,
     SideBarWidth = 180,
     OpenButton = {
-        Title = "Open UI",
-        Enabled = true,
-        Scale = 1,
-        Draggable = true,
-        OnlyMobile = false,
+        Enabled = false,
+        Scale = 0
     },
 })
 
