@@ -12,10 +12,10 @@ WindUI:SetTheme("Dark")
 
 Window = WindUI:CreateWindow({
     NewElements = true,
-    Title = "Evade Legacy",
+    Title = "EmoteMacro",
     Icon = "",
     Author = "",
-    Folder = "Evade-Legacy",
+    Folder = "Macro",
     Size = UDim2.fromOffset(400, 300),
     Theme = "Dark",
     HidePanelBackground = false,
