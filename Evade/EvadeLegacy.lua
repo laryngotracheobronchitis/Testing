@@ -695,7 +695,7 @@ JumpCooldownInput = Tabs.Auto:Input({
     end
 })
 
--- ============= SETTINGS (only Show/Hide UI) =============
+-- ============= SETTINGS =============
 Tabs.Settings:Section({ Title = "UI Settings" })
 
 Tabs.Settings:Toggle({
