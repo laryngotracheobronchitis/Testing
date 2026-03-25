@@ -12,10 +12,10 @@ WindUI:SetTheme("Dark")
 
 Window = WindUI:CreateWindow({
     NewElements = true,
-    Title = "Evade Legacy",
+    Title = "MovemenEvade",
     Icon = "",
     Author = "",
-    Folder = "Evade-Legacy",
+    Folder = "idk",
     Size = UDim2.fromOffset(450, 450),
     Theme = "Dark",
     HidePanelBackground = false,
