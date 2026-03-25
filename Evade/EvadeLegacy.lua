@@ -19,10 +19,7 @@ local Window = WindUI:CreateWindow({
     Acrylic = false,
     HideSearchBar = false,
     SideBarWidth = 180,
-    OpenButton = {
-        Enabled = false,
-        Scale = 0
-    },
+    OpenButton = { Enabled = false, Scale = 0 },
 })
 
 -- Create tabs
@@ -71,6 +68,7 @@ MAX_SLOPE_ANGLE = 45
 
 movementModule = nil
 originalApplyFriction = nil
+SpringSpeedMultiplier = 1
 
 particleTemplate = nil
 
@@ -169,11 +167,9 @@ function setupBhopJumpBtn()
         local jumpButton = touchGui:FindFirstChild("JumpButton", true)
         if not jumpButton then return end
         jumpButton.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                if bhopHoldFeature then
-                    bhopHoldActive = true
-                    checkBhopState()
-                end
+            if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and bhopHoldFeature then
+                bhopHoldActive = true
+                checkBhopState()
             end
         end)
         jumpButton.InputEnded:Connect(function(input)
@@ -231,16 +227,12 @@ function applyInfiniteSlide(character)
     if not InfiniteSlide then return end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-
     local movement = character:FindFirstChild("Movement")
     if not movement or not movement:IsA("ModuleScript") then return end
-
     local movementModule = require(movement)
     if not movementModule then return end
-
     local originalApplyFriction = movementModule.ApplyFriction
     if not originalApplyFriction then return end
-
     movementModule.ApplyFriction = function(self, friction, dt)
         originalApplyFriction(self, SlideFriction, dt)
     end
@@ -249,7 +241,6 @@ end
 function setupModuleWatcher(character)
     local movement = character:WaitForChild("Movement", 5)
     if not movement then return end
-
     movement.AncestryChanged:Connect(function()
         if movement.Parent then
             local newModule = require(movement)
@@ -274,7 +265,6 @@ function setupCharacter(character)
     local movement = character:FindFirstChild("Movement")
     if movement and movement:IsA("ModuleScript") then
         local movementModule = require(movement)
-
         local originalUpdate = movementModule.Update
         movementModule.Update = function(self, dt)
             local originalSpeed = self.j
@@ -287,7 +277,6 @@ function setupCharacter(character)
                     targetSpeed = targetSpeed * AirAcceleration
                     return originalAccelerate(accSelf, direction, targetSpeed, acceleration)
                 end
-
                 originalAirMove(airSelf, ...)
                 airSelf.Accelerate = originalAccelerate
             end
@@ -407,7 +396,6 @@ end
 if player.Character then
     setupCharacter(player.Character)
 end
-
 player.CharacterAdded:Connect(setupCharacter)
 
 -- ============= EMOTE MACRO =============
@@ -610,26 +598,29 @@ end
 end
 })
 
--- ================== GUI TOGGLE (Mobile + PC) ==================
+-- ================== SHOW/HIDE GUI (Mobile + PC) ==================
 local guiVisible = true
+local mainFrame = nil
+
+task.wait(1)
+pcall(function()
+    mainFrame = Window.Frame or Window.Main or Window:FindFirstChildWhichIsA("Frame", true)
+end)
 
 local function toggleGUI()
     guiVisible = not guiVisible
     pcall(function()
-        if guiVisible then
-            Window:Open()
-        else
-            Window:Close()
+        if mainFrame then
+            mainFrame.Visible = guiVisible
         end
     end)
 end
 
--- Tombol Toggle untuk Mobile
+-- Tombol Mobile
 local function createToggleButton()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "EvadeLegacyToggle"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = player:WaitForChild("PlayerGui")
+    local sg = Instance.new("ScreenGui")
+    sg.ResetOnSpawn = false
+    sg.Parent = player:WaitForChild("PlayerGui")
 
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 60, 0, 60)
@@ -640,16 +631,12 @@ local function createToggleButton()
     btn.TextScaled = true
     btn.Font = Enum.Font.GothamBold
     btn.BorderSizePixel = 0
-    btn.Parent = screenGui
+    btn.Parent = sg
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = btn
-
-    local stroke = Instance.new("UIStroke")
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    local stroke = Instance.new("UIStroke", btn)
     stroke.Color = Color3.fromRGB(0, 255, 120)
     stroke.Thickness = 2
-    stroke.Parent = btn
 
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -658,9 +645,9 @@ local function createToggleButton()
     end)
 end
 
--- Keybind untuk PC (Right Shift)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+-- Keybind PC
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
         toggleGUI()
     end
@@ -670,6 +657,6 @@ createToggleButton()
 
 WindUI:Notify({
     Title = "Evade Legacy",
-    Content = "Script loaded successfully!\nShow/Hide: Right Shift (PC) atau tap EL (Mobile)",
-    Duration = 5
+    Content = "Script loaded successfully!\nShow/Hide: Right Shift (PC) | Tap EL (Mobile)",
+    Duration = 6
 })
