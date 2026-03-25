@@ -598,25 +598,26 @@ end
 end
 })
 
--- ================== SHOW/HIDE GUI (Mobile + PC) ==================
+-- ================== SHOW/HIDE GUI (FIXED) ==================
 local guiVisible = true
 local mainFrame = nil
 
-task.wait(1)
+-- Cari frame utama WindUI (cara paling stabil)
+task.wait(1.5)
 pcall(function()
-    mainFrame = Window.Frame or Window.Main or Window:FindFirstChildWhichIsA("Frame", true)
+    mainFrame = Window.Frame or Window.MainFrame or Window:FindFirstChildWhichIsA("Frame", true)
 end)
 
 local function toggleGUI()
     guiVisible = not guiVisible
     pcall(function()
-        if mainFrame then
+        if mainFrame and mainFrame.Visible \~= nil then
             mainFrame.Visible = guiVisible
         end
     end)
 end
 
--- Tombol Mobile
+-- Tombol Mobile (EL)
 local function createToggleButton()
     local sg = Instance.new("ScreenGui")
     sg.ResetOnSpawn = false
@@ -633,10 +634,14 @@ local function createToggleButton()
     btn.BorderSizePixel = 0
     btn.Parent = sg
 
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-    local stroke = Instance.new("UIStroke", btn)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(0, 255, 120)
     stroke.Thickness = 2
+    stroke.Parent = btn
 
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -645,7 +650,7 @@ local function createToggleButton()
     end)
 end
 
--- Keybind PC
+-- Keybind PC (Right Shift)
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -657,6 +662,6 @@ createToggleButton()
 
 WindUI:Notify({
     Title = "Evade Legacy",
-    Content = "Script loaded successfully!\nShow/Hide: Right Shift (PC) | Tap EL (Mobile)",
+    Content = "Script loaded!\nShow/Hide → Right Shift (PC) atau tap tombol EL (Mobile)",
     Duration = 6
 })
