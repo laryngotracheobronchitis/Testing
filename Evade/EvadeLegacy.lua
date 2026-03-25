@@ -4,7 +4,8 @@ if getgenv().DaraHubExecuted then
 end
 getgenv().DaraHubExecuted = true
 
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local ButtonLib = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Button-lib.lua"))()
+WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 WindUI.TransparencyValue = 0.2
 WindUI:SetTheme("Dark")
@@ -36,8 +37,8 @@ Tabs.Settings = Window:Tab({ Title = "Settings", Icon = "settings" })
 
 -- ============= CORE VARIABLES =============
 RealSpeed = 1500
-JumpHeight = 3
 AirAcceleration = 1
+AirStrafeAcceleration = 182
 jumpcap = 1
 SpringSpeedMultiplier = 1
 
@@ -60,7 +61,6 @@ GROUND_CHECK_DISTANCE = 3.5
 MAX_SLOPE_ANGLE = 45
 
 movementModule = nil
-originalApplyFriction = nil
 
 function IsOnGround()
     if not Character or not HumanoidRootPart or not Humanoid then return false end
@@ -146,18 +146,12 @@ function setupBhopJumpBtn()
     end)
 end
 
-function getCurrentSpeed()
-    if HumanoidRootPart then
-        return (HumanoidRootPart.Velocity * Vector3.new(1, 0, 1)).Magnitude
-    end
-    return 0
-end
-
 function setupCharacter(character)
     Character = character
     Humanoid = character:WaitForChild("Humanoid", 5)
     HumanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
 
+    -- Speed & Strafe Acceleration
     local movement = character:FindFirstChild("Movement")
     if movement and movement:IsA("ModuleScript") then
         local movementModule = require(movement)
@@ -174,8 +168,21 @@ function setupCharacter(character)
                     targetSpeed = targetSpeed * AirAcceleration
                     return originalAccelerate(accSelf, direction, targetSpeed, acceleration)
                 end
+                
+                -- Air Strafe Acceleration
+                local originalStrafe = airSelf.Strafe
+                if originalStrafe then
+                    airSelf.Strafe = function(strSelf, direction, ...)
+                        direction = direction * (AirStrafeAcceleration / 182)
+                        return originalStrafe(strSelf, direction, ...)
+                    end
+                end
+                
                 originalAirMove(airSelf, ...)
                 airSelf.Accelerate = originalAccelerate
+                if originalStrafe then
+                    airSelf.Strafe = originalStrafe
+                end
             end
 
             originalUpdate(self, dt)
@@ -184,21 +191,11 @@ function setupCharacter(character)
         end
     end
 
-    local hum = character:WaitForChild("Humanoid")
-    hum.JumpHeight = JumpHeight
-
-    spawn(function()
-        while hum and hum.Parent do
-            hum.JumpHeight = JumpHeight
-            wait(0.5)
-        end
-    end)
-
-    -- Jump Cap (no effects)
+    -- Jump Cap (NO particle effects, NO sound)
     local jumps = 0
     local jumpTick = tick()
 
-    hum.StateChanged:Connect(function(old, new)
+    Humanoid.StateChanged:Connect(function(old, new)
         if new == Enum.HumanoidStateType.Landed then
             jumps = 0
         end
@@ -209,7 +206,7 @@ function setupCharacter(character)
         if jumps < jumpcap and tick() - jumpTick > 0.05 then
             jumpTick = tick()
             jumps = jumps + 1
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end)
 
@@ -245,7 +242,7 @@ end
 player.CharacterAdded:Connect(setupCharacter)
 
 -- ============= EMOTE MACRO =============
-Tabs.Main:Section({Title="Emote Crouch", TextSize=20})
+Tabs.Main:Section({Title="Emote Crouch",TextSize=20})
 Tabs.Main:Divider()
 
 local p = game:GetService("Players").LocalPlayer
@@ -335,6 +332,15 @@ function triggerRandomEmote()
     end
 end
 
+ButtonLib.Create:Button({
+    Text = "Emote Crouch",
+    Flag = "EmoteCrouch",
+    Visible = false,
+    Callback = function()
+        triggerRandomEmote()
+    end
+}).Position = UDim2.new(0.5, -125, 0.2, 0)
+
 EmoteCrouchToggle = Tabs.Main:Toggle({
     Title = "Emote Crouch",
     Flag = "EmoteCrouchToggle",
@@ -342,6 +348,9 @@ EmoteCrouchToggle = Tabs.Main:Toggle({
     Value = false,
     Callback = function(state)
         EmoteCrouchEnabled = state
+        if _G.DarahubLibBtn and _G.DarahubLibBtn.EmoteCrouch then
+            _G.DarahubLibBtn.EmoteCrouch.Visible = state
+        end
     end
 })
 
@@ -397,16 +406,16 @@ AirAccelerationInput = Tabs.Player:Input({
 
 Tabs.Player:Space()
 
-JumpHeightInput = Tabs.Player:Input({
-    Title = "Jump Height",
-    Flag = "JumpHeightInput",
-    Placeholder = "3",
+AirStrafeAccelerationInput = Tabs.Player:Input({
+    Title = "Air Strafe Acceleration",
+    Flag = "AirStrafeAccelerationInput",
+    Placeholder = "182",
     Numeric = true,
-    Value = "3",
+    Value = "182",
     Callback = function(value)
         local n = tonumber(value)
         if n then
-            JumpHeight = n
+            AirStrafeAcceleration = n
         end
     end
 })
@@ -437,6 +446,29 @@ BhopHoldToggle = Tabs.Auto:Toggle({
         end
     end
 })
+
+ShowBunnyHopButtonToggle = Tabs.Auto:Toggle({
+    Title = "Show Bhop Button",
+    Flag = "ShowBunnyHopButton",
+    Value = false,
+    Callback = function(state)
+        if _G.DarahubLibBtn and _G.DarahubLibBtn.BunnyHopToggle then
+            _G.DarahubLibBtn.BunnyHopToggle.Visible = state
+        end
+    end
+})
+
+ButtonLib.Create:Toggle({
+    Text = "Bunny Hop",
+    Flag = "BunnyHopToggle",
+    Default = false,
+    Visible = false,
+    Callback = function(s)
+        if BhopToggle then
+            BhopToggle:Set(s)
+        end
+    end
+}).Position = UDim2.new(0.5, -125, 0.4, 0)
 
 AutoJumpTypeDropdown = Tabs.Auto:Dropdown({
     Title = "Auto Jump Mode",
@@ -509,6 +541,6 @@ EmoteCrouchKeybind = Tabs.Settings:Keybind({
 
 WindUI:Notify({
     Title = "Evade Legacy",
-    Content = "Script loaded! Features: Auto Jump, Strafe, Jump Cap, Speed, Emote Macro",
+    Content = "Script loaded! Features: Speed, Jump Cap, Air Acceleration, Air Strafe, Auto Jump, Emote Macro",
     Duration = 4
 })
