@@ -1,5 +1,5 @@
 -- ==============================================================================
--- 1. BUTTON LIBRARY (Dari Source yang Kamu Berikan)
+-- 1. BUTTON LIBRARY (Modifikasi untuk Custom Size & Default Visibility)
 -- ==============================================================================
 local ButtonLib = {}
 local CoreGui = game:GetService("CoreGui")
@@ -12,129 +12,6 @@ local function getDPIScale()
     return camera.ViewportSize.Y / 1080
 end
 
-if not UserInputService.KeyboardEnabled then
-    local darahubGui = CoreGui:FindFirstChild("Darahub") or Instance.new("ScreenGui", CoreGui)
-    darahubGui.Name = "Darahub"
-    darahubGui.DisplayOrder = 78
-    darahubGui.IgnoreGuiInset = true
-    darahubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    local floatingButton = Instance.new("ImageButton")
-    floatingButton.Name = "FloatingButton_Darahub"
-    floatingButton.Parent = darahubGui
-    floatingButton.Active = true
-    floatingButton.BorderSizePixel = 0
-    floatingButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    floatingButton.Size = UDim2.new(0, 80, 0, 80)
-    floatingButton.Position = UDim2.new(0.85, 0, 0.05, 0)
-    floatingButton.BackgroundTransparency = 1
-    floatingButton.Image = "rbxassetid://137330250139083"
-    floatingButton.Visible = false
-    
-    local aspectRatio = Instance.new("UIAspectRatioConstraint", floatingButton)
-    aspectRatio.DominantAxis = Enum.DominantAxis.Height
-    local sizeConstraint = Instance.new("UISizeConstraint", floatingButton)
-    sizeConstraint.MinSize = Vector2.new(68, 68)
-    sizeConstraint.MaxSize = Vector2.new(100, 100)
-    local corner = Instance.new("UICorner", floatingButton)
-    corner.CornerRadius = UDim.new(1, 0)
-    local uiScale = Instance.new("UIScale", floatingButton)
-    uiScale.Scale = getDPIScale()
-    
-    local dragDetector = Instance.new("UIDragDetector", floatingButton)
-    local dragStartPosition = nil
-    local CLICK_THRESHOLD = 10
-    local HOLD_TIME = 1.5
-    local holdStartTime = nil
-    local isHolding = false
-    local holdCheckConnection = nil
-    local holdStartPosition = nil
-    local resettingDragDetector = false
-    
-    local function reinsertDragDetector()
-        resettingDragDetector = true
-        if dragDetector then
-            dragDetector.Enabled = false
-            task.wait(0.01)
-            dragDetector.Enabled = true
-        end
-        task.wait(0.2)
-        resettingDragDetector = false
-        dragStartPosition = nil
-    end
-    
-    local function startHoldCheck()
-        holdStartTime = tick()
-        holdStartPosition = floatingButton.Position
-        isHolding = true
-        holdCheckConnection = RunService.Heartbeat:Connect(function()
-            if not isHolding then
-                holdCheckConnection:Disconnect()
-                return
-            end
-            local currentPosition = floatingButton.Position
-            local positionChanged = currentPosition.X.Offset ~= holdStartPosition.X.Offset or 
-                                   currentPosition.Y.Offset ~= holdStartPosition.Y.Offset
-            if positionChanged then
-                isHolding = false
-                holdCheckConnection:Disconnect()
-                return
-            end
-            local holdDuration = tick() - holdStartTime
-            if holdDuration >= HOLD_TIME then
-                isHolding = false
-                holdCheckConnection:Disconnect()
-                reinsertDragDetector()
-            end
-        end)
-    end
-    
-    floatingButton.InputBegan:Connect(function(input)
-        if resettingDragDetector then return end
-        if input.UserInputType == Enum.UserInputType.Touch or 
-           input.UserInputType == Enum.UserInputType.MouseButton1 then
-            startHoldCheck()
-        end
-    end)
-    
-    floatingButton.InputEnded:Connect(function(input)
-        if resettingDragDetector then return end
-        if input.UserInputType == Enum.UserInputType.Touch or 
-           input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isHolding = false
-            if holdCheckConnection then
-                holdCheckConnection:Disconnect()
-            end
-        end
-    end)
-    
-    dragDetector.DragStart:Connect(function()
-        if resettingDragDetector then return end
-        dragStartPosition = floatingButton.Position
-        isHolding = false
-        if holdCheckConnection then
-            holdCheckConnection:Disconnect()
-        end
-    end)
-    
-    dragDetector.DragEnd:Connect(function()
-        if resettingDragDetector then return end
-        if dragStartPosition then
-            local currentPosition = floatingButton.Position
-            local distance = math.sqrt(
-                (currentPosition.X.Offset - dragStartPosition.X.Offset)^2 +
-                (currentPosition.Y.Offset - dragStartPosition.Y.Offset)^2
-            )
-            if distance < CLICK_THRESHOLD then
-                if Window and Window.Open then
-                    Window:Open()
-                end
-            end
-            dragStartPosition = nil
-        end
-    end)
-end
-
 ButtonLib.Create = {}
 
 local function buildBaseFrame(config)
@@ -142,20 +19,26 @@ local function buildBaseFrame(config)
     darahubGui.Name = "Darahub"
     darahubGui.IgnoreGuiInset = true
     darahubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
     local frame = Instance.new("Frame")
     local flag = config.Flag or config.Text or "Element"
     if _G.DarahubLibBtn[flag] then
         pcall(function() _G.DarahubLibBtn[flag]:Destroy() end)
     end
+    
+    local targetSizeX = config.SizeX or 250
+    local targetSizeY = config.SizeY or 90
+    
     frame.Name = flag
     frame.Parent = darahubGui
-    frame.Visible = config.Visible ~= false
+    frame.Visible = config.Visible ~= false -- Default true, kecuali secara eksplisit diset false
     frame.Draggable = true
     frame.Active = true
-    frame.Size = UDim2.new(0, 250, 0, 90)
+    frame.Size = UDim2.new(0, targetSizeX, 0, targetSizeY)
     frame.Position = config.Position or UDim2.new(0.5, -125, 0.5, -45)
     frame.BackgroundColor3 = Color3.new(1, 1, 1)
     frame.BackgroundTransparency = 0.2
+    
     local uiScale = Instance.new("UIScale", frame)
     uiScale.Scale = getDPIScale()
     local corner = Instance.new("UICorner", frame)
@@ -266,11 +149,11 @@ local function buildBaseFrame(config)
     function api:SetVisible(visible)
         frame.Visible = visible
     end
-    return api, frame, label, drag, flag
+    return api, frame, label, drag, flag, targetSizeX, targetSizeY
 end
 
 function ButtonLib.Create:Toggle(config)
-    local api, frame, label, drag, flag = buildBaseFrame(config)
+    local api, frame, label, drag, flag, targetSizeX, targetSizeY = buildBaseFrame(config)
     local callback = config.Callback or config[1] or function() end
     local baseText = config.Text or "Toggle"
     local state = config.Default or false
@@ -304,9 +187,9 @@ function ButtonLib.Create:Toggle(config)
             (currentPos.Y.Offset - startPos.Y.Offset)^2
         )
         if dist < 5 then
-            frame:TweenSize(UDim2.new(0, 240, 0, 85), "Out", "Quad", 0.05, true)
+            frame:TweenSize(UDim2.new(0, targetSizeX - 10, 0, targetSizeY - 5), "Out", "Quad", 0.05, true)
             task.wait(0.05)
-            frame:TweenSize(UDim2.new(0, 250, 0, 90), "Out", "Quad", 0.05, true)
+            frame:TweenSize(UDim2.new(0, targetSizeX, 0, targetSizeY), "Out", "Quad", 0.05, true)
             api:Set(not state)
         end
         startPos = nil
@@ -323,7 +206,6 @@ end
 loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))()
 local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
--- Nama disingkat agar toggle show/hide UI tidak panjang
 local Window = WindUI:CreateWindow({
     NewElements = true,
     Title = "Evade",
@@ -340,26 +222,37 @@ Window:ToggleTransparency(true)
 Window:DisableTopbarButtons({ "Fullscreen" })
 
 local Tabs = {
-    Main = Window:Tab({ Title = "Main", Icon = "layout-grid" })
+    Main = Window:Tab({ Title = "Main", Icon = "layout-grid" }),
+    Visuals = Window:Tab({ Title = "Visuals & Utility", Icon = "eye" })
 }
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
 local player = Players.LocalPlayer
 
 -- ==============================================================================
--- 3. MOVEMENT MODIFICATIONS (Strafe Acceleration, Jump Cap, Auto-Apply on Respawn)
+-- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC
 -- ==============================================================================
 local m = require(game.ReplicatedStorage.Modules.Character.CharacterTable.CharacterController.Local.Movement.returnValues)
 local originalGetStats = m.getStats
 local movementInstances = {}
 
--- Menyimpan nilai stat yang diatur user agar bisa diapply otomatis saat respawn
 local savedMovementStats = {
     AirStrafeAcceleration = 182,
     JumpCap = 1
 }
+
+local autoJumpEnabled = false
+local bhopHoldActive = false
+local accelerationMethod = "Acceleration"
+local accelerationValue = -0.2
+local Bhop = false
+local BhopHold = false
+local bhopLoaded = false
+local bhopConnection = nil
+local Character, Humanoid, HumanoidRootPart = nil, nil, nil
 
 local function findMovementInstances()
     movementInstances = {}
@@ -372,7 +265,6 @@ local function findMovementInstances()
 end
 
 local function applySavedMovementStats()
-    -- Melakukan loop sebentar untuk memastikan controller movement baru sudah dimuat Evade setelah respawn
     task.spawn(function()
         for i = 1, 10 do
             task.wait(0.5)
@@ -388,19 +280,6 @@ local function applySavedMovementStats()
         end
     end)
 end
-
--- ==============================================================================
--- 4. BHOP LOGIC
--- ==============================================================================
-local autoJumpEnabled = false
-local bhopHoldActive = false
-local accelerationMethod = "Acceleration"
-local accelerationValue = -0.2
-local Bhop = false
-local BhopHold = false
-local bhopLoaded = false
-local bhopConnection = nil
-local Character, Humanoid, HumanoidRootPart = nil, nil, nil
 
 local function IsOnGround()
     if not Character or not HumanoidRootPart or not Humanoid then return false end
@@ -452,7 +331,7 @@ end
 player.CharacterAdded:Connect(function(char)
     Character = char
     setupJumpButton()
-    applySavedMovementStats() -- OTO-APPLY saat karakter respawn / reset
+    applySavedMovementStats() 
     if autoJumpEnabled or bhopHoldActive then
         task.wait(0.5)
         checkBhopState()
@@ -478,19 +357,61 @@ m.getStats = function(s, p)
 end
 
 -- ==============================================================================
--- 5. FLOATING BHOP TOGGLE BUTTON (Menggunakan ButtonLib yang kamu minta)
+-- 4. FLOATING BHOP TOGGLE BUTTON (Membesar & Default Disembunyikan)
 -- ==============================================================================
 local FloatingBhopToggle = ButtonLib.Create:Toggle({
     Text = "Bhop",
     Flag = "FloatingBhop",
     Default = false,
-    Position = UDim2.new(0.5, -125, 0.2, 0), -- Posisi di layar
+    Visible = false, -- Disembunyikan di awal
+    SizeX = 300,     -- Ukuran diperbesar
+    SizeY = 110,
+    Position = UDim2.new(0.5, -150, 0.2, 0),
     Callback = function(state)
         Bhop = state
         autoJumpEnabled = state
         checkBhopState()
     end
 })
+
+-- ==============================================================================
+-- 5. VISUALS & UTILITIES SCRIPTING (Timer, Fullbright)
+-- ==============================================================================
+local fullbrightEnabled = false
+RunService.RenderStepped:Connect(function()
+    if fullbrightEnabled then
+        Lighting.Ambient = Color3.new(1, 1, 1)
+        Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
+        Lighting.ColorShift_Top = Color3.new(1, 1, 1)
+        Lighting.GlobalShadows = false
+    end
+end)
+
+local timerGui = Instance.new("ScreenGui", CoreGui)
+timerGui.Name = "EvadeTimerDisplay"
+timerGui.ResetOnSpawn = false
+local timerLabel = Instance.new("TextLabel", timerGui)
+timerLabel.Size = UDim2.new(0, 200, 0, 50)
+timerLabel.Position = UDim2.new(0.5, -100, 0, 0)
+timerLabel.BackgroundTransparency = 0.3
+timerLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+timerLabel.TextColor3 = Color3.new(1, 1, 1)
+timerLabel.TextScaled = true
+timerLabel.Font = Enum.Font.FredokaOne
+timerLabel.Visible = false
+
+local corner = Instance.new("UICorner", timerLabel)
+corner.CornerRadius = UDim.new(0, 10)
+
+local startTime = tick()
+RunService.RenderStepped:Connect(function()
+    if timerLabel.Visible then
+        local t = tick() - startTime
+        local mins = math.floor(t / 60)
+        local secs = math.floor(t % 60)
+        timerLabel.Text = string.format("Timer: %02d:%02d", mins, secs)
+    end
+end)
 
 -- ==============================================================================
 -- 6. COLA LOGIC
@@ -532,13 +453,21 @@ setreadonly(mt, true)
 -- ==============================================================================
 -- 7. WINDUI TABS & MENUS
 -- ==============================================================================
+-- [ TAB MAIN ] --
 Tabs.Main:Section({ Title = "Movement Options", TextSize = 20 })
 Tabs.Main:Divider()
 
--- Toggle Bhop di Menu WindUI juga akan sinkron dengan Button Floating
 Tabs.Main:Toggle({
-    Title = "Bhop",
-    Flag = "BhopToggle",
+    Title = "Show Floating Bhop Button",
+    Desc = "Memunculkan toggle bhop besar di layar",
+    Value = false,
+    Callback = function(state)
+        FloatingBhopToggle:SetVisible(state)
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Bhop (Sync with Floating)",
     Value = false,
     Callback = function(state)
         FloatingBhopToggle:Set(state)
@@ -559,7 +488,7 @@ Tabs.Main:Dropdown({
 })
 
 Tabs.Main:Input({
-    Title = "Bhop Acceleration (Negative Only)",
+    Title = "Bhop Acceleration (Negative)",
     Placeholder = "-0.2", Numeric = true, Value = "-0.2",
     Callback = function(value) local n = tonumber(value) if n then accelerationValue = n end end
 })
@@ -596,11 +525,40 @@ Tabs.Main:Toggle({ Title = "Unlimited Cola", Value = false, Callback = function(
 Tabs.Main:Input({ Title = "Cola Speed Multiplier", Placeholder = "1.4", Numeric = true, Value = "1.4", Callback = function(value) ColaCheat.CustomSpeed = tonumber(value) or 1.4 end })
 Tabs.Main:Input({ Title = "Cola Duration", Placeholder = "3.5", Numeric = true, Value = "3.5", Callback = function(value) ColaCheat.CustomDuration = tonumber(value) or 3.5 end })
 
-Tabs.Main:Space()
-Tabs.Main:Section({ Title = "World Utility", TextSize = 20 })
-Tabs.Main:Divider()
+-- [ TAB VISUALS ] --
+Tabs.Visuals:Section({ Title = "Visuals & Helpers", TextSize = 20 })
+Tabs.Visuals:Divider()
 
-Tabs.Main:Button({
+Tabs.Visuals:Toggle({
+    Title = "Fullbright",
+    Desc = "Menerangkan seluruh map",
+    Value = false,
+    Callback = function(state)
+        fullbrightEnabled = state
+    end
+})
+
+Tabs.Visuals:Toggle({
+    Title = "Show Timer Display",
+    Desc = "Menampilkan timer di atas layar",
+    Value = false,
+    Callback = function(state)
+        timerLabel.Visible = state
+    end
+})
+
+Tabs.Visuals:Toggle({
+    Title = "Hide Roblox Leaderboard",
+    Desc = "Menghilangkan Player List (Tab) agar layar lega",
+    Value = false,
+    Callback = function(state)
+        pcall(function()
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, not state)
+        end)
+    end
+})
+
+Tabs.Visuals:Button({
     Title = "Clear Invis Walls",
     Callback = function()
         pcall(function()
