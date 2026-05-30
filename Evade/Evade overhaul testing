@@ -19,26 +19,26 @@ local function buildBaseFrame(config)
     darahubGui.Name = "Darahub"
     darahubGui.IgnoreGuiInset = true
     darahubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
+
     local frame = Instance.new("Frame")
     local flag = config.Flag or config.Text or "Element"
     if _G.DarahubLibBtn[flag] then
         pcall(function() _G.DarahubLibBtn[flag]:Destroy() end)
     end
-    
+
     local targetSizeX = config.SizeX or 250
     local targetSizeY = config.SizeY or 90
-    
+
     frame.Name = flag
     frame.Parent = darahubGui
-    frame.Visible = config.Visible ~= false -- Default true, kecuali secara eksplisit diset false
+    frame.Visible = config.Visible ~= false
     frame.Draggable = true
     frame.Active = true
     frame.Size = UDim2.new(0, targetSizeX, 0, targetSizeY)
     frame.Position = config.Position or UDim2.new(0.5, -125, 0.5, -45)
     frame.BackgroundColor3 = Color3.new(1, 1, 1)
     frame.BackgroundTransparency = 0.2
-    
+
     local uiScale = Instance.new("UIScale", frame)
     uiScale.Scale = getDPIScale()
     local corner = Instance.new("UICorner", frame)
@@ -65,14 +65,14 @@ local function buildBaseFrame(config)
     label.ZIndex = 5
     local drag = Instance.new("UIDragDetector", frame)
     drag.Parent.Draggable = true
-    
+
     local HOLD_TIME_FRAME = 1.5
     local isHoldingFrame = false
     local holdStartTimeFrame = nil
     local holdCheckConnectionFrame = nil
     local holdStartPositionFrame = nil
     local resettingDragDetectorFrame = false
-    
+
     local function reinsertDragDetectorFrame()
         resettingDragDetectorFrame = true
         if drag then
@@ -85,7 +85,7 @@ local function buildBaseFrame(config)
         task.wait(0.2)
         resettingDragDetectorFrame = false
     end
-    
+
     local function startHoldCheckFrame()
         holdStartTimeFrame = tick()
         holdStartPositionFrame = frame.Position
@@ -96,8 +96,8 @@ local function buildBaseFrame(config)
                 return
             end
             local currentPosition = frame.Position
-            local positionChanged = currentPosition.X.Offset ~= holdStartPositionFrame.X.Offset or 
-                                   currentPosition.Y.Offset ~= holdStartPositionFrame.Y.Offset
+            local positionChanged = currentPosition.X.Offset ~= holdStartPositionFrame.X.Offset or
+                currentPosition.Y.Offset ~= holdStartPositionFrame.Y.Offset
             if positionChanged then
                 isHoldingFrame = false
                 holdCheckConnectionFrame:Disconnect()
@@ -111,26 +111,26 @@ local function buildBaseFrame(config)
             end
         end)
     end
-    
+
     frame.InputBegan:Connect(function(input)
         if resettingDragDetectorFrame then return end
-        if input.UserInputType == Enum.UserInputType.Touch or 
-           input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.Touch or
+            input.UserInputType == Enum.UserInputType.MouseButton1 then
             startHoldCheckFrame()
         end
     end)
-    
+
     frame.InputEnded:Connect(function(input)
         if resettingDragDetectorFrame then return end
-        if input.UserInputType == Enum.UserInputType.Touch or 
-           input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.Touch or
+            input.UserInputType == Enum.UserInputType.MouseButton1 then
             isHoldingFrame = false
             if holdCheckConnectionFrame then
                 holdCheckConnectionFrame:Disconnect()
             end
         end
     end)
-    
+
     drag.DragStart:Connect(function()
         if resettingDragDetectorFrame then return end
         isHoldingFrame = false
@@ -138,7 +138,7 @@ local function buildBaseFrame(config)
             holdCheckConnectionFrame:Disconnect()
         end
     end)
-    
+
     local api = {}
     function api:Destroy()
         if _G.DarahubLibBtn[flag] then
@@ -158,12 +158,12 @@ function ButtonLib.Create:Toggle(config)
     local baseText = config.Text or "Toggle"
     local state = config.Default or false
     local resettingDragDetector = false
-    
+
     local function updateUI()
         label.Text = baseText .. (state and " : ON" or " : OFF")
     end
     updateUI()
-    
+
     function api:Set(val)
         if state ~= val then
             state = val
@@ -171,20 +171,20 @@ function ButtonLib.Create:Toggle(config)
             pcall(callback, state)
         end
     end
-    
+
     local startPos
-    drag.DragStart:Connect(function() 
+    drag.DragStart:Connect(function()
         if resettingDragDetector then return end
-        startPos = frame.Position 
+        startPos = frame.Position
     end)
-    
+
     drag.DragEnd:Connect(function()
         if resettingDragDetector then return end
         if not startPos then return end
         local currentPos = frame.Position
         local dist = math.sqrt(
-            (currentPos.X.Offset - startPos.X.Offset)^2 +
-            (currentPos.Y.Offset - startPos.Y.Offset)^2
+            (currentPos.X.Offset - startPos.X.Offset) ^ 2 +
+            (currentPos.Y.Offset - startPos.Y.Offset) ^ 2
         )
         if dist < 5 then
             frame:TweenSize(UDim2.new(0, targetSizeX - 10, 0, targetSizeY - 5), "Out", "Quad", 0.05, true)
@@ -194,7 +194,7 @@ function ButtonLib.Create:Toggle(config)
         end
         startPos = nil
     end)
-    
+
     _G.DarahubLibBtn[flag] = api
     return api
 end
@@ -231,6 +231,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local StarterGui = game:GetService("StarterGui")
 local player = Players.LocalPlayer
+
 
 -- ==============================================================================
 -- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC
@@ -285,10 +286,9 @@ local function IsOnGround()
     if not Character or not HumanoidRootPart or not Humanoid then return false end
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {Character}
+    raycastParams.FilterDescendantsInstances = { Character }
     local rayOrigin = HumanoidRootPart.Position
     local raycastResult = workspace:Raycast(rayOrigin, Vector3.new(0, -3.5, 0), raycastParams)
-    
     if not raycastResult then return false end
     local angle = math.deg(math.acos(raycastResult.Normal:Dot(Vector3.new(0, 1, 0))))
     return angle <= 45
@@ -300,7 +300,6 @@ local function updateBhop()
     Humanoid = Character and Character:FindFirstChild("Humanoid")
     HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
     if not Character or not Humanoid then return end
-
     if (autoJumpEnabled or bhopHoldActive) and IsOnGround() then
         Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
@@ -331,7 +330,7 @@ end
 player.CharacterAdded:Connect(function(char)
     Character = char
     setupJumpButton()
-    applySavedMovementStats() 
+    applySavedMovementStats()
     if autoJumpEnabled or bhopHoldActive then
         task.wait(0.5)
         checkBhopState()
@@ -356,15 +355,16 @@ m.getStats = function(s, p)
     return v
 end
 
+
 -- ==============================================================================
--- 4. FLOATING BHOP TOGGLE BUTTON (Membesar & Default Disembunyikan)
+-- 4. FLOATING BHOP TOGGLE BUTTON
 -- ==============================================================================
 local FloatingBhopToggle = ButtonLib.Create:Toggle({
     Text = "Bhop",
     Flag = "FloatingBhop",
     Default = false,
-    Visible = false, -- Disembunyikan di awal
-    SizeX = 300,     -- Ukuran diperbesar
+    Visible = false,
+    SizeX = 300,
     SizeY = 110,
     Position = UDim2.new(0.5, -150, 0.2, 0),
     Callback = function(state)
@@ -373,6 +373,7 @@ local FloatingBhopToggle = ButtonLib.Create:Toggle({
         checkBhopState()
     end
 })
+
 
 -- ==============================================================================
 -- 5. VISUALS & UTILITIES SCRIPTING (Timer, Fullbright)
@@ -387,31 +388,70 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ==============================================================================
+-- TIMER DISPLAY (Style DaraHub: gradient dark, UIStroke, UICorner, FredokaOne)
+-- ==============================================================================
 local timerGui = Instance.new("ScreenGui", CoreGui)
 timerGui.Name = "EvadeTimerDisplay"
 timerGui.ResetOnSpawn = false
-local timerLabel = Instance.new("TextLabel", timerGui)
-timerLabel.Size = UDim2.new(0, 200, 0, 50)
-timerLabel.Position = UDim2.new(0.5, -100, 0, 0)
-timerLabel.BackgroundTransparency = 0.3
-timerLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+timerGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+timerGui.IgnoreGuiInset = true
+
+local timerFrame = Instance.new("Frame", timerGui)
+timerFrame.Name = "TimerFrame"
+timerFrame.Size = UDim2.new(0, 220, 0, 60)
+timerFrame.Position = UDim2.new(0.5, -110, 0, 10)
+timerFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+timerFrame.BackgroundTransparency = 0.2
+timerFrame.Visible = false
+
+-- UIScale mengikuti DPI seperti ButtonLib
+local timerUIScale = Instance.new("UIScale", timerFrame)
+timerUIScale.Scale = getDPIScale()
+
+-- UICorner seperti DaraHub
+local timerCorner = Instance.new("UICorner", timerFrame)
+timerCorner.CornerRadius = UDim.new(0, 10)
+
+-- UIStroke border hitam tebal (outer)
+local timerStrokeB = Instance.new("UIStroke", timerFrame)
+timerStrokeB.Thickness = 2
+timerStrokeB.Color = Color3.new(0, 0, 0)
+timerStrokeB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- UIStroke border putih tipis (inner glow)
+local timerStrokeW = Instance.new("UIStroke", timerFrame)
+timerStrokeW.Thickness = 1
+timerStrokeW.Color = Color3.new(1, 1, 1)
+timerStrokeW.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Gradient dark seperti buildBaseFrame DaraHub
+local timerGrad = Instance.new("UIGradient", timerFrame)
+timerGrad.Rotation = 90
+timerGrad.Color = ColorSequence.new(Color3.fromRGB(47, 47, 47), Color3.new(0, 0, 0))
+
+-- TextLabel timer
+local timerLabel = Instance.new("TextLabel", timerFrame)
+timerLabel.Name = "TimerLabel"
+timerLabel.Size = UDim2.new(1, -20, 1, 0)
+timerLabel.Position = UDim2.new(0, 10, 0, 0)
+timerLabel.BackgroundTransparency = 1
 timerLabel.TextColor3 = Color3.new(1, 1, 1)
 timerLabel.TextScaled = true
 timerLabel.Font = Enum.Font.FredokaOne
-timerLabel.Visible = false
-
-local corner = Instance.new("UICorner", timerLabel)
-corner.CornerRadius = UDim.new(0, 10)
+timerLabel.Text = "Timer: 00:00"
+timerLabel.ZIndex = 5
 
 local startTime = tick()
 RunService.RenderStepped:Connect(function()
-    if timerLabel.Visible then
+    if timerFrame.Visible then
         local t = tick() - startTime
         local mins = math.floor(t / 60)
         local secs = math.floor(t % 60)
         timerLabel.Text = string.format("Timer: %02d:%02d", mins, secs)
     end
 end)
+
 
 -- ==============================================================================
 -- 6. COLA LOGIC
@@ -427,14 +467,14 @@ setreadonly(mt, false)
 
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    local args = {...}
+    local args = { ... }
 
     if method == "FireServer" and self == ToolAction then
         if args[1] == 0 then
             firstFired = true
             task.delay(0.5, function()
                 if ColaCheat.CustomSpeed and ColaCheat.CustomDuration then
-                    firesignal(SpeedBoostEvent.OnClientEvent, "Drink", ColaCheat.CustomSpeed, ColaCheat.CustomDuration, Color3.new(1,1,1))
+                    firesignal(SpeedBoostEvent.OnClientEvent, "Drink", ColaCheat.CustomSpeed, ColaCheat.CustomDuration, Color3.new(1, 1, 1))
                 end
             end)
         elseif firstFired and args[1] == 2 then
@@ -450,8 +490,60 @@ mt.__namecall = newcclosure(function(self, ...)
 end)
 setreadonly(mt, true)
 
+
 -- ==============================================================================
--- 7. WINDUI TABS & MENUS
+-- 7. LEADERBOARD TOPBAR BUTTON (style DaraHub - toggle leaderboard PlayerGui)
+-- ==============================================================================
+-- Referensi: leaderboard ada di PlayerGui.Global.Leaderboard
+-- DaraHub asli pakai coroutine untuk setup exit button leaderboard
+-- Di sini kita buat toggle button di topbar WindUI untuk show/hide leaderboard
+
+local leaderboardVisible = false
+
+local function getLeaderboard()
+    local pg = player:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local global = pg:FindFirstChild("Global")
+    if not global then return nil end
+    return global:FindFirstChild("Leaderboard")
+end
+
+local function setLeaderboardVisible(state)
+    local lb = getLeaderboard()
+    if lb then
+        lb.Visible = state
+        leaderboardVisible = state
+    end
+end
+
+-- Setup exit button leaderboard seperti DaraHub asli (agar X button leaderboard tetap berfungsi)
+coroutine.wrap(function()
+    task.wait(3)
+    while true do
+        pcall(function()
+            local lb = getLeaderboard()
+            if lb then
+                local exitButton = lb:FindFirstChild("Center") and lb.Center:FindFirstChild("XboxExit")
+                if exitButton then
+                    exitButton.Visible = true
+                    -- Cek apakah sudah diconnect sebelumnya
+                    if not exitButton:GetAttribute("ExitConnected") then
+                        exitButton:SetAttribute("ExitConnected", true)
+                        exitButton:FindFirstChild("Exit") and exitButton.Exit.MouseButton1Click:Connect(function()
+                            lb.Visible = false
+                            leaderboardVisible = false
+                        end)
+                    end
+                end
+            end
+        end)
+        task.wait(5)
+    end
+end)()
+
+
+-- ==============================================================================
+-- 8. WINDUI TABS & MENUS
 -- ==============================================================================
 -- [ TAB MAIN ] --
 Tabs.Main:Section({ Title = "Movement Options", TextSize = 20 })
@@ -482,7 +574,7 @@ Tabs.Main:Toggle({
 
 Tabs.Main:Dropdown({
     Title = "Bhop Mode",
-    Values = {"No Acceleration", "Ground Acceleration", "Acceleration"},
+    Values = { "No Acceleration", "Ground Acceleration", "Acceleration" },
     Value = "Acceleration",
     Callback = function(value) accelerationMethod = value end
 })
@@ -525,6 +617,7 @@ Tabs.Main:Toggle({ Title = "Unlimited Cola", Value = false, Callback = function(
 Tabs.Main:Input({ Title = "Cola Speed Multiplier", Placeholder = "1.4", Numeric = true, Value = "1.4", Callback = function(value) ColaCheat.CustomSpeed = tonumber(value) or 1.4 end })
 Tabs.Main:Input({ Title = "Cola Duration", Placeholder = "3.5", Numeric = true, Value = "3.5", Callback = function(value) ColaCheat.CustomDuration = tonumber(value) or 3.5 end })
 
+
 -- [ TAB VISUALS ] --
 Tabs.Visuals:Section({ Title = "Visuals & Helpers", TextSize = 20 })
 Tabs.Visuals:Divider()
@@ -540,21 +633,26 @@ Tabs.Visuals:Toggle({
 
 Tabs.Visuals:Toggle({
     Title = "Show Timer Display",
-    Desc = "Menampilkan timer di atas layar",
+    Desc = "Menampilkan timer bergaya DaraHub di atas layar",
     Value = false,
     Callback = function(state)
-        timerLabel.Visible = state
+        timerFrame.Visible = state
+        if state then
+            -- Reset timer setiap kali dinyalakan
+            startTime = tick()
+        end
     end
 })
 
+-- [PERBAIKAN] Toggle Leaderboard Topbar
+-- Bukan hide PlayerList (StarterGui CoreGuiType), 
+-- tapi show/hide Leaderboard button yang ada di topbar Evade (PlayerGui.Global.Leaderboard)
 Tabs.Visuals:Toggle({
-    Title = "Hide Roblox Leaderboard",
-    Desc = "Menghilangkan Player List (Tab) agar layar lega",
+    Title = "Show Leaderboard",
+    Desc = "Toggle tampilan Leaderboard Evade (tombol topbar)",
     Value = false,
     Callback = function(state)
-        pcall(function()
-            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, not state)
-        end)
+        setLeaderboardVisible(state)
     end
 })
 
