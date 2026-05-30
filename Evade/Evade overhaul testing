@@ -529,10 +529,13 @@ coroutine.wrap(function()
                     -- Cek apakah sudah diconnect sebelumnya
                     if not exitButton:GetAttribute("ExitConnected") then
                         exitButton:SetAttribute("ExitConnected", true)
-                        exitButton:FindFirstChild("Exit") and exitButton.Exit.MouseButton1Click:Connect(function()
-                            lb.Visible = false
-                            leaderboardVisible = false
-                        end)
+                        local exitBtn = exitButton:FindFirstChild("Exit")
+                        if exitBtn then
+                            exitBtn.MouseButton1Click:Connect(function()
+                                lb.Visible = false
+                                leaderboardVisible = false
+                            end)
+                        end
                     end
                 end
             end
