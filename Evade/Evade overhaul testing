@@ -389,68 +389,218 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==============================================================================
--- TIMER DISPLAY (Style DaraHub: gradient dark, UIStroke, UICorner, FredokaOne)
+-- TIMER DISPLAY (Persis seperti DaraHub asli - baca workspace.Game.Stats attribute)
 -- ==============================================================================
-local timerGui = Instance.new("ScreenGui", CoreGui)
-timerGui.Name = "EvadeTimerDisplay"
-timerGui.ResetOnSpawn = false
-timerGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-timerGui.IgnoreGuiInset = true
+local localPlayer = Players.LocalPlayer
+local PlayerGui = localPlayer:WaitForChild("PlayerGui")
 
-local timerFrame = Instance.new("Frame", timerGui)
-timerFrame.Name = "TimerFrame"
-timerFrame.Size = UDim2.new(0, 220, 0, 60)
-timerFrame.Position = UDim2.new(0.5, -110, 0, 10)
-timerFrame.BackgroundColor3 = Color3.new(1, 1, 1)
-timerFrame.BackgroundTransparency = 0.2
-timerFrame.Visible = false
+local TimerGUI = nil
+local TimerEnabled = false
+local OriginalTimerVisible = false
+local CheckingGameTimer = false
+local _attributeConnection = nil
+local _attributeConnection2 = nil
 
--- UIScale mengikuti DPI seperti ButtonLib
-local timerUIScale = Instance.new("UIScale", timerFrame)
-timerUIScale.Scale = getDPIScale()
+local function createTimerGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TimerGUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = PlayerGui
 
--- UICorner seperti DaraHub
-local timerCorner = Instance.new("UICorner", timerFrame)
-timerCorner.CornerRadius = UDim.new(0, 10)
+    local Timer = Instance.new("Frame")
+    Timer.Name = "Timer"
+    Timer.BackgroundTransparency = 1
+    Timer.Size = UDim2.new(1, 0, 1, 0)
+    Timer.Parent = ScreenGui
 
--- UIStroke border hitam tebal (outer)
-local timerStrokeB = Instance.new("UIStroke", timerFrame)
-timerStrokeB.Thickness = 2
-timerStrokeB.Color = Color3.new(0, 0, 0)
-timerStrokeB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local Top = Instance.new("Frame")
+    Top.Name = "Top"
+    Top.AnchorPoint = Vector2.new(0.5, 0)
+    Top.BackgroundTransparency = 1
+    Top.Position = UDim2.new(0.5, 0, 0, 0)
+    Top.Size = UDim2.new(1, 0, 1, 0)
+    Top.Parent = Timer
 
--- UIStroke border putih tipis (inner glow)
-local timerStrokeW = Instance.new("UIStroke", timerFrame)
-timerStrokeW.Thickness = 1
-timerStrokeW.Color = Color3.new(1, 1, 1)
-timerStrokeW.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    Instance.new("UIAspectRatioConstraint").Parent = Top
+    local sc = Instance.new("UISizeConstraint")
+    sc.MaxSize = Vector2.new(900, 900)
+    sc.Parent = Top
 
--- Gradient dark seperti buildBaseFrame DaraHub
-local timerGrad = Instance.new("UIGradient", timerFrame)
-timerGrad.Rotation = 90
-timerGrad.Color = ColorSequence.new(Color3.fromRGB(47, 47, 47), Color3.new(0, 0, 0))
+    local MainTimer = Instance.new("Frame")
+    MainTimer.Name = "MainTimer"
+    MainTimer.AnchorPoint = Vector2.new(0.5, 0)
+    MainTimer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainTimer.BackgroundTransparency = 0.6
+    MainTimer.BorderSizePixel = 0
+    MainTimer.Position = UDim2.new(0.5, 0, 0.04, 0)
+    MainTimer.Size = UDim2.new(0.25, 0, 0.1, 0)
+    MainTimer.Visible = false
+    MainTimer.Parent = Top
 
--- TextLabel timer
-local timerLabel = Instance.new("TextLabel", timerFrame)
-timerLabel.Name = "TimerLabel"
-timerLabel.Size = UDim2.new(1, -20, 1, 0)
-timerLabel.Position = UDim2.new(0, 10, 0, 0)
-timerLabel.BackgroundTransparency = 1
-timerLabel.TextColor3 = Color3.new(1, 1, 1)
-timerLabel.TextScaled = true
-timerLabel.Font = Enum.Font.FredokaOne
-timerLabel.Text = "Timer: 00:00"
-timerLabel.ZIndex = 5
+    local mc = Instance.new("UICorner")
+    mc.CornerRadius = UDim.new(0, 4)
+    mc.Parent = MainTimer
+    local ms = Instance.new("UIStroke")
+    ms.Transparency = 0.8
+    ms.Parent = MainTimer
 
-local startTime = tick()
-RunService.RenderStepped:Connect(function()
-    if timerFrame.Visible then
-        local t = tick() - startTime
-        local mins = math.floor(t / 60)
-        local secs = math.floor(t % 60)
-        timerLabel.Text = string.format("Timer: %02d:%02d", mins, secs)
+    local bg = Instance.new("ImageLabel")
+    bg.Image = "rbxassetid://196969716"
+    bg.ImageColor3 = Color3.fromRGB(21, 21, 21)
+    bg.ImageTransparency = 0.7
+    bg.AnchorPoint = Vector2.new(0.5, 0.5)
+    bg.BackgroundTransparency = 1
+    bg.Position = UDim2.new(0.5, 0, 0.5, 0)
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.ZIndex = 0
+    bg.Parent = MainTimer
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 4)
+
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "Status"
+    StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    StatusLabel.Text = "ROUND ACTIVE"
+    StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255)
+    StatusLabel.TextScaled = true
+    StatusLabel.TextStrokeTransparency = 0.95
+    StatusLabel.TextWrapped = true
+    StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Position = UDim2.new(0.5, 0, 0.25, 0)
+    StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0)
+    StatusLabel.ZIndex = 3
+    StatusLabel.Parent = MainTimer
+    local ss = Instance.new("UIStroke")
+    ss.Thickness = 2; ss.Transparency = 0.7; ss.Parent = StatusLabel
+    local sg = Instance.new("UIGradient")
+    sg.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(194,194,194))})
+    sg.Rotation = 90; sg.Parent = StatusLabel
+
+    local TimeDisplay = Instance.new("TextLabel")
+    TimeDisplay.Name = "TimeDisplay"
+    TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    TimeDisplay.Text = "0:00"
+    TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255)
+    TimeDisplay.TextScaled = true
+    TimeDisplay.TextStrokeTransparency = 0.95
+    TimeDisplay.TextWrapped = true
+    TimeDisplay.AnchorPoint = Vector2.new(0.5, 0.5)
+    TimeDisplay.BackgroundTransparency = 1
+    TimeDisplay.Position = UDim2.new(0.5, 0, 0.65, 0)
+    TimeDisplay.Size = UDim2.new(0.5, 0, 0.5, 0)
+    TimeDisplay.ZIndex = 3
+    TimeDisplay.Parent = MainTimer
+    local ts = Instance.new("UIStroke")
+    ts.Thickness = 3; ts.Transparency = 0.7; ts.Parent = TimeDisplay
+    local tg = Instance.new("UIGradient")
+    tg.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(194,194,194))})
+    tg.Rotation = 90; tg.Parent = TimeDisplay
+
+    return { ScreenGui = ScreenGui, TimeDisplay = TimeDisplay, StatusLabel = StatusLabel, MainTimer = MainTimer }
+end
+
+local function destroyTimerGUI()
+    if _attributeConnection then _attributeConnection:Disconnect() _attributeConnection = nil end
+    if _attributeConnection2 then _attributeConnection2:Disconnect() _attributeConnection2 = nil end
+    CheckingGameTimer = false
+    if TimerGUI then TimerGUI.ScreenGui:Destroy() TimerGUI = nil end
+    TimerEnabled = false
+end
+
+local function ensureTimerGUI()
+    if not TimerGUI then TimerGUI = createTimerGUI() end
+end
+
+local function SetTime(seconds)
+    if not TimerGUI then return end
+    if type(seconds) == "number" then
+        local m2 = math.floor(seconds / 60)
+        local s2 = math.floor(seconds % 60)
+        TimerGUI.TimeDisplay.Text = string.format("%d:%02d", m2, s2)
+        local col = seconds <= 5 and Color3.fromRGB(215, 100, 100) or Color3.fromRGB(165, 194, 255)
+        TimerGUI.TimeDisplay.TextColor3 = col
+        TimerGUI.StatusLabel.TextColor3 = col
+    else
+        TimerGUI.TimeDisplay.Text = tostring(seconds)
     end
-end)
+end
+
+local function SetStatus(text)
+    if not TimerGUI then return end
+    TimerGUI.StatusLabel.Text = text:upper()
+end
+
+local function CheckGameTimerVisibility()
+    if not TimerEnabled or not TimerGUI then
+        if TimerGUI then TimerGUI.MainTimer.Visible = false end
+        return
+    end
+    local hud = localPlayer.PlayerGui:FindFirstChild("Shared")
+    if hud then hud = hud:FindFirstChild("HUD") end
+    if hud then hud = hud:FindFirstChild("Overlay") end
+    if hud then hud = hud:FindFirstChild("Default") end
+    if hud then hud = hud:FindFirstChild("RoundOverlay") end
+    if hud then hud = hud:FindFirstChild("Round") end
+    local roundTimer = hud and hud:FindFirstChild("RoundTimer")
+    if roundTimer and roundTimer.Visible then
+        TimerGUI.MainTimer.Visible = false
+    else
+        TimerGUI.MainTimer.Visible = OriginalTimerVisible
+    end
+end
+
+local function StartGameTimerCheck()
+    if CheckingGameTimer then return end
+    CheckingGameTimer = true
+    spawn(function()
+        while CheckingGameTimer do CheckGameTimerVisibility() wait(0.1) end
+    end)
+end
+
+local function UpdateFromAttributes()
+    local statsFolder = workspace:FindFirstChild("Game")
+    if statsFolder then statsFolder = statsFolder:FindFirstChild("Stats") end
+    if not statsFolder then return end
+    local timerValue = statsFolder:GetAttribute("Timer")
+    local roundStarted = statsFolder:GetAttribute("RoundStarted")
+    if timerValue then SetTime(timerValue) end
+    if roundStarted ~= nil then
+        SetStatus(roundStarted and "Round Active" or "Intermission")
+    end
+end
+
+local function StartAttributeMonitor()
+    if _attributeConnection then _attributeConnection:Disconnect() _attributeConnection = nil end
+    if _attributeConnection2 then _attributeConnection2:Disconnect() _attributeConnection2 = nil end
+    local statsFolder = workspace:FindFirstChild("Game")
+    if statsFolder then statsFolder = statsFolder:FindFirstChild("Stats") end
+    if not statsFolder then return end
+    _attributeConnection = statsFolder:GetAttributeChangedSignal("Timer"):Connect(UpdateFromAttributes)
+    _attributeConnection2 = statsFolder:GetAttributeChangedSignal("RoundStarted"):Connect(UpdateFromAttributes)
+    UpdateFromAttributes()
+end
+
+local function SetTimerVisible(visible)
+    TimerEnabled = visible
+    OriginalTimerVisible = visible
+    if CheckingGameTimer then
+        CheckGameTimerVisibility()
+    elseif TimerGUI then
+        TimerGUI.MainTimer.Visible = visible
+    end
+end
+
+local function handleTimerToggles()
+    if not TimerEnabled then
+        destroyTimerGUI()
+    else
+        ensureTimerGUI()
+        SetTimerVisible(true)
+        StartAttributeMonitor()
+        StartGameTimerCheck()
+    end
+end
 
 
 -- ==============================================================================
@@ -492,57 +642,180 @@ setreadonly(mt, true)
 
 
 -- ==============================================================================
--- 7. LEADERBOARD TOPBAR BUTTON (style DaraHub - toggle leaderboard PlayerGui)
+-- 7. LEADERBOARD TOPBAR BUTTON (Persis seperti DaraHub asli - line 243 & 2078)
 -- ==============================================================================
--- Referensi: leaderboard ada di PlayerGui.Global.Leaderboard
--- DaraHub asli pakai coroutine untuk setup exit button leaderboard
--- Di sini kita buat toggle button di topbar WindUI untuk show/hide leaderboard
-
-local leaderboardVisible = false
-
-local function getLeaderboard()
-    local pg = player:FindFirstChild("PlayerGui")
-    if not pg then return nil end
-    local global = pg:FindFirstChild("Global")
-    if not global then return nil end
-    return global:FindFirstChild("Leaderboard")
-end
-
-local function setLeaderboardVisible(state)
-    local lb = getLeaderboard()
-    if lb then
-        lb.Visible = state
-        leaderboardVisible = state
-    end
-end
-
--- Setup exit button leaderboard seperti DaraHub asli (agar X button leaderboard tetap berfungsi)
+-- Bagian 1: Setup exit button leaderboard (persis line 243 DaraHub)
 coroutine.wrap(function()
     task.wait(3)
     while true do
-        pcall(function()
-            local lb = getLeaderboard()
-            if lb then
-                local exitButton = lb:FindFirstChild("Center") and lb.Center:FindFirstChild("XboxExit")
+        local success, err = pcall(function()
+            local leaderboard = game:GetService("Players").LocalPlayer.PlayerGui.Global.Leaderboard
+            if leaderboard then
+                local exitButton = leaderboard.Center.XboxExit
                 if exitButton then
                     exitButton.Visible = true
-                    -- Cek apakah sudah diconnect sebelumnya
-                    if not exitButton:GetAttribute("ExitConnected") then
-                        exitButton:SetAttribute("ExitConnected", true)
-                        local exitBtn = exitButton:FindFirstChild("Exit")
-                        if exitBtn then
-                            exitBtn.MouseButton1Click:Connect(function()
-                                lb.Visible = false
-                                leaderboardVisible = false
-                            end)
-                        end
-                    end
+                    exitButton.Exit.MouseButton1Click:Connect(function()
+                        leaderboard.Visible = false
+                    end)
                 end
             end
         end)
+        if not success then warn("Leaderboard exit button setup failed:", err) end
         task.wait(5)
     end
 end)()
+
+-- Bagian 2: Buat topbar button Leaderboard (persis seperti DaraHub line 2078)
+-- Hanya untuk TouchEnabled (mobile), sama seperti DaraHub asli
+if game:GetService("UserInputService").TouchEnabled then
+    local isButtonLocked, currentMouseHold, createdButtons = {}, {}, {}
+    local playerGui2 = localPlayer:WaitForChild("PlayerGui")
+    local topbarStandard = playerGui2:FindFirstChild("TopbarStandard")
+    local targetParent = nil
+
+    if topbarStandard then
+        local main = topbarStandard:FindFirstChild("Main")
+        if main then
+            local holders = main:FindFirstChild("Holders")
+            if holders then
+                targetParent = holders:FindFirstChild("Left")
+            end
+        end
+    end
+
+    if not targetParent then
+        local StarterGui2 = game:GetService("StarterGui")
+        if playerGui2:FindFirstChild("TopbarStandard") then
+            playerGui2:FindFirstChild("TopbarStandard"):Destroy()
+        end
+        StarterGui2:SetCore("TopbarEnabled", false)
+        local screenGui2 = Instance.new("ScreenGui")
+        screenGui2.Name = "TopbarStandard"
+        screenGui2.IgnoreGuiInset = false
+        screenGui2.ScreenInsets = Enum.ScreenInsets.TopbarSafeInsets
+        screenGui2.DisplayOrder = 100
+        screenGui2.ResetOnSpawn = false
+        screenGui2.Parent = playerGui2
+        local holders2 = Instance.new("Frame")
+        holders2.Name = "Holders"
+        holders2.BackgroundTransparency = 1
+        holders2.BorderSizePixel = 0
+        holders2.Position = UDim2.new(0, 0, 0, 0)
+        holders2.Size = UDim2.new(1, 0, 1, -2)
+        holders2.Parent = screenGui2
+        local frame2 = Instance.new("Frame")
+        frame2.Name = "Main"
+        frame2.BackgroundTransparency = 1
+        frame2.BorderSizePixel = 0
+        frame2.Position = UDim2.new(0, 0, 0, 0)
+        frame2.Size = UDim2.new(1, 0, 1, 0)
+        frame2.Parent = holders2
+        local scrollingFrame = Instance.new("ScrollingFrame")
+        scrollingFrame.Name = "Right"
+        scrollingFrame.BackgroundTransparency = 1
+        scrollingFrame.BorderSizePixel = 0
+        scrollingFrame.Position = UDim2.new(0, 12, 0, 0)
+        scrollingFrame.Size = UDim2.new(1, -24, 1, 0)
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.X
+        scrollingFrame.ScrollBarThickness = 0
+        scrollingFrame.ScrollingDirection = Enum.ScrollingDirection.X
+        scrollingFrame.ScrollingEnabled = false
+        scrollingFrame.Parent = frame2
+        local uiListLayout = Instance.new("UIListLayout")
+        uiListLayout.Padding = UDim.new(0, 12)
+        uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+        uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+        uiListLayout.Parent = scrollingFrame
+        targetParent = scrollingFrame
+    end
+
+    local function createLeaderboardButton(parent)
+        local config = {
+            name = "LeaderboardButton",
+            layoutOrder = 998,
+            icon = "rbxassetid://5107166345",
+            label = "Leaderboard",
+            key = "Leaderboard"
+        }
+
+        local Button = Instance.new("Frame")
+        Button.Name = config.name
+        Button.BackgroundTransparency = 1
+        Button.ClipsDescendants = true
+        Button.LayoutOrder = config.layoutOrder
+        Button.Size = UDim2.new(0, 44, 0, 44)
+        Button.ZIndex = 20
+        Button.Parent = parent
+
+        local IconButton = Instance.new("Frame")
+        IconButton.Name = "IconButton"
+        IconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        IconButton.BackgroundTransparency = 0.3
+        IconButton.BorderSizePixel = 0
+        IconButton.ClipsDescendants = true
+        IconButton.Size = UDim2.new(1, 0, 1, 0)
+        IconButton.ZIndex = 2
+        IconButton.Parent = Button
+        Instance.new("UICorner", IconButton).CornerRadius = UDim.new(1, 0)
+
+        local IconImage = Instance.new("ImageLabel")
+        IconImage.AnchorPoint = Vector2.new(0.5, 0.5)
+        IconImage.BackgroundTransparency = 1
+        IconImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+        IconImage.Size = UDim2.new(0.5, 0, 0.5, 0)
+        IconImage.ZIndex = 15
+        IconImage.Image = config.icon
+        IconImage.Parent = IconButton
+        Instance.new("UIAspectRatioConstraint", IconImage).DominantAxis = Enum.DominantAxis.Height
+
+        local ClickRegion = Instance.new("TextButton")
+        ClickRegion.BackgroundTransparency = 1
+        ClickRegion.Size = UDim2.new(1, 0, 1, 0)
+        ClickRegion.ZIndex = 20
+        ClickRegion.Text = ""
+        ClickRegion.Parent = IconButton
+
+        local IconOverlay = Instance.new("Frame")
+        IconOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        IconOverlay.BackgroundTransparency = 0.925
+        IconOverlay.Size = UDim2.new(1, 0, 1, 0)
+        IconOverlay.Visible = false
+        IconOverlay.ZIndex = 6
+        IconOverlay.Parent = IconButton
+        Instance.new("UICorner", IconOverlay).CornerRadius = UDim.new(1, 0)
+
+        local function updateVisualState()
+            IconOverlay.Visible = currentMouseHold[config.key] or false
+        end
+
+        ClickRegion.MouseButton1Down:Connect(function()
+            currentMouseHold[config.key] = true
+            -- Fire keybind Leaderboard ke game
+            pcall(function()
+                localPlayer.PlayerScripts.Events.temporary_events.UseKeybind:Fire({ Key = config.key, Down = true })
+            end)
+            updateVisualState()
+        end)
+        ClickRegion.MouseButton1Up:Connect(function()
+            if currentMouseHold[config.key] then
+                currentMouseHold[config.key] = false
+                pcall(function()
+                    localPlayer.PlayerScripts.Events.temporary_events.UseKeybind:Fire({ Key = config.key, Down = false })
+                end)
+                updateVisualState()
+            end
+        end)
+
+        createdButtons[config.key] = { Button = Button, updateVisualState = updateVisualState }
+    end
+
+    if targetParent then
+        createLeaderboardButton(targetParent)
+    end
+end
 
 
 -- ==============================================================================
@@ -635,27 +908,13 @@ Tabs.Visuals:Toggle({
 })
 
 Tabs.Visuals:Toggle({
-    Title = "Show Timer Display",
-    Desc = "Menampilkan timer bergaya DaraHub di atas layar",
+    Title = "Timer Display",
+    Flag = "TimerDisplayToggle",
+    Desc = "Tampilkan timer round (Round Active / Intermission) seperti DaraHub",
     Value = false,
     Callback = function(state)
-        timerFrame.Visible = state
-        if state then
-            -- Reset timer setiap kali dinyalakan
-            startTime = tick()
-        end
-    end
-})
-
--- [PERBAIKAN] Toggle Leaderboard Topbar
--- Bukan hide PlayerList (StarterGui CoreGuiType), 
--- tapi show/hide Leaderboard button yang ada di topbar Evade (PlayerGui.Global.Leaderboard)
-Tabs.Visuals:Toggle({
-    Title = "Show Leaderboard",
-    Desc = "Toggle tampilan Leaderboard Evade (tombol topbar)",
-    Value = false,
-    Callback = function(state)
-        setLeaderboardVisible(state)
+        TimerEnabled = state
+        handleTimerToggles()
     end
 })
 
