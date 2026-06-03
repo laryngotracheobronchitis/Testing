@@ -155,40 +155,65 @@ local player = Players.LocalPlayer
 local localPlayer = player
 
 -- ==============================================================================
--- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC (LightingWare Integration)
+-- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC (Draconic Improved System)
 -- ==============================================================================
 local m = require(game.ReplicatedStorage.Modules.Character.CharacterTable.CharacterController.Local.Movement.returnValues)
 local originalReturnTable = m.returnTable
-local movementInstances = {}
-
 local savedMovementStats = { AirStrafeAcceleration = 182, JumpCap = 1 }
 local infiniteSlide = false
 local slideFriction = -8
 
-local function findMovementInstances()
-    movementInstances = {}
-    for _, v in pairs(getgc(true)) do
-        if type(v) == "table" and rawget(v, "defaultMovementStats") then
-            table.insert(movementInstances, v)
+local movementRequiredFields = {
+    Friction = true,
+    AirStrafeAcceleration = true,
+    JumpHeight = true,
+    RunDeaccel = true,
+    JumpSpeedMultiplier = true,
+    JumpCap = true,
+    SprintCap = true,
+    WalkSpeedMultiplier = true,
+    BhopEnabled = true,
+    Speed = true,
+    AirAcceleration = true,
+    RunAccel = true,
+    SprintAcceleration = true
+}
+
+local function hasAllMovementFields(tbl)
+    if type(tbl) ~= "table" then return false end
+    for field, _ in pairs(movementRequiredFields) do
+        if rawget(tbl, field) == nil then return false end
+    end
+    return true
+end
+
+local function getConfigTables()
+    local tables = {}
+    for _, obj in ipairs(getgc(true)) do
+        local success, result = pcall(function()
+            if hasAllMovementFields(obj) then return obj end
+        end)
+        if success and result then
+            table.insert(tables, result)
         end
     end
-    return #movementInstances > 0
+    return tables
+end
+
+local function applyToTables(callback)
+    local targets = getConfigTables()
+    if #targets == 0 then return end
+    for _, tableObj in ipairs(targets) do
+        if tableObj and typeof(tableObj) == "table" then
+            pcall(callback, tableObj)
+        end
+    end
 end
 
 local function applySavedMovementStats()
-    task.spawn(function()
-        for i = 1, 10 do
-            task.wait(0.5)
-            if findMovementInstances() then
-                for _, instance in ipairs(movementInstances) do
-                    if instance and instance.overrideMovementStats then
-                        instance.overrideMovementStats["AirStrafeAcceleration"] = tonumber(savedMovementStats.AirStrafeAcceleration)
-                        instance.overrideMovementStats["JumpCap"] = tonumber(savedMovementStats.JumpCap)
-                    end
-                end
-                break
-            end
-        end
+    applyToTables(function(obj)
+        obj.AirStrafeAcceleration = tonumber(savedMovementStats.AirStrafeAcceleration)
+        obj.JumpCap = tonumber(savedMovementStats.JumpCap)
     end)
 end
 
@@ -209,10 +234,28 @@ m.returnTable = function(s, p28, p29)
     return t
 end
 
--- [ LIGHTINGWARE BHOP LOGIC ]
-getgenv().autoJumpEnabled = false
+-- [ DRACONIC IMPROVED BHOP SYSTEM ]
+getgenv().autoJumpType = "Bounce"
 getgenv().bhopMode = "Acceleration"
-getgenv().bhopAccelValue = -0.1
+getgenv().bhopAccelValue = -0.5
+getgenv().bhopHoldActive = false
+getgenv().autoJumpEnabled = false
+
+featureStates = featureStates or {}
+featureStates.Bhop = false
+featureStates.BhopHold = false
+
+local bhopConnection = nil
+local bhopLoaded = false
+local frictionTables = {}
+local Character = nil
+local Humanoid = nil
+local HumanoidRootPart = nil
+local LastJump = 0
+local GROUND_CHECK_OFFSET = 3.5
+local GROUND_CHECK_RAY_LENGTH = 4
+local MAX_SLOPE_ANGLE = 45
+local bhopButtonScreenGui = nil
 
 -- FloatingBhopToggle menggunakan ButtonLib DaraHub
 local FloatingBhopToggle = ButtonLib.Create:Toggle({
@@ -220,55 +263,170 @@ local FloatingBhopToggle = ButtonLib.Create:Toggle({
     SizeX = 300, SizeY = 110, Position = UDim2.new(0.5, -150, 0.2, 0),
     Callback = function(state)
         getgenv().autoJumpEnabled = state
+        featureStates.Bhop = state
+        checkBhopState()
     end
 })
 
-task.spawn(function()
-	while true do
-		local friction = 5
-		if getgenv().autoJumpEnabled and getgenv().bhopMode == "Acceleration" then
-			friction = getgenv().bhopAccelValue or -5
-		end
-		if getgenv().autoJumpEnabled == false then
-			friction = 5
-		end
+local function IsOnGround()
+    if not Character or not HumanoidRootPart or not Humanoid then
+        return false
+    end
 
-		for _, t in pairs(getgc(true)) do
-			if type(t) == "table" and rawget(t, "Friction") then
-				if getgenv().bhopMode == "No Acceleration" then
-				else
-					t.Friction = friction
-				end
-			end
-		end
-		task.wait(0.15)
-	end
-end)
+    local state = Humanoid:GetState()
+    if state == Enum.HumanoidStateType.Jumping or
+       state == Enum.HumanoidStateType.Freefall or
+       state == Enum.HumanoidStateType.Swimming then
+        return false
+    end
 
-task.spawn(function()
-	while true do
-		if getgenv().autoJumpEnabled and getgenv().bhopMode == "Acceleration" then
-			local character = player.Character
-			if character and character:FindFirstChild("Humanoid") then
-				local humanoid = character.Humanoid
-				if humanoid:GetState() ~= Enum.HumanoidStateType.Jumping and humanoid:GetState() ~= Enum.HumanoidStateType.Freefall then
-					humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-				end
-			end
-		end
-		if getgenv().autoJumpEnabled and getgenv().bhopMode == "No Acceleration" then
-			local character = player.Character
-			if character and character:FindFirstChild("Humanoid") then
-				local humanoid = character.Humanoid
-				if humanoid:GetState() ~= Enum.HumanoidStateType.Jumping and humanoid:GetState() ~= Enum.HumanoidStateType.Freefall then
-					humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-				end
-			end
-			task.wait(0.05)
-		else
-			task.wait()
-		end
-	end
+    if Humanoid:GetState() == Enum.HumanoidStateType.Running then
+        return true
+    end
+
+    local rayOrigin = HumanoidRootPart.Position
+    local rayDirection = Vector3.new(0, -GROUND_CHECK_RAY_LENGTH, 0)
+
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {Character}
+    raycastParams.IgnoreWater = true
+
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+    if raycastResult then
+        local surfaceNormal = raycastResult.Normal
+        local angle = math.deg(math.acos(surfaceNormal:Dot(Vector3.new(0, 1, 0))))
+        if angle <= MAX_SLOPE_ANGLE then
+            local heightDiff = math.abs(rayOrigin.Y - raycastResult.Position.Y)
+            return heightDiff <= GROUND_CHECK_OFFSET
+        end
+    end
+
+    if HumanoidRootPart.Velocity.Y > -1 and HumanoidRootPart.Velocity.Y < 1 then
+        return true
+    end
+
+    return false
+end
+
+local function findFrictionTables()
+    frictionTables = {}
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" and rawget(obj, "Friction") then
+            table.insert(frictionTables, {
+                obj = obj,
+                original = obj.Friction
+            })
+        end
+    end
+end
+
+local function applyBhopFriction()
+    local isActive = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+
+    if isActive and getgenv().bhopMode == "Acceleration" then
+        if #frictionTables == 0 then
+            findFrictionTables()
+        end
+        for _, tableData in ipairs(frictionTables) do
+            if tableData.obj and type(tableData.obj) == "table" then
+                pcall(function()
+                    tableData.obj.Friction = getgenv().bhopAccelValue or -0.5
+                end)
+            end
+        end
+    else
+        for _, tableData in ipairs(frictionTables) do
+            if tableData.obj and type(tableData.obj) == "table" and tableData.original then
+                pcall(function()
+                    tableData.obj.Friction = tableData.original
+                end)
+            end
+        end
+    end
+end
+
+local function updateBhop()
+    if not bhopLoaded then return end
+
+    local isActive = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+
+    if isActive then
+        -- Selalu sync karakter terkini
+        local currentChar = player.Character
+        if currentChar ~= Character then
+            Character = currentChar
+            Humanoid = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
+            HumanoidRootPart = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+        end
+
+        if not Character or not Humanoid or not HumanoidRootPart then return end
+
+        if Humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
+
+        local now = tick()
+
+        if getgenv().autoJumpType == "Realistic" then
+            pcall(function()
+                player.PlayerScripts.Events.temporary_events.JumpReact:Fire()
+                player.PlayerScripts.Events.temporary_events.EndJump:Fire()
+            end)
+        else -- Bounce
+            if IsOnGround() and (now - LastJump) > 0.25 then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                LastJump = now
+            end
+        end
+    end
+end
+
+local function loadBhop()
+    if bhopLoaded then return end
+    bhopLoaded = true
+    -- Inisialisasi karakter saat pertama load
+    Character = player.Character
+    if Character then
+        Humanoid = Character:FindFirstChildOfClass("Humanoid")
+        HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    end
+    findFrictionTables()
+    applyBhopFriction()
+    if bhopConnection then bhopConnection:Disconnect() end
+    bhopConnection = RunService.Heartbeat:Connect(function()
+        updateBhop()
+    end)
+end
+
+local function unloadBhop()
+    if not bhopLoaded then return end
+    bhopLoaded = false
+    if bhopConnection then
+        bhopConnection:Disconnect()
+        bhopConnection = nil
+    end
+    getgenv().bhopHoldActive = false
+    applyBhopFriction()
+end
+
+function checkBhopState()
+    local shouldLoad = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+    if shouldLoad then
+        loadBhop()
+    else
+        unloadBhop()
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    applySavedMovementStats()
+    if getgenv().autoJumpEnabled or getgenv().bhopHoldActive then
+        task.wait(1)
+        Character = char
+        Humanoid = char:FindFirstChildOfClass("Humanoid")
+        HumanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+        checkBhopState()
+    end
 end)
 
 -- ==============================================================================
@@ -466,235 +624,9 @@ mt.__namecall = newcclosure(function(self, ...)
 end)
 setreadonly(mt, true)
 
--- ==============================================================================
--- 7. LEADERBOARD & TOPBAR BUTTONS (INSTANT SCROLL & SPLIT HEADER FIX)
--- ==============================================================================
-coroutine.wrap(function()
-    local playerGui = localPlayer:WaitForChild("PlayerGui", 15)
-    if not playerGui then return end
-    local globalGui = playerGui:WaitForChild("Global", 15)
-    if not globalGui then return end
-    local leaderboard = globalGui:WaitForChild("Leaderboard", 15)
-    if not leaderboard then return end
-
-    local function isPlayerRow(frame)
-        if not frame:IsA("Frame") then return false end
-        local hasLabel = false
-        local hasImage = false
-        for _, child in ipairs(frame:GetChildren()) do
-            if child:IsA("TextLabel") then hasLabel = true end
-            if child:IsA("ImageLabel") then hasImage = true end
-        end
-        return hasLabel and hasImage
-    end
-
-    local function fixScrollingFrame(sf)
-        if not sf or not sf:IsA("ScrollingFrame") then return end
-        sf.ScrollingEnabled = true
-        sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        sf.CanvasSize = UDim2.new(0, 0, 0, 0)
-        sf.ClipsDescendants = true
-        sf.ScrollBarThickness = 4
-        sf.ScrollBarImageColor3 = Color3.fromRGB(200, 200, 200)
-    end
-
-    local function processLeaderboard()
-        pcall(function()
-            local center = leaderboard:FindFirstChild("Center")
-            local exitButton = center and center:FindFirstChild("XboxExit")
-            if exitButton then
-                exitButton.Visible = true
-                if not exitButton:FindFirstChild("DarahubExitConn") then
-                    local btn = exitButton:FindFirstChild("Exit") or exitButton
-                    if btn:IsA("GuiButton") then
-                        btn.MouseButton1Click:Connect(function() leaderboard.Visible = false end)
-                    end
-                    local tag = Instance.new("BoolValue")
-                    tag.Name = "DarahubExitConn"; tag.Parent = exitButton
-                end
-            end
-            
-            for _, desc in ipairs(leaderboard:GetDescendants()) do
-                fixScrollingFrame(desc)
-            end
-            
-            for _, desc in ipairs(leaderboard:GetDescendants()) do
-                if desc:IsA("Frame") and desc:FindFirstChildOfClass("UIListLayout") and not desc:FindFirstChild("DarahubScrollSplit") then
-                    local playerRowCount = 0
-                    local hasHeader = false
-                    
-                    for _, child in ipairs(desc:GetChildren()) do
-                        if isPlayerRow(child) then playerRowCount = playerRowCount + 1 end
-                        if child.Name == "Header" or child.Name == "Title" or child.Name == "ServerInfo" or (child:IsA("Frame") and not isPlayerRow(child) and #child:GetChildren() > 0) then 
-                            hasHeader = true 
-                        end
-                    end
-                    
-                    if playerRowCount >= 2 and hasHeader then
-                        local sf = Instance.new("ScrollingFrame")
-                        sf.Name = "DarahubScrollSplit"
-                        sf.Size = UDim2.new(1, 0, 1, 0)
-                        sf.BackgroundTransparency = 1
-                        sf.Parent = desc
-                        
-                        local listLayout = desc:FindFirstChildOfClass("UIListLayout")
-                        local newLayout = Instance.new("UIListLayout", sf)
-                        if listLayout then
-                            newLayout.SortOrder = listLayout.SortOrder
-                            newLayout.Padding = listLayout.Padding
-                            newLayout.HorizontalAlignment = listLayout.HorizontalAlignment
-                        end
-                        
-                        for _, child in ipairs(desc:GetChildren()) do
-                            if child ~= sf and child ~= listLayout and isPlayerRow(child) then
-                                child.Parent = sf
-                            end
-                        end
-                        
-                        fixScrollingFrame(sf)
-                        
-                        desc.ChildAdded:Connect(function(child)
-                            if child:IsA("Frame") and isPlayerRow(child) and child.Parent == desc then
-                                child.Parent = sf
-                            end
-                        end)
-                    end
-                end
-            end
-        end)
-    end
-
-    processLeaderboard()
-    
-    leaderboard.DescendantAdded:Connect(function(desc)
-        task.wait(0.05) 
-        if desc:IsA("ScrollingFrame") then
-            fixScrollingFrame(desc)
-        elseif desc:IsA("Frame") then
-            if isPlayerRow(desc) then
-                local parent = desc.Parent
-                if parent then
-                    local scrollSplit = parent:FindFirstChild("DarahubScrollSplit")
-                    if scrollSplit then
-                        desc.Parent = scrollSplit
-                    end
-                end
-            else
-                processLeaderboard()
-            end
-        end
-    end)
-end)()
-
-if game:GetService("UserInputService").TouchEnabled then
-    local currentMouseHold, createdButtons = {}, {}
-    local playerGui2 = localPlayer:WaitForChild("PlayerGui")
-    local topbarStandard = playerGui2:FindFirstChild("TopbarStandard")
-    local targetParent = nil
-    if topbarStandard then
-        local main = topbarStandard:FindFirstChild("Main")
-        if main then
-            local holders = main:FindFirstChild("Holders")
-            if holders then targetParent = holders:FindFirstChild("Left") end
-        end
-    end
-    if not targetParent then
-        local StarterGui2 = game:GetService("StarterGui")
-        if playerGui2:FindFirstChild("TopbarStandard") then playerGui2:FindFirstChild("TopbarStandard"):Destroy() end
-        StarterGui2:SetCore("TopbarEnabled", false)
-        local sg = Instance.new("ScreenGui"); sg.Name = "TopbarStandard"
-        sg.IgnoreGuiInset = false
-        sg.ScreenInsets = Enum.ScreenInsets.TopbarSafeInsets; sg.DisplayOrder = 100; sg.ResetOnSpawn = false
-        sg.Parent = playerGui2
-        local h = Instance.new("Frame"); h.Name = "Holders"; h.BackgroundTransparency = 1
-        h.BorderSizePixel = 0
-        h.Position = UDim2.new(0,0,0,0); h.Size = UDim2.new(1,0,1,-2)
-        h.Parent = sg
-        local f = Instance.new("Frame"); f.Name = "Main"; f.BackgroundTransparency = 1
-        f.BorderSizePixel = 0
-        f.Position = UDim2.new(0,0,0,0); f.Size = UDim2.new(1,0,1,0)
-        f.Parent = h
-        local sf = Instance.new("ScrollingFrame"); sf.Name = "Right"; sf.BackgroundTransparency = 1
-        sf.BorderSizePixel = 0
-        sf.Position = UDim2.new(0,12,0,0); sf.Size = UDim2.new(1,-24,1,0)
-        sf.CanvasSize = UDim2.new(0,0,0,0)
-        sf.AutomaticCanvasSize = Enum.AutomaticSize.X
-        sf.ScrollBarThickness = 0
-        sf.ScrollingDirection = Enum.ScrollingDirection.X; sf.ScrollingEnabled = false
-        sf.Parent = f
-        local ul = Instance.new("UIListLayout"); ul.Padding = UDim.new(0,12)
-        ul.SortOrder = Enum.SortOrder.LayoutOrder
-        ul.FillDirection = Enum.FillDirection.Horizontal
-        ul.HorizontalAlignment = Enum.HorizontalAlignment.Left
-        ul.VerticalAlignment = Enum.VerticalAlignment.Bottom
-        ul.Parent = sf
-        targetParent = sf
-    end
-
-    local function createKeybindButton(config, parent)
-        local Button = Instance.new("Frame")
-        Button.Name = config.name
-        Button.BackgroundTransparency = 1; Button.ClipsDescendants = true
-        Button.LayoutOrder = config.layoutOrder; Button.Size = UDim2.new(0,44,0,44)
-        Button.ZIndex = 20; Button.Parent = parent
-        local IconButton = Instance.new("Frame")
-        IconButton.Name = "IconButton"
-        IconButton.BackgroundColor3 = Color3.fromRGB(0,0,0)
-        IconButton.BackgroundTransparency = 0.3; IconButton.BorderSizePixel = 0
-        IconButton.ClipsDescendants = true
-        IconButton.Size = UDim2.new(1,0,1,0); IconButton.ZIndex = 2
-        IconButton.Parent = Button
-        Instance.new("UICorner", IconButton).CornerRadius = UDim.new(1,0)
-        local IconImage = Instance.new("ImageLabel")
-        IconImage.Parent = IconButton
-        IconImage.AnchorPoint = Vector2.new(0.5,0.5); IconImage.BackgroundTransparency = 1
-        IconImage.Position = UDim2.new(0.5,0,0.5,0)
-        IconImage.Size = UDim2.new(0.5,0,0.5,0)
-        IconImage.ZIndex = 15
-        IconImage.Image = config.icon
-        Instance.new("UIAspectRatioConstraint", IconImage).DominantAxis = Enum.DominantAxis.Height
-        local ClickRegion = Instance.new("TextButton")
-        ClickRegion.Parent = IconButton
-        ClickRegion.BackgroundTransparency = 1
-        ClickRegion.Size = UDim2.new(1,0,1,0); ClickRegion.ZIndex = 20
-        ClickRegion.Text = ""
-        local IconOverlay = Instance.new("Frame")
-        IconOverlay.Parent = IconButton
-        IconOverlay.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        IconOverlay.BackgroundTransparency = 0.925
-        IconOverlay.Size = UDim2.new(1,0,1,0)
-        IconOverlay.Visible = false
-        IconOverlay.ZIndex = 6
-        Instance.new("UICorner", IconOverlay).CornerRadius = UDim.new(1,0)
-        local function updateVisualState() IconOverlay.Visible = currentMouseHold[config.key] or false end
-        ClickRegion.MouseButton1Down:Connect(function()
-            currentMouseHold[config.key] = true
-            pcall(function() player.PlayerScripts.Events.temporary_events.UseKeybind:Fire({Key=config.key, Down=true}) end)
-            updateVisualState()
-        end)
-        ClickRegion.MouseButton1Up:Connect(function()
-            if currentMouseHold[config.key] then
-                currentMouseHold[config.key] = false
-                pcall(function() player.PlayerScripts.Events.temporary_events.UseKeybind:Fire({Key=config.key, Down=false}) end)
-                updateVisualState()
-            end
-        end)
-        createdButtons[config.key] = {Button=Button, updateVisualState=updateVisualState}
-    end
-
-    local keybindButtonsConfig = {
-        { name = "ReloadButton",      layoutOrder = 997, icon = "rbxassetid://78648212535999", key = "Reload" },
-        { name = "LeaderboardButton", layoutOrder = 998, icon = "rbxassetid://5107166345",     key = "Leaderboard" },
-    }
-    if targetParent then
-        for _, config in ipairs(keybindButtonsConfig) do
-            createKeybindButton(config, targetParent)
-        end
-    end
-end
 
 -- ==============================================================================
--- 8. WINDUI TABS & MENUS
+-- 7. WINDUI TABS & MENUS
 -- ==============================================================================
 -- [ TAB MAIN ] --
 Tabs.Main:Section({ Title = "Movement Options", TextSize = 20 })
@@ -704,33 +636,79 @@ Tabs.Main:Toggle({
     Title = "Bhop",
     Value = false,
     Callback = function(state)
+        featureStates.Bhop = state
+        getgenv().autoJumpEnabled = state
         FloatingBhopToggle:SetVisible(state)
         if not state then
-            getgenv().autoJumpEnabled = false
             FloatingBhopToggle:Set(false)
+        end
+        checkBhopState()
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Bhop Hold (Tahan Tombol Jump)",
+    Value = false,
+    Callback = function(state)
+        featureStates.BhopHold = state
+        if not state then
+            getgenv().bhopHoldActive = false
+            checkBhopState()
+        end
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Bhop Button GUI",
+    Value = false,
+    Callback = function(state)
+        if state then
+            if not bhopButtonScreenGui then
+                bhopButtonScreenGui = Instance.new("ScreenGui")
+                bhopButtonScreenGui.Name = "BhopButtonGUI"
+                bhopButtonScreenGui.ResetOnSpawn = false
+                bhopButtonScreenGui.Parent = game:GetService("CoreGui")
+            end
+            FloatingBhopToggle:SetVisible(true)
+        else
+            if bhopButtonScreenGui then
+                bhopButtonScreenGui:Destroy()
+                bhopButtonScreenGui = nil
+            end
+            FloatingBhopToggle:SetVisible(false)
         end
     end
 })
 
 Tabs.Main:Dropdown({
-	Title = "Bhop Mode",
-	Values = {"Acceleration", "No Acceleration"},
-	Value = "Acceleration",
-	Callback = function(value)
-		getgenv().bhopMode = value
-	end
+    Title = "Bhop Mode",
+    Values = {"Acceleration", "No Acceleration"},
+    Value = "Acceleration",
+    Callback = function(value)
+        getgenv().bhopMode = value
+        checkBhopState()
+    end
+})
+
+Tabs.Main:Dropdown({
+    Title = "Auto Jump Type",
+    Values = {"Bounce", "Realistic"},
+    Value = "Bounce",
+    Callback = function(value)
+        getgenv().autoJumpType = value
+    end
 })
 
 Tabs.Main:Input({
-	Title = "Bhop Acceleration (Negative Only)",
-	Placeholder = "-0.5",
-	Numeric = true,
-	Value = "-0.1",
-	Callback = function(value)
-		if tostring(value):sub(1, 1) == "-" then
-			getgenv().bhopAccelValue = tonumber(value)
-		end
-	end
+    Title = "Bhop Acceleration (Negative Only)",
+    Placeholder = "-0.5",
+    Numeric = true,
+    Value = "-0.5",
+    Callback = function(value)
+        if tostring(value):sub(1, 1) == "-" then
+            getgenv().bhopAccelValue = tonumber(value)
+        end
+    end
 })
 
 Tabs.Main:Space()
