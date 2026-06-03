@@ -755,6 +755,18 @@ Tabs.Visuals:Section({ Title = "Visuals & Helpers", TextSize = 20 })
 Tabs.Visuals:Divider()
 
 Tabs.Visuals:Toggle({
+    Title = "Lag Switch",
+    Desc = "Tampilkan / sembunyikan tombol Lag Switch",
+    Value = false,
+    Callback = function(state)
+        local lagGui = player.PlayerGui:FindFirstChild("LagSwitchUI")
+        if lagGui then
+            lagGui.Enabled = state
+        end
+    end
+})
+
+Tabs.Visuals:Toggle({
     Title = "Fullbright",
     Desc = "Menerangkan seluruh map",
     Value = false,
