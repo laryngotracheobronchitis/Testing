@@ -13,7 +13,7 @@ local LastFreezeTime = 0
 local IsFreezing = false
 local SettingsOpen = false
 local fflagEnabled = false
-local dragEnabled = true
+local dragEnabled = false
 local demonModeEnabled = false
 local isDemonFreezing = false
 
@@ -21,8 +21,8 @@ local originalMainText = "CYBER FREEZE"
 local originalStatusText = "SYSTEM READY"
 
 local function SetFFlag(val)
-    pcall(function()
-        setfflag("MaxMissedWorldStepsRemembered", tostring(val))
+    pcall(function() 
+        setfflag("MaxMissedWorldStepsRemembered", tostring(val)) 
     end)
 end
 
@@ -80,39 +80,39 @@ local dragConnection
 local function updateDragPosition(input)
     local delta = input.Position - dragStart
     IceButton.Position = UDim2.new(
-        startPos.X.Scale,
-        startPos.X.Offset + delta.X,
-        startPos.Y.Scale,
+        startPos.X.Scale, 
+        startPos.X.Offset + delta.X, 
+        startPos.Y.Scale, 
         startPos.Y.Offset + delta.Y
     )
 end
 
 local function startDrag(input)
     if not dragEnabled or dragging then return end
-
+    
     local objects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
     local canDrag = false
-
+    
     for _, obj in ipairs(objects) do
         if obj:IsDescendantOf(IceButton) and obj ~= SettingsButton and obj ~= SettingsPanel then
             canDrag = true
             break
         end
     end
-
+    
     if canDrag then
         dragging = true
         dragInput = input
         dragStart = input.Position
         startPos = IceButton.Position
-
+        
         if input.UserInputType == Enum.UserInputType.Touch then
             dragConnection = UserInputService.TouchMoved:Connect(function(touchInput)
                 if touchInput == input and dragging then
                     updateDragPosition(touchInput)
                 end
             end)
-
+            
             UserInputService.TouchEnded:Connect(function(touchInput)
                 if touchInput == input then
                     dragging = false
@@ -136,8 +136,8 @@ end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
        input.UserInputType == Enum.UserInputType.Touch then
         startDrag(input)
     end
@@ -145,7 +145,7 @@ end)
 
 UserInputService.InputChanged:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-
+    
     if dragging and input == dragInput then
         if input.UserInputType == Enum.UserInputType.MouseMovement then
             updateDragPosition(input)
@@ -315,7 +315,6 @@ ClickDetector.Text = ""
 ClickDetector.ZIndex = 6
 ClickDetector.Parent = IceButton
 
--- ==================== SETTINGS PANEL (HEIGHT 230) ====================
 local SettingsPanel = Instance.new("Frame")
 SettingsPanel.Name = "SettingsPanel"
 SettingsPanel.Size = UDim2.new(0, 140, 0, 230)
@@ -548,7 +547,6 @@ BloxstrapButtonBorder.Color = Color3.fromRGB(200, 100, 255)
 BloxstrapButtonBorder.Thickness = 1
 BloxstrapButtonBorder.Parent = BloxstrapButton
 
--- ==================== DEMON MODE SECTION ====================
 local DemonSection = Instance.new("Frame")
 DemonSection.Name = "DemonSection"
 DemonSection.Size = UDim2.new(1, -16, 0, 20)
@@ -579,7 +577,6 @@ DemonButtonBorder.Color = Color3.fromRGB(100, 100, 100)
 DemonButtonBorder.Thickness = 1
 DemonButtonBorder.Parent = DemonToggleButton
 
--- ApplyButton posisi digeser ke bawah
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Size = UDim2.new(1, -16, 0, 22)
 ApplyButton.Position = UDim2.new(0, 8, 0, 176)
@@ -601,10 +598,9 @@ ApplyButtonBorder.Color = Color3.fromRGB(0, 255, 255)
 ApplyButtonBorder.Thickness = 1
 ApplyButtonBorder.Parent = ApplyButton
 
--- ==================== ANIMATIONS ====================
 local function AnimateBorderFlow()
     local duration = 4
-
+    
     task.spawn(function()
         while IceButton and IceButton.Parent do
             TweenService:Create(LineTop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 1)}):Play()
@@ -615,7 +611,7 @@ local function AnimateBorderFlow()
             task.wait(duration)
             TweenService:Create(LineLeft, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 1, 1, 0)}):Play()
             task.wait(duration)
-
+            
             LineTop.Size = UDim2.new(0, 0, 0, 1)
             LineRight.Size = UDim2.new(0, 1, 0, 0)
             LineBottom.Size = UDim2.new(0, 0, 0, 1)
@@ -632,7 +628,7 @@ local function PlayBootAnimation()
         IceButton.BackgroundTransparency = 0.3
         task.wait(0.1)
     end
-
+    
     ScannerLine.Visible = true
     local scannerSweep = TweenService:Create(ScannerLine, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {Position = UDim2.new(1, 10, 0, 0)})
     scannerSweep:Play()
@@ -640,7 +636,7 @@ local function PlayBootAnimation()
         ScannerLine.Visible = false
         ScannerLine.Position = UDim2.new(0, -10, 0, 0)
     end)
-
+    
     local function TypeText(textLabel, text, delay)
         textLabel.Text = ""
         for i = 1, #text do
@@ -648,7 +644,7 @@ local function PlayBootAnimation()
             task.wait(delay)
         end
     end
-
+    
     task.wait(0.3)
     task.spawn(TypeText, ButtonText, originalMainText, 0.1)
     task.wait(0.3)
@@ -668,7 +664,7 @@ local function StartIdleAnimation()
             pulseOut.Completed:Wait()
         end
     end)()
-
+    
     coroutine.wrap(function()
         while IceButton and IceButton.Parent do
             local glowIn = TweenService:Create(ButtonText, TweenInfo.new(2, Enum.EasingStyle.Sine), {TextStrokeTransparency = 0.1})
@@ -679,7 +675,7 @@ local function StartIdleAnimation()
             glowOut.Completed:Wait()
         end
     end)()
-
+    
     coroutine.wrap(function()
         while IceButton and IceButton.Parent do
             local targetTransparency = demonModeEnabled and 0.4 or 0.6
@@ -694,37 +690,35 @@ local function StartIdleAnimation()
     end)()
 end
 
--- ==================== DEMON MODE VISUAL UPDATE ====================
 local function UpdateDemonVisuals()
     if demonModeEnabled then
         DemonToggleButton.Text = "DEMON ON"
         DemonToggleButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
         DemonButtonBorder.Color = Color3.fromRGB(255, 50, 50)
-
-        -- Border berubah merah
+        
         CyberBorder.Color = Color3.fromRGB(200, 0, 0)
         GlowEffect.ImageColor3 = Color3.fromRGB(200, 0, 0)
-
+        
         LineTop.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         LineRight.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         LineBottom.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         LineLeft.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-
+        
         TopGlow.Color = Color3.fromRGB(255, 100, 100)
         RightGlow.Color = Color3.fromRGB(255, 100, 100)
         BottomGlow.Color = Color3.fromRGB(255, 100, 100)
         LeftGlow.Color = Color3.fromRGB(255, 100, 100)
-
+        
         IceButton.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
-
+        
         ButtonText.TextColor3 = Color3.fromRGB(255, 50, 50)
         ButtonText.TextStrokeColor3 = Color3.fromRGB(150, 0, 0)
         StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
-
+        
         SettingsBorder.Color = Color3.fromRGB(255, 50, 50)
         SettingsButton.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
         SettingsButton.TextColor3 = Color3.fromRGB(255, 50, 50)
-
+        
         SettingsPanelBorder.Color = Color3.fromRGB(200, 50, 50)
         SettingsHeader.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
         SettingsTitle.TextColor3 = Color3.fromRGB(255, 50, 50)
@@ -732,45 +726,44 @@ local function UpdateDemonVisuals()
         DemonToggleButton.Text = "DEMON OFF"
         DemonToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         DemonButtonBorder.Color = Color3.fromRGB(100, 100, 100)
-
+        
         CyberBorder.Color = Color3.fromRGB(0, 255, 255)
         GlowEffect.ImageColor3 = Color3.fromRGB(0, 100, 255)
-
+        
         LineTop.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         LineRight.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         LineBottom.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         LineLeft.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-
+        
         TopGlow.Color = Color3.fromRGB(100, 255, 255)
         RightGlow.Color = Color3.fromRGB(100, 255, 255)
         BottomGlow.Color = Color3.fromRGB(100, 255, 255)
         LeftGlow.Color = Color3.fromRGB(100, 255, 255)
-
+        
         IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
-
+        
         ButtonText.TextColor3 = Color3.fromRGB(0, 255, 255)
         ButtonText.TextStrokeColor3 = Color3.fromRGB(0, 100, 255)
         StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
-
+        
         SettingsBorder.Color = Color3.fromRGB(0, 200, 255)
         SettingsButton.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
         SettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
-
+        
         SettingsPanelBorder.Color = Color3.fromRGB(0, 200, 255)
         SettingsHeader.BackgroundColor3 = Color3.fromRGB(0, 50, 100)
         SettingsTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
     end
 end
 
--- ==================== SETTINGS HANDLERS ====================
 SettingsButton.Activated:Connect(function()
     SettingsOpen = not SettingsOpen
     SettingsPanel.Visible = SettingsOpen
-
+    
     if SettingsOpen then
         DurationTextBox.Text = tostring(FreezeDuration)
         SizeTextBox.Text = tostring(IceButton.Size.X.Offset)
-
+        
         local openTween = TweenService:Create(SettingsPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2})
         openTween:Play()
     end
@@ -778,7 +771,7 @@ end)
 
 DragToggleButton.Activated:Connect(function()
     dragEnabled = not dragEnabled
-
+    
     if dragEnabled then
         DragToggleButton.Text = "DRAG ON"
         DragToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
@@ -805,32 +798,26 @@ FflagToggleButton.Activated:Connect(function()
     end
 end)
 
--- ==================== DEMON MODE TOGGLE ====================
+-- ==================== DEMON MODE (TANPA FFLAG) ====================
 DemonToggleButton.Activated:Connect(function()
     demonModeEnabled = not demonModeEnabled
-
+    
     if demonModeEnabled then
-        -- Aktifkan demon mode
-        SetFFlag(1000)
+        -- Demon mode murni membekukan thread, TIDAK menggunakan SetFFlag
         UpdateDemonVisuals()
-
+        
         if not isDemonFreezing then
             ButtonText.Text = "DEMON"
             StatusText.Text = "READY"
         end
     else
-        -- Nonaktifkan demon mode - stop demon freeze jika sedang berjalan
+        -- Matikan freeze jika sedang berjalan
         if isDemonFreezing then
             isDemonFreezing = false
-            -- Thread akan detect dan cleanup otomatis
         end
-
-        if not fflagEnabled then
-            SetFFlag(1)
-        end
-
+        
         UpdateDemonVisuals()
-
+        
         if not IsFreezing then
             ButtonText.Text = originalMainText
             StatusText.Text = originalStatusText
@@ -841,17 +828,17 @@ end)
 BloxstrapButton.Activated:Connect(function()
     BloxstrapButton.Text = "LOADING.."
     BloxstrapButton.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
-
+    
     task.spawn(function()
         getgenv().autosetup = {
             path = 'Bloxstrap',
             setup = true
         }
-
+        
         local success = pcall(function()
             loadstring(game:HttpGet('https://raw.githubusercontent.com/qwertyui-is-back/Bloxstrap/main/Initiate.lua'), 'lol')()
         end)
-
+        
         if success then
             BloxstrapButton.Text = "LOADED"
             BloxstrapButton.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
@@ -870,7 +857,7 @@ end)
 
 ApplyButton.Activated:Connect(function()
     local hasChanges = false
-
+    
     local newDuration = tonumber(DurationTextBox.Text)
     if newDuration and newDuration >= 0.1 and newDuration <= 100 then
         FreezeDuration = newDuration
@@ -885,7 +872,7 @@ ApplyButton.Activated:Connect(function()
         end
         return
     end
-
+    
     local newSize = tonumber(SizeTextBox.Text)
     if newSize and newSize >= 60 and newSize <= 300 then
         local newHeight = newSize * 0.4
@@ -902,43 +889,42 @@ ApplyButton.Activated:Connect(function()
         end
         return
     end
-
+    
     if hasChanges then
         StatusText.Text = "APPLIED"
         StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-
+        
         ApplyButton.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
         task.wait(0.2)
         ApplyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-
+        
         task.wait(1.5)
         if not IsFreezing then
             StatusText.Text = originalStatusText
             StatusText.TextColor3 = demonModeEnabled and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 255, 255)
         end
     end
-
+    
     SettingsOpen = false
     SettingsPanel.Visible = false
 end)
 
--- ==================== FFLAG LOOP ====================
+-- Loop FFlag HANYA berjalan jika FFlag toggle aktif (Demon Mode tidak ikut campur)
 task.spawn(function()
     while ScreenGui.Parent do
-        if fflagEnabled or demonModeEnabled then
+        if fflagEnabled then
             SetFFlag(1000)
         end
         task.wait(1)
     end
 end)
 
--- ==================== SETTINGS PANEL POSITIONING ====================
 task.spawn(function()
     while ScreenGui.Parent do
         if SettingsPanel.Visible then
             local viewportSize = workspace.Camera.ViewportSize
             local totalWidth = IceButton.Size.X.Offset + SettingsPanel.Size.X.Offset
-
+            
             if IceButton.Position.X.Offset + totalWidth > viewportSize.X then
                 SettingsPanel.Position = UDim2.new(0, -SettingsPanel.Size.X.Offset - 5, 0, 0)
             else
@@ -953,87 +939,82 @@ end)
 local function PerformFreeze()
     if IsFreezing then return end
     if tick() - LastFreezeTime < Cooldown then return end
-
+    
     IsFreezing = true
     LastFreezeTime = tick()
-
+    
     ButtonText.Text = "FREEZING"
     StatusText.Text = "BUSY"
     StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
-
+    
     CyberBorder.Color = Color3.fromRGB(255, 0, 0)
-
+    
     if fflagEnabled then
         SetFFlag(1000)
     end
-
+    
     task.wait(0.05)
-
+    
     local startTime = os.clock()
     while os.clock() - startTime < FreezeDuration do
     end
-
+    
     ButtonText.Text = originalMainText
     StatusText.Text = originalStatusText
     StatusText.TextColor3 = demonModeEnabled and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 255, 255)
     CyberBorder.Color = demonModeEnabled and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 255, 255)
-
+    
     if fflagEnabled then
         SetFFlag(1000)
     end
-
+    
     IsFreezing = false
 end
 
--- ==================== DEMON FREEZE (Draconic Mode) ====================
+-- ==================== DEMON FREEZE (MURNI THREAD LAG - TANPA FFLAG) ====================
 local function PerformDemonFreeze()
+    -- Jika sedang freeze, matikan (Toggle OFF)
     if isDemonFreezing then
-        -- Stop demon freeze
         isDemonFreezing = false
         return
     end
-
+    
     if IsFreezing then return end
-
+    
     isDemonFreezing = true
     IsFreezing = true
     LastFreezeTime = tick()
-
+    
     ButtonText.Text = "DEMON"
     StatusText.Text = "FREEZING"
     StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
     CyberBorder.Color = Color3.fromRGB(255, 0, 0)
-
-    SetFFlag(1000)
-
+    
+    -- TIDAK ADA SetFFlag DI SINI. Demon mode bekerja murni menahan thread klien.
+    
     task.spawn(function()
         while isDemonFreezing do
-            -- Busy-wait burst (0.15s per cycle - optimal untuk Evade)
+            -- Membekukan thread klien (busy-wait) agar packet network tertahan
             local startTime = os.clock()
             while os.clock() - startTime < 0.15 do
                 if not isDemonFreezing then break end
             end
             if not isDemonFreezing then break end
-
-            -- Yield singkat agar toggle bisa di-check
+            
+            -- Yield sesaat agar input/toggle bisa terbaca oleh script
             task.wait()
         end
-
-        -- Cleanup setelah demon freeze berhenti
+        
+        -- Cleanup setelah loop selesai
         ButtonText.Text = demonModeEnabled and "DEMON" or originalMainText
         StatusText.Text = demonModeEnabled and "READY" or originalStatusText
         StatusText.TextColor3 = demonModeEnabled and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 255, 255)
         CyberBorder.Color = demonModeEnabled and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(0, 255, 255)
-
+        
         IsFreezing = false
-
-        if not fflagEnabled and not demonModeEnabled then
-            SetFFlag(1)
-        end
     end)
 end
 
--- ==================== CLICK & KEYBIND ====================
 ClickDetector.Activated:Connect(function()
     if not SettingsOpen then
         if demonModeEnabled then
@@ -1057,7 +1038,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ==================== BOOT ====================
 PlayBootAnimation()
 task.wait(1.5)
 StartIdleAnimation()
