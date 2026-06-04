@@ -282,7 +282,7 @@ ButtonText.TextScaled = true
 ButtonText.Font = Enum.Font.SciFi
 ButtonText.TextStrokeTransparency = 0.3
 ButtonText.TextStrokeColor3 = Color3.fromRGB(0, 100, 255)
-ButtonText.ZIndex = 1
+ButtonText.ZIndex = 2
 ButtonText.Parent = IceButton
 
 -- STATUS TEXT
@@ -297,7 +297,7 @@ StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
 StatusText.TextScaled = true
 StatusText.Font = Enum.Font.Code
 StatusText.TextStrokeTransparency = 0.5
-StatusText.ZIndex = 1
+StatusText.ZIndex = 2
 StatusText.Parent = IceButton
 
 -- SETTINGS BUTTON
@@ -312,7 +312,7 @@ SettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
 SettingsButton.TextSize = 11
 SettingsButton.Font = Enum.Font.GothamBold
 SettingsButton.BorderSizePixel = 0
-SettingsButton.ZIndex = 49
+SettingsButton.ZIndex = 10
 SettingsButton.Parent = IceButton
 
 local SettingsBorder = Instance.new("UIStroke")
@@ -326,7 +326,7 @@ local SettingsCorner = Instance.new("UICorner")
 SettingsCorner.CornerRadius = UDim.new(0, 3)
 SettingsCorner.Parent = SettingsButton
 
--- ============ CLICK DETECTOR (DIPERBAIKI) ============
+-- ============ CLICK DETECTOR (HANYA UNTUK AREA BUTTON UTAMA, BUKAN SETTINGS PANEL) ============
 local ClickDetector = Instance.new("TextButton")
 ClickDetector.Name = "ClickDetector"
 ClickDetector.Size = UDim2.new(1, 0, 1, 0)
@@ -334,7 +334,7 @@ ClickDetector.Position = UDim2.new(0, 0, 0, 0)
 ClickDetector.BackgroundTransparency = 1
 ClickDetector.Text = ""
 ClickDetector.AutoButtonColor = false
-ClickDetector.ZIndex = 50
+ClickDetector.ZIndex = 5
 ClickDetector.Parent = IceButton
 
 -- SETTINGS PANEL
@@ -346,7 +346,7 @@ SettingsPanel.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 SettingsPanel.BackgroundTransparency = 0.2
 SettingsPanel.BorderSizePixel = 0
 SettingsPanel.Visible = false
-SettingsPanel.ZIndex = 40
+SettingsPanel.ZIndex = 100  -- ZIndex tinggi agar panel di atas ClickDetector
 SettingsPanel.Parent = IceButton
 
 local SettingsPanelBorder = Instance.new("UIStroke")
@@ -367,7 +367,7 @@ SettingsHeader.Position = UDim2.new(0, 0, 0, 0)
 SettingsHeader.BackgroundColor3 = Color3.fromRGB(0, 50, 100)
 SettingsHeader.BackgroundTransparency = 0.2
 SettingsHeader.BorderSizePixel = 0
-SettingsHeader.ZIndex = 41
+SettingsHeader.ZIndex = 101
 SettingsHeader.Parent = SettingsPanel
 
 local SettingsHeaderCorner = Instance.new("UICorner")
@@ -383,7 +383,7 @@ SettingsTitle.TextSize = 11
 SettingsTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
 SettingsTitle.BackgroundTransparency = 1
 SettingsTitle.TextStrokeTransparency = 0.3
-SettingsTitle.ZIndex = 42
+SettingsTitle.ZIndex = 102
 SettingsTitle.Parent = SettingsHeader
 
 local SettingsContent = Instance.new("Frame")
@@ -391,7 +391,7 @@ SettingsContent.Name = "SettingsContent"
 SettingsContent.Size = UDim2.new(1, 0, 1, -20)
 SettingsContent.Position = UDim2.new(0, 0, 0, 20)
 SettingsContent.BackgroundTransparency = 1
-SettingsContent.ZIndex = 41
+SettingsContent.ZIndex = 101
 SettingsContent.Parent = SettingsPanel
 
 -- DURATION
@@ -400,6 +400,7 @@ DurationSection.Name = "DurationSection"
 DurationSection.Size = UDim2.new(1, -16, 0, 32)
 DurationSection.Position = UDim2.new(0, 8, 0, 4)
 DurationSection.BackgroundTransparency = 1
+DurationSection.ZIndex = 101
 DurationSection.Parent = SettingsContent
 
 local DurationLabel = Instance.new("TextLabel")
@@ -411,6 +412,7 @@ DurationLabel.TextSize = 8
 DurationLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DurationLabel.BackgroundTransparency = 1
 DurationLabel.TextXAlignment = Enum.TextXAlignment.Left
+DurationLabel.ZIndex = 102
 DurationLabel.Parent = DurationSection
 
 local DurationTextBox = Instance.new("TextBox")
@@ -424,6 +426,7 @@ DurationTextBox.Font = Enum.Font.Code
 DurationTextBox.TextSize = 10
 DurationTextBox.PlaceholderText = "s"
 DurationTextBox.ClearTextOnFocus = false
+DurationTextBox.ZIndex = 102
 DurationTextBox.Parent = DurationSection
 
 local DurationBoxCorner = Instance.new("UICorner")
@@ -441,6 +444,7 @@ SizeSection.Name = "SizeSection"
 SizeSection.Size = UDim2.new(1, -16, 0, 32)
 SizeSection.Position = UDim2.new(0, 8, 0, 40)
 SizeSection.BackgroundTransparency = 1
+SizeSection.ZIndex = 101
 SizeSection.Parent = SettingsContent
 
 local SizeLabel = Instance.new("TextLabel")
@@ -452,6 +456,7 @@ SizeLabel.TextSize = 8
 SizeLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 SizeLabel.BackgroundTransparency = 1
 SizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+SizeLabel.ZIndex = 102
 SizeLabel.Parent = SizeSection
 
 local SizeTextBox = Instance.new("TextBox")
@@ -465,6 +470,7 @@ SizeTextBox.Font = Enum.Font.Code
 SizeTextBox.TextSize = 10
 SizeTextBox.PlaceholderText = "px"
 SizeTextBox.ClearTextOnFocus = false
+SizeTextBox.ZIndex = 102
 SizeTextBox.Parent = SizeSection
 
 local SizeBoxCorner = Instance.new("UICorner")
@@ -482,6 +488,7 @@ DemonSection.Name = "DemonSection"
 DemonSection.Size = UDim2.new(1, -16, 0, 20)
 DemonSection.Position = UDim2.new(0, 8, 0, 76)
 DemonSection.BackgroundTransparency = 1
+DemonSection.ZIndex = 101
 DemonSection.Parent = SettingsContent
 
 local DemonToggleButton = Instance.new("TextButton")
@@ -494,6 +501,7 @@ DemonToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 DemonToggleButton.Text = "DEMON OFF"
 DemonToggleButton.TextSize = 9
 DemonToggleButton.Font = Enum.Font.SciFi
+DemonToggleButton.ZIndex = 102
 DemonToggleButton.Parent = DemonSection
 
 local DemonButtonCorner = Instance.new("UICorner")
@@ -511,6 +519,7 @@ DemonHeightSection.Name = "DemonHeightSection"
 DemonHeightSection.Size = UDim2.new(1, -16, 0, 32)
 DemonHeightSection.Position = UDim2.new(0, 8, 0, 100)
 DemonHeightSection.BackgroundTransparency = 1
+DemonHeightSection.ZIndex = 101
 DemonHeightSection.Parent = SettingsContent
 
 local DemonHeightLabel = Instance.new("TextLabel")
@@ -522,6 +531,7 @@ DemonHeightLabel.TextSize = 8
 DemonHeightLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DemonHeightLabel.BackgroundTransparency = 1
 DemonHeightLabel.TextXAlignment = Enum.TextXAlignment.Left
+DemonHeightLabel.ZIndex = 102
 DemonHeightLabel.Parent = DemonHeightSection
 
 local DemonHeightTextBox = Instance.new("TextBox")
@@ -535,6 +545,7 @@ DemonHeightTextBox.Font = Enum.Font.Code
 DemonHeightTextBox.TextSize = 10
 DemonHeightTextBox.PlaceholderText = "studs"
 DemonHeightTextBox.ClearTextOnFocus = false
+DemonHeightTextBox.ZIndex = 102
 DemonHeightTextBox.Parent = DemonHeightSection
 
 local DemonHeightBoxCorner = Instance.new("UICorner")
@@ -552,6 +563,7 @@ DemonSpeedSection.Name = "DemonSpeedSection"
 DemonSpeedSection.Size = UDim2.new(1, -16, 0, 32)
 DemonSpeedSection.Position = UDim2.new(0, 8, 0, 136)
 DemonSpeedSection.BackgroundTransparency = 1
+DemonSpeedSection.ZIndex = 101
 DemonSpeedSection.Parent = SettingsContent
 
 local DemonSpeedLabel = Instance.new("TextLabel")
@@ -563,6 +575,7 @@ DemonSpeedLabel.TextSize = 8
 DemonSpeedLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DemonSpeedLabel.BackgroundTransparency = 1
 DemonSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+DemonSpeedLabel.ZIndex = 102
 DemonSpeedLabel.Parent = DemonSpeedSection
 
 local DemonSpeedTextBox = Instance.new("TextBox")
@@ -576,6 +589,7 @@ DemonSpeedTextBox.Font = Enum.Font.Code
 DemonSpeedTextBox.TextSize = 10
 DemonSpeedTextBox.PlaceholderText = "speed"
 DemonSpeedTextBox.ClearTextOnFocus = false
+DemonSpeedTextBox.ZIndex = 102
 DemonSpeedTextBox.Parent = DemonSpeedSection
 
 local DemonSpeedBoxCorner = Instance.new("UICorner")
@@ -593,6 +607,7 @@ SoftLandingSection.Name = "SoftLandingSection"
 SoftLandingSection.Size = UDim2.new(1, -16, 0, 20)
 SoftLandingSection.Position = UDim2.new(0, 8, 0, 172)
 SoftLandingSection.BackgroundTransparency = 1
+SoftLandingSection.ZIndex = 101
 SoftLandingSection.Parent = SettingsContent
 
 local SoftLandingToggleButton = Instance.new("TextButton")
@@ -605,6 +620,7 @@ SoftLandingToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SoftLandingToggleButton.Text = "SOFT LANDING ON"
 SoftLandingToggleButton.TextSize = 9
 SoftLandingToggleButton.Font = Enum.Font.SciFi
+SoftLandingToggleButton.ZIndex = 102
 SoftLandingToggleButton.Parent = SoftLandingSection
 
 local SoftLandingButtonCorner = Instance.new("UICorner")
@@ -622,6 +638,7 @@ DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -16, 0, 20)
 DragSection.Position = UDim2.new(0, 8, 0, 196)
 DragSection.BackgroundTransparency = 1
+DragSection.ZIndex = 101
 DragSection.Parent = SettingsContent
 
 local DragToggleButton = Instance.new("TextButton")
@@ -634,6 +651,7 @@ DragToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 DragToggleButton.Text = "DRAG ON"
 DragToggleButton.TextSize = 9
 DragToggleButton.Font = Enum.Font.SciFi
+DragToggleButton.ZIndex = 102
 DragToggleButton.Parent = DragSection
 
 local DragButtonCorner = Instance.new("UICorner")
@@ -651,6 +669,7 @@ FflagSection.Name = "FflagSection"
 FflagSection.Size = UDim2.new(1, -16, 0, 20)
 FflagSection.Position = UDim2.new(0, 8, 0, 220)
 FflagSection.BackgroundTransparency = 1
+FflagSection.ZIndex = 101
 FflagSection.Parent = SettingsContent
 
 local FflagToggleButton = Instance.new("TextButton")
@@ -663,6 +682,7 @@ FflagToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FflagToggleButton.Text = "FFlag OFF"
 FflagToggleButton.TextSize = 9
 FflagToggleButton.Font = Enum.Font.SciFi
+FflagToggleButton.ZIndex = 102
 FflagToggleButton.Parent = FflagSection
 
 local FflagButtonCorner = Instance.new("UICorner")
@@ -680,6 +700,7 @@ BloxstrapSection.Name = "BloxstrapSection"
 BloxstrapSection.Size = UDim2.new(1, -16, 0, 20)
 BloxstrapSection.Position = UDim2.new(0, 8, 0, 244)
 BloxstrapSection.BackgroundTransparency = 1
+BloxstrapSection.ZIndex = 101
 BloxstrapSection.Parent = SettingsContent
 
 local BloxstrapButton = Instance.new("TextButton")
@@ -692,6 +713,7 @@ BloxstrapButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 BloxstrapButton.Text = "BLOXSTRAP"
 BloxstrapButton.TextSize = 9
 BloxstrapButton.Font = Enum.Font.SciFi
+BloxstrapButton.ZIndex = 102
 BloxstrapButton.Parent = BloxstrapSection
 
 local BloxstrapButtonCorner = Instance.new("UICorner")
@@ -713,6 +735,7 @@ ApplyButton.Text = "APPLY"
 ApplyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApplyButton.TextSize = 10
 ApplyButton.Font = Enum.Font.SciFi
+ApplyButton.ZIndex = 102
 ApplyButton.Parent = SettingsContent
 
 local ApplyButtonCorner = Instance.new("UICorner")
@@ -744,17 +767,19 @@ end
 local function startDrag(input)
     if not dragEnabled or dragging then return end
     
+    -- Cek apakah klik pada SettingsPanel atau tombol di dalamnya
     local guiObjects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
-    local isOnSettings = false
+    local isOnSettingsPanel = false
     
     for _, obj in ipairs(guiObjects) do
-        if obj == SettingsButton or obj:IsDescendantOf(SettingsPanel) then
-            isOnSettings = true
+        if obj:IsDescendantOf(SettingsPanel) then
+            isOnSettingsPanel = true
             break
         end
     end
     
-    if not isOnSettings then
+    -- Hanya drag jika tidak klik pada SettingsPanel
+    if not isOnSettingsPanel then
         dragging = true
         dragInput = input
         dragStart = input.Position
@@ -939,7 +964,7 @@ local function PerformFreeze()
     end
 end
 
--- ============ CLICK DETECTOR EVENT ============
+-- ============ CLICK DETECTOR EVENT (HANYA UNTUK BUTTON UTAMA) ============
 ClickDetector.MouseButton1Click:Connect(function()
     if not SettingsOpen then
         PerformFreeze()
@@ -1145,6 +1170,28 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.V then
         if not SettingsOpen then
             PerformFreeze()
+        end
+    end
+end)
+
+-- ============ CLOSE SETTINGS WHEN CLICKING OUTSIDE ============
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if SettingsOpen and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        local guiObjects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+        local isOnSettings = false
+        
+        for _, obj in ipairs(guiObjects) do
+            if obj:IsDescendantOf(SettingsPanel) or obj == SettingsButton then
+                isOnSettings = true
+                break
+            end
+        end
+        
+        if not isOnSettings then
+            SettingsOpen = false
+            SettingsPanel.Visible = false
         end
     end
 end)
