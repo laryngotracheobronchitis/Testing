@@ -1012,7 +1012,9 @@ Tabs.Main:Button({
 
 
 -- ==============================================================================
--- LAG SWITCH (ButtonLib, Normal + Demon Mode, Draconic-faithful)
+
+-- ==============================================================================
+-- LAG SWITCH (ButtonLib)
 -- ==============================================================================
 local lagSwitchEnabled = false
 local lagSwitchMode    = "Normal"
@@ -1022,9 +1024,10 @@ local lagIntensity     = 1000000
 
 getgenv().DemonRiseHeight  = 10
 getgenv().DemonRiseSpeed   = 80
-getgenv().DemonSoftLanding = true
 
--- ── Normal lag (blocking math loop) ──────────────────────────────────────────
+local lagBtn, lagModeToggle
+
+-- Normal mode: blocking math loop
 local function performMathLag()
     local startTime = tick()
     while tick() - startTime < lagDelayValue do
@@ -1038,15 +1041,14 @@ local function performMathLag()
     end
 end
 
--- ── Demon lag (math in background + rise, identical to Draconic) ─────────────
+-- Demon mode: math di background + rise blocking (identik Draconic)
 local function performDemonLag()
     local RISE_HEIGHT = getgenv().DemonRiseHeight or 10
     local BOOST_SPEED = getgenv().DemonRiseSpeed  or 80
 
-    -- Bagian 1: math lag di background
     task.spawn(function()
-        local startLagTime = tick()
-        while tick() - startLagTime < lagDelayValue do
+        local t = tick()
+        while tick() - t < lagDelayValue do
             for i = 1, math.floor(lagIntensity / 2) do
                 local a = math.random(1, 1000000) * math.random(1, 1000000)
                 a = a / math.random(1, 10000)
@@ -1056,12 +1058,10 @@ local function performDemonLag()
         end
     end)
 
-    -- Bagian 2: naikan karakter (blocking di thread ini)
     local character = player.Character
     if character then
         local hrp      = character:FindFirstChild("HumanoidRootPart")
         local humanoid = character:FindFirstChild("Humanoid")
-
         if hrp and humanoid then
             local startHeight = hrp.Position.Y
 
@@ -1072,17 +1072,16 @@ local function performDemonLag()
             bodyThrust.Parent   = hrp
 
             local bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.Name      = "DemonRiseVelocity"
-            bodyVelocity.MaxForce  = Vector3.new(0, 500000, 0)
-            bodyVelocity.Velocity  = Vector3.new(0, BOOST_SPEED, 0)
-            bodyVelocity.Parent    = hrp
+            bodyVelocity.Name     = "DemonRiseVelocity"
+            bodyVelocity.MaxForce = Vector3.new(0, 500000, 0)
+            bodyVelocity.Velocity = Vector3.new(0, BOOST_SPEED, 0)
+            bodyVelocity.Parent   = hrp
 
-            local waitTime   = 0
-            local maxWait    = 5
-            while waitTime < maxWait do
+            local waited = 0
+            while waited < 5 do
                 if hrp.Position.Y - startHeight >= RISE_HEIGHT then break end
                 task.wait(0.1)
-                waitTime += 0.1
+                waited += 0.1
             end
 
             bodyThrust:Destroy()
@@ -1093,7 +1092,7 @@ local function performDemonLag()
     isLagActive = false
 end
 
--- ── Toggle dispatcher (sama persis Draconic) ─────────────────────────────────
+-- Toggle dispatcher identik Draconic
 local function toggleLagSwitch()
     if not isLagActive then
         isLagActive = true
@@ -1105,69 +1104,49 @@ local function toggleLagSwitch()
         elseif lagSwitchMode == "Demon" then
             task.spawn(function()
                 performDemonLag()
-                isLagActive = false
             end)
         end
     end
 end
 
--- ── Button creator (sama pola Draconic: destroy jika ada, create jika tidak) ──
+-- Buat/hapus button saat toggle WindUI diaktifkan (pola Draconic)
 function createLagSwitchButton()
-    local existingGui = CoreGui:FindFirstChild("LagSwitchButtonGUI")
-
-    if existingGui then
-        existingGui:Destroy()
-        return
+    -- Hapus jika sudah ada
+    if lagBtn then
+        pcall(function() lagBtn:Destroy() end)
+        lagBtn = nil
+    end
+    if lagModeToggle then
+        pcall(function() lagModeToggle:Destroy() end)
+        lagModeToggle = nil
     end
 
     if not lagSwitchEnabled then return end
 
-    -- ── Main button (ButtonLib.Create:Button) ─────────────────────────────
-    local lagBtn = ButtonLib.Create:Button({
-        Flag     = "LagSwitchBtn",
-        Text     = "Lag Switch : NORMAL",
-        Position = UDim2.new(0.5, -125, 0.5, 0),
+    -- Button utama: tekan = jalankan lag
+    lagBtn = ButtonLib.Create:Button({
+        Flag     = "LagSwitchMainBtn",
+        Text     = "Lag Switch",
+        Position = UDim2.new(0.5, -125, 0.5, 10),
         Visible  = true,
         Callback = function()
-            toggleLagSwitch()
-        end,
-    })
-
-    -- Simpan ref ke CoreGui ScreenGui agar bisa di-destroy
-    local lagGui = CoreGui:FindFirstChild("Darahub")
-    -- Buat wrapper ScreenGui khusus untuk destroy tracking
-    local wrapGui = Instance.new("ScreenGui")
-    wrapGui.Name          = "LagSwitchButtonGUI"
-    wrapGui.ResetOnSpawn  = false
-    wrapGui.Parent        = CoreGui
-
-    -- ── Mode toggle button ────────────────────────────────────────────────
-    local modeBtn = ButtonLib.Create:Button({
-        Flag     = "LagSwitchModeBtn",
-        Text     = "Mode : NORMAL",
-        Position = UDim2.new(0.5, -125, 0.5, 100),
-        Visible  = true,
-        Callback = function()
-            if lagSwitchMode == "Normal" then
-                lagSwitchMode = "Demon"
-            else
-                lagSwitchMode = "Normal"
+            if lagSwitchEnabled then
+                toggleLagSwitch()
             end
-            -- Update teks kedua button
-            local lagFrame  = _G.DarahubLibBtn["LagSwitchBtn"]
-            local modeFrame = _G.DarahubLibBtn["LagSwitchModeBtn"]
-            if lagFrame  then lagFrame.Label.Text  = "Lag Switch : " .. lagSwitchMode:upper() end
-            if modeFrame then modeFrame.Label.Text = "Mode : "        .. lagSwitchMode:upper() end
         end,
     })
 
-    -- Hapus kedua button saat wrapper di-destroy
-    wrapGui.AncestryChanged:Connect(function()
-        if not wrapGui.Parent then
-            pcall(function() _G.DarahubLibBtn["LagSwitchBtn"]:Destroy() end)
-            pcall(function() _G.DarahubLibBtn["LagSwitchModeBtn"]:Destroy() end)
-        end
-    end)
+    -- Toggle mode Normal / Demon
+    lagModeToggle = ButtonLib.Create:Toggle({
+        Flag     = "LagSwitchModeToggle",
+        Text     = "Demon Mode",
+        Default  = false,
+        Position = UDim2.new(0.5, -125, 0.5, 110),
+        Visible  = true,
+        Callback = function(state)
+            lagSwitchMode = state and "Demon" or "Normal"
+        end,
+    })
 end
 
 Window:SelectTab(1)
