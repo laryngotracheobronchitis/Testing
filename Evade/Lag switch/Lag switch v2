@@ -15,22 +15,13 @@ local SettingsOpen = false
 local fflagEnabled = false
 local dragEnabled = true
 
--- DEMON MODE VARIABLES
+-- ============ TAMBAHAN DEMON MODE ============
 local demonModeEnabled = false
 local demonRiseHeight = 100
 local demonRiseSpeed = 80
 local demonSoftLanding = true
 
-local originalMainText = "CYBER FREEZE"
-local originalStatusText = "SYSTEM READY"
-
-local function SetFFlag(val)
-    pcall(function() 
-        setfflag("MaxMissedWorldStepsRemembered", tostring(val)) 
-    end)
-end
-
--- DEMON MODE FUNCTION
+-- ============ FUNGSI DEMON MODE ============
 local function PerformDemonFreeze()
     if IsFreezing then return end
     if tick() - LastFreezeTime < Cooldown then return end
@@ -41,9 +32,12 @@ local function PerformDemonFreeze()
     ButtonText.Text = "DEMON MODE"
     StatusText.Text = "RISING..."
     StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+    
     CyberBorder.Color = Color3.fromRGB(255, 0, 100)
     
-    if fflagEnabled then SetFFlag(1000) end
+    if fflagEnabled then
+        SetFFlag(1000)
+    end
     
     task.spawn(function()
         local character = Player.Character
@@ -117,18 +111,75 @@ local function PerformDemonFreeze()
     end
     CyberBorder.Color = Color3.fromRGB(0, 255, 255)
     
-    if fflagEnabled then SetFFlag(1000) end
+    if fflagEnabled then
+        SetFFlag(1000)
+    end
+    
     IsFreezing = false
+end
+
+-- ============ MODIFIKASI FUNGSI PERFORM FREEZE ============
+local function PerformFreeze()
+    if IsFreezing then return end
+    if tick() - LastFreezeTime < Cooldown then return end
+    
+    if demonModeEnabled then
+        PerformDemonFreeze()
+    else
+        IsFreezing = true
+        LastFreezeTime = tick()
+        
+        ButtonText.Text = "FREEZING"
+        StatusText.Text = "BUSY"
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+        
+        CyberBorder.Color = Color3.fromRGB(255, 0, 0)
+        
+        if fflagEnabled then
+            SetFFlag(1000)
+        end
+        
+        task.wait(0.05)
+        
+        local startTime = os.clock()
+        while os.clock() - startTime < FreezeDuration do
+        end
+        
+        ButtonText.Text = originalMainText
+        if demonModeEnabled then
+            StatusText.Text = "DEMON READY"
+            StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
+        else
+            StatusText.Text = originalStatusText
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+        end
+        CyberBorder.Color = Color3.fromRGB(0, 255, 255)
+        
+        if fflagEnabled then
+            SetFFlag(1000)
+        end
+        
+        IsFreezing = false
+    end
+end
+
+local originalMainText = "CYBER FREEZE"
+local originalStatusText = "SYSTEM READY"
+
+local function SetFFlag(val)
+    pcall(function() 
+        setfflag("MaxMissedWorldStepsRemembered", tostring(val)) 
+    end)
 end
 
 if PlayerGui:FindFirstChild("LagSwitchUI") then
     PlayerGui.LagSwitchUI:Destroy()
 end
 
--- CREDIT GUI
 local creditGui = Instance.new("ScreenGui")
 creditGui.Name = "CreditGUI"
 creditGui.ResetOnSpawn = false
+creditGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 creditGui.Parent = PlayerGui
 
 local creditLabel = Instance.new("TextLabel")
@@ -148,10 +199,10 @@ task.spawn(function()
     creditGui:Destroy()
 end)
 
--- MAIN GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LagSwitchUI"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
 local IceButton = Instance.new("Frame")
@@ -166,7 +217,88 @@ IceButton.Visible = true
 IceButton.ClipsDescendants = false
 IceButton.Parent = ScreenGui
 
--- CYBER BORDER
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+local dragConnection
+
+local function updateDragPosition(input)
+    local delta = input.Position - dragStart
+    IceButton.Position = UDim2.new(
+        startPos.X.Scale, 
+        startPos.X.Offset + delta.X, 
+        startPos.Y.Scale, 
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+local function startDrag(input)
+    if not dragEnabled or dragging then return end
+    
+    local objects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+    local canDrag = false
+    
+    for _, obj in ipairs(objects) do
+        if obj:IsDescendantOf(IceButton) and obj ~= SettingsButton and obj ~= SettingsPanel then
+            canDrag = true
+            break
+        end
+    end
+    
+    if canDrag then
+        dragging = true
+        dragInput = input
+        dragStart = input.Position
+        startPos = IceButton.Position
+        
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragConnection = UserInputService.TouchMoved:Connect(function(touchInput)
+                if touchInput == input and dragging then
+                    updateDragPosition(touchInput)
+                end
+            end)
+            
+            UserInputService.TouchEnded:Connect(function(touchInput)
+                if touchInput == input then
+                    dragging = false
+                    if dragConnection then
+                        dragConnection:Disconnect()
+                        dragConnection = nil
+                    end
+                end
+            end)
+        else
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if dragging and input == dragInput then
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateDragPosition(input)
+        end
+    end
+end)
+
 local CyberBorder = Instance.new("UIStroke")
 CyberBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 CyberBorder.Color = Color3.fromRGB(0, 255, 255)
@@ -174,7 +306,6 @@ CyberBorder.Thickness = 1.5
 CyberBorder.Transparency = 0.1
 CyberBorder.Parent = IceButton
 
--- GLOW EFFECT
 local GlowEffect = Instance.new("ImageLabel")
 GlowEffect.Name = "GlowEffect"
 GlowEffect.Size = UDim2.new(1.2, 0, 1.2, 0)
@@ -187,7 +318,6 @@ GlowEffect.ScaleType = Enum.ScaleType.Slice
 GlowEffect.SliceCenter = Rect.new(100, 100, 100, 100)
 GlowEffect.Parent = IceButton
 
--- SCANNER LINE
 local ScannerLine = Instance.new("Frame")
 ScannerLine.Size = UDim2.new(0, 2, 1, 0)
 ScannerLine.Position = UDim2.new(0, -10, 0, 0)
@@ -196,7 +326,6 @@ ScannerLine.BorderSizePixel = 0
 ScannerLine.Visible = false
 ScannerLine.Parent = IceButton
 
--- BORDER FLOW
 local BorderFlowContainer = Instance.new("Frame")
 BorderFlowContainer.Name = "BorderFlowContainer"
 BorderFlowContainer.Size = UDim2.new(1, 0, 1, 0)
@@ -269,38 +398,6 @@ LeftGlow.Thickness = 2
 LeftGlow.Transparency = 0.3
 LeftGlow.Parent = LineLeft
 
--- BUTTON TEXT
-local ButtonText = Instance.new("TextLabel")
-ButtonText.Name = "ButtonText"
-ButtonText.Size = UDim2.new(0.8, 0, 0, 18)
-ButtonText.Position = UDim2.new(0.5, 0, 0.2, 0)
-ButtonText.AnchorPoint = Vector2.new(0.5, 0.5)
-ButtonText.BackgroundTransparency = 1
-ButtonText.Text = originalMainText
-ButtonText.TextColor3 = Color3.fromRGB(0, 255, 255)
-ButtonText.TextScaled = true
-ButtonText.Font = Enum.Font.SciFi
-ButtonText.TextStrokeTransparency = 0.3
-ButtonText.TextStrokeColor3 = Color3.fromRGB(0, 100, 255)
-ButtonText.ZIndex = 2
-ButtonText.Parent = IceButton
-
--- STATUS TEXT
-local StatusText = Instance.new("TextLabel")
-StatusText.Name = "StatusText"
-StatusText.Size = UDim2.new(0.8, 0, 0, 10)
-StatusText.Position = UDim2.new(0.5, 0, 0.68, 0)
-StatusText.AnchorPoint = Vector2.new(0.5, 0.5)
-StatusText.BackgroundTransparency = 1
-StatusText.Text = originalStatusText
-StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
-StatusText.TextScaled = true
-StatusText.Font = Enum.Font.Code
-StatusText.TextStrokeTransparency = 0.5
-StatusText.ZIndex = 2
-StatusText.Parent = IceButton
-
--- SETTINGS BUTTON
 local SettingsButton = Instance.new("TextButton")
 SettingsButton.Name = "SettingsButton"
 SettingsButton.Size = UDim2.new(0, 18, 0, 18)
@@ -326,27 +423,53 @@ local SettingsCorner = Instance.new("UICorner")
 SettingsCorner.CornerRadius = UDim.new(0, 3)
 SettingsCorner.Parent = SettingsButton
 
--- ============ CLICK DETECTOR (HANYA UNTUK AREA BUTTON UTAMA, BUKAN SETTINGS PANEL) ============
+local ButtonText = Instance.new("TextLabel")
+ButtonText.Name = "ButtonText"
+ButtonText.Size = UDim2.new(0.8, 0, 0, 18)
+ButtonText.Position = UDim2.new(0.5, 0, 0.2, 0)
+ButtonText.AnchorPoint = Vector2.new(0.5, 0.5)
+ButtonText.BackgroundTransparency = 1
+ButtonText.Text = originalMainText
+ButtonText.TextColor3 = Color3.fromRGB(0, 255, 255)
+ButtonText.TextScaled = true
+ButtonText.Font = Enum.Font.SciFi
+ButtonText.TextStrokeTransparency = 0.3
+ButtonText.TextStrokeColor3 = Color3.fromRGB(0, 100, 255)
+ButtonText.ZIndex = 5
+ButtonText.Parent = IceButton
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Name = "StatusText"
+StatusText.Size = UDim2.new(0.8, 0, 0, 10)
+StatusText.Position = UDim2.new(0.5, 0, 0.68, 0)
+StatusText.AnchorPoint = Vector2.new(0.5, 0.5)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = originalStatusText
+StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+StatusText.TextScaled = true
+StatusText.Font = Enum.Font.Code
+StatusText.TextStrokeTransparency = 0.5
+StatusText.ZIndex = 5
+StatusText.Parent = IceButton
+
 local ClickDetector = Instance.new("TextButton")
 ClickDetector.Name = "ClickDetector"
 ClickDetector.Size = UDim2.new(1, 0, 1, 0)
 ClickDetector.Position = UDim2.new(0, 0, 0, 0)
 ClickDetector.BackgroundTransparency = 1
 ClickDetector.Text = ""
-ClickDetector.AutoButtonColor = false
-ClickDetector.ZIndex = 5
+ClickDetector.ZIndex = 6
 ClickDetector.Parent = IceButton
 
--- SETTINGS PANEL
 local SettingsPanel = Instance.new("Frame")
 SettingsPanel.Name = "SettingsPanel"
-SettingsPanel.Size = UDim2.new(0, 160, 0, 310)
+SettingsPanel.Size = UDim2.new(0, 160, 0, 250)
 SettingsPanel.Position = UDim2.new(0, 125, 0, 0)
 SettingsPanel.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 SettingsPanel.BackgroundTransparency = 0.2
 SettingsPanel.BorderSizePixel = 0
 SettingsPanel.Visible = false
-SettingsPanel.ZIndex = 100  -- ZIndex tinggi agar panel di atas ClickDetector
+SettingsPanel.ZIndex = 20
 SettingsPanel.Parent = IceButton
 
 local SettingsPanelBorder = Instance.new("UIStroke")
@@ -367,7 +490,7 @@ SettingsHeader.Position = UDim2.new(0, 0, 0, 0)
 SettingsHeader.BackgroundColor3 = Color3.fromRGB(0, 50, 100)
 SettingsHeader.BackgroundTransparency = 0.2
 SettingsHeader.BorderSizePixel = 0
-SettingsHeader.ZIndex = 101
+SettingsHeader.ZIndex = 21
 SettingsHeader.Parent = SettingsPanel
 
 local SettingsHeaderCorner = Instance.new("UICorner")
@@ -383,7 +506,7 @@ SettingsTitle.TextSize = 11
 SettingsTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
 SettingsTitle.BackgroundTransparency = 1
 SettingsTitle.TextStrokeTransparency = 0.3
-SettingsTitle.ZIndex = 102
+SettingsTitle.ZIndex = 22
 SettingsTitle.Parent = SettingsHeader
 
 local SettingsContent = Instance.new("Frame")
@@ -391,16 +514,16 @@ SettingsContent.Name = "SettingsContent"
 SettingsContent.Size = UDim2.new(1, 0, 1, -20)
 SettingsContent.Position = UDim2.new(0, 0, 0, 20)
 SettingsContent.BackgroundTransparency = 1
-SettingsContent.ZIndex = 101
+SettingsContent.ZIndex = 21
 SettingsContent.Parent = SettingsPanel
 
--- DURATION
+-- DURATION SETTING (SAMA PERSIS SEPERTI ASLI)
 local DurationSection = Instance.new("Frame")
 DurationSection.Name = "DurationSection"
 DurationSection.Size = UDim2.new(1, -16, 0, 32)
 DurationSection.Position = UDim2.new(0, 8, 0, 4)
 DurationSection.BackgroundTransparency = 1
-DurationSection.ZIndex = 101
+DurationSection.ZIndex = 21
 DurationSection.Parent = SettingsContent
 
 local DurationLabel = Instance.new("TextLabel")
@@ -412,7 +535,7 @@ DurationLabel.TextSize = 8
 DurationLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DurationLabel.BackgroundTransparency = 1
 DurationLabel.TextXAlignment = Enum.TextXAlignment.Left
-DurationLabel.ZIndex = 102
+DurationLabel.ZIndex = 22
 DurationLabel.Parent = DurationSection
 
 local DurationTextBox = Instance.new("TextBox")
@@ -425,8 +548,8 @@ DurationTextBox.Text = tostring(FreezeDuration)
 DurationTextBox.Font = Enum.Font.Code
 DurationTextBox.TextSize = 10
 DurationTextBox.PlaceholderText = "s"
+DurationTextBox.ZIndex = 22
 DurationTextBox.ClearTextOnFocus = false
-DurationTextBox.ZIndex = 102
 DurationTextBox.Parent = DurationSection
 
 local DurationBoxCorner = Instance.new("UICorner")
@@ -438,13 +561,13 @@ DurationBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 DurationBoxBorder.Thickness = 1
 DurationBoxBorder.Parent = DurationTextBox
 
--- SIZE
+-- SIZE SETTING (SAMA PERSIS SEPERTI ASLI)
 local SizeSection = Instance.new("Frame")
 SizeSection.Name = "SizeSection"
 SizeSection.Size = UDim2.new(1, -16, 0, 32)
 SizeSection.Position = UDim2.new(0, 8, 0, 40)
 SizeSection.BackgroundTransparency = 1
-SizeSection.ZIndex = 101
+SizeSection.ZIndex = 21
 SizeSection.Parent = SettingsContent
 
 local SizeLabel = Instance.new("TextLabel")
@@ -456,7 +579,7 @@ SizeLabel.TextSize = 8
 SizeLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 SizeLabel.BackgroundTransparency = 1
 SizeLabel.TextXAlignment = Enum.TextXAlignment.Left
-SizeLabel.ZIndex = 102
+SizeLabel.ZIndex = 22
 SizeLabel.Parent = SizeSection
 
 local SizeTextBox = Instance.new("TextBox")
@@ -469,8 +592,8 @@ SizeTextBox.Text = tostring(IceButton.Size.X.Offset)
 SizeTextBox.Font = Enum.Font.Code
 SizeTextBox.TextSize = 10
 SizeTextBox.PlaceholderText = "px"
+SizeTextBox.ZIndex = 22
 SizeTextBox.ClearTextOnFocus = false
-SizeTextBox.ZIndex = 102
 SizeTextBox.Parent = SizeSection
 
 local SizeBoxCorner = Instance.new("UICorner")
@@ -482,13 +605,13 @@ SizeBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 SizeBoxBorder.Thickness = 1
 SizeBoxBorder.Parent = SizeTextBox
 
--- DEMON MODE TOGGLE
+-- ============ TAMBAHAN DEMON MODE TOGGLE ============
 local DemonSection = Instance.new("Frame")
 DemonSection.Name = "DemonSection"
 DemonSection.Size = UDim2.new(1, -16, 0, 20)
 DemonSection.Position = UDim2.new(0, 8, 0, 76)
 DemonSection.BackgroundTransparency = 1
-DemonSection.ZIndex = 101
+DemonSection.ZIndex = 21
 DemonSection.Parent = SettingsContent
 
 local DemonToggleButton = Instance.new("TextButton")
@@ -501,7 +624,7 @@ DemonToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 DemonToggleButton.Text = "DEMON OFF"
 DemonToggleButton.TextSize = 9
 DemonToggleButton.Font = Enum.Font.SciFi
-DemonToggleButton.ZIndex = 102
+DemonToggleButton.ZIndex = 22
 DemonToggleButton.Parent = DemonSection
 
 local DemonButtonCorner = Instance.new("UICorner")
@@ -513,13 +636,13 @@ DemonButtonBorder.Color = Color3.fromRGB(100, 100, 100)
 DemonButtonBorder.Thickness = 1
 DemonButtonBorder.Parent = DemonToggleButton
 
--- DEMON RISE HEIGHT
+-- ============ TAMBAHAN DEMON RISE HEIGHT ============
 local DemonHeightSection = Instance.new("Frame")
 DemonHeightSection.Name = "DemonHeightSection"
 DemonHeightSection.Size = UDim2.new(1, -16, 0, 32)
 DemonHeightSection.Position = UDim2.new(0, 8, 0, 100)
 DemonHeightSection.BackgroundTransparency = 1
-DemonHeightSection.ZIndex = 101
+DemonHeightSection.ZIndex = 21
 DemonHeightSection.Parent = SettingsContent
 
 local DemonHeightLabel = Instance.new("TextLabel")
@@ -531,7 +654,7 @@ DemonHeightLabel.TextSize = 8
 DemonHeightLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DemonHeightLabel.BackgroundTransparency = 1
 DemonHeightLabel.TextXAlignment = Enum.TextXAlignment.Left
-DemonHeightLabel.ZIndex = 102
+DemonHeightLabel.ZIndex = 22
 DemonHeightLabel.Parent = DemonHeightSection
 
 local DemonHeightTextBox = Instance.new("TextBox")
@@ -544,8 +667,8 @@ DemonHeightTextBox.Text = tostring(demonRiseHeight)
 DemonHeightTextBox.Font = Enum.Font.Code
 DemonHeightTextBox.TextSize = 10
 DemonHeightTextBox.PlaceholderText = "studs"
+DemonHeightTextBox.ZIndex = 22
 DemonHeightTextBox.ClearTextOnFocus = false
-DemonHeightTextBox.ZIndex = 102
 DemonHeightTextBox.Parent = DemonHeightSection
 
 local DemonHeightBoxCorner = Instance.new("UICorner")
@@ -557,13 +680,13 @@ DemonHeightBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 DemonHeightBoxBorder.Thickness = 1
 DemonHeightBoxBorder.Parent = DemonHeightTextBox
 
--- DEMON RISE SPEED
+-- ============ TAMBAHAN DEMON RISE SPEED ============
 local DemonSpeedSection = Instance.new("Frame")
 DemonSpeedSection.Name = "DemonSpeedSection"
 DemonSpeedSection.Size = UDim2.new(1, -16, 0, 32)
 DemonSpeedSection.Position = UDim2.new(0, 8, 0, 136)
 DemonSpeedSection.BackgroundTransparency = 1
-DemonSpeedSection.ZIndex = 101
+DemonSpeedSection.ZIndex = 21
 DemonSpeedSection.Parent = SettingsContent
 
 local DemonSpeedLabel = Instance.new("TextLabel")
@@ -575,7 +698,7 @@ DemonSpeedLabel.TextSize = 8
 DemonSpeedLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
 DemonSpeedLabel.BackgroundTransparency = 1
 DemonSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-DemonSpeedLabel.ZIndex = 102
+DemonSpeedLabel.ZIndex = 22
 DemonSpeedLabel.Parent = DemonSpeedSection
 
 local DemonSpeedTextBox = Instance.new("TextBox")
@@ -588,8 +711,8 @@ DemonSpeedTextBox.Text = tostring(demonRiseSpeed)
 DemonSpeedTextBox.Font = Enum.Font.Code
 DemonSpeedTextBox.TextSize = 10
 DemonSpeedTextBox.PlaceholderText = "speed"
+DemonSpeedTextBox.ZIndex = 22
 DemonSpeedTextBox.ClearTextOnFocus = false
-DemonSpeedTextBox.ZIndex = 102
 DemonSpeedTextBox.Parent = DemonSpeedSection
 
 local DemonSpeedBoxCorner = Instance.new("UICorner")
@@ -601,13 +724,13 @@ DemonSpeedBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 DemonSpeedBoxBorder.Thickness = 1
 DemonSpeedBoxBorder.Parent = DemonSpeedTextBox
 
--- SOFT LANDING TOGGLE
+-- ============ TAMBAHAN SOFT LANDING TOGGLE ============
 local SoftLandingSection = Instance.new("Frame")
 SoftLandingSection.Name = "SoftLandingSection"
 SoftLandingSection.Size = UDim2.new(1, -16, 0, 20)
 SoftLandingSection.Position = UDim2.new(0, 8, 0, 172)
 SoftLandingSection.BackgroundTransparency = 1
-SoftLandingSection.ZIndex = 101
+SoftLandingSection.ZIndex = 21
 SoftLandingSection.Parent = SettingsContent
 
 local SoftLandingToggleButton = Instance.new("TextButton")
@@ -620,7 +743,7 @@ SoftLandingToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SoftLandingToggleButton.Text = "SOFT LANDING ON"
 SoftLandingToggleButton.TextSize = 9
 SoftLandingToggleButton.Font = Enum.Font.SciFi
-SoftLandingToggleButton.ZIndex = 102
+SoftLandingToggleButton.ZIndex = 22
 SoftLandingToggleButton.Parent = SoftLandingSection
 
 local SoftLandingButtonCorner = Instance.new("UICorner")
@@ -632,13 +755,13 @@ SoftLandingButtonBorder.Color = Color3.fromRGB(0, 255, 200)
 SoftLandingButtonBorder.Thickness = 1
 SoftLandingButtonBorder.Parent = SoftLandingToggleButton
 
--- DRAG TOGGLE
+-- DRAG TOGGLE (SAMA PERSIS SEPERTI ASLI, POSISI DISESUAIKAN)
 local DragSection = Instance.new("Frame")
 DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -16, 0, 20)
 DragSection.Position = UDim2.new(0, 8, 0, 196)
 DragSection.BackgroundTransparency = 1
-DragSection.ZIndex = 101
+DragSection.ZIndex = 21
 DragSection.Parent = SettingsContent
 
 local DragToggleButton = Instance.new("TextButton")
@@ -651,7 +774,7 @@ DragToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 DragToggleButton.Text = "DRAG ON"
 DragToggleButton.TextSize = 9
 DragToggleButton.Font = Enum.Font.SciFi
-DragToggleButton.ZIndex = 102
+DragToggleButton.ZIndex = 22
 DragToggleButton.Parent = DragSection
 
 local DragButtonCorner = Instance.new("UICorner")
@@ -663,13 +786,13 @@ DragButtonBorder.Color = Color3.fromRGB(0, 255, 200)
 DragButtonBorder.Thickness = 1
 DragButtonBorder.Parent = DragToggleButton
 
--- FFLAG TOGGLE
+-- FFLAG TOGGLE (SAMA PERSIS SEPERTI ASLI, POSISI DISESUAIKAN)
 local FflagSection = Instance.new("Frame")
 FflagSection.Name = "FflagSection"
 FflagSection.Size = UDim2.new(1, -16, 0, 20)
 FflagSection.Position = UDim2.new(0, 8, 0, 220)
 FflagSection.BackgroundTransparency = 1
-FflagSection.ZIndex = 101
+FflagSection.ZIndex = 21
 FflagSection.Parent = SettingsContent
 
 local FflagToggleButton = Instance.new("TextButton")
@@ -682,7 +805,7 @@ FflagToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FflagToggleButton.Text = "FFlag OFF"
 FflagToggleButton.TextSize = 9
 FflagToggleButton.Font = Enum.Font.SciFi
-FflagToggleButton.ZIndex = 102
+FflagToggleButton.ZIndex = 22
 FflagToggleButton.Parent = FflagSection
 
 local FflagButtonCorner = Instance.new("UICorner")
@@ -694,13 +817,13 @@ FflagButtonBorder.Color = Color3.fromRGB(100, 100, 100)
 FflagButtonBorder.Thickness = 1
 FflagButtonBorder.Parent = FflagToggleButton
 
--- BLOXSTRAP BUTTON
+-- BLOXSTRAP BUTTON (SAMA PERSIS SEPERTI ASLI)
 local BloxstrapSection = Instance.new("Frame")
 BloxstrapSection.Name = "BloxstrapSection"
 BloxstrapSection.Size = UDim2.new(1, -16, 0, 20)
 BloxstrapSection.Position = UDim2.new(0, 8, 0, 244)
 BloxstrapSection.BackgroundTransparency = 1
-BloxstrapSection.ZIndex = 101
+BloxstrapSection.ZIndex = 21
 BloxstrapSection.Parent = SettingsContent
 
 local BloxstrapButton = Instance.new("TextButton")
@@ -713,7 +836,7 @@ BloxstrapButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 BloxstrapButton.Text = "BLOXSTRAP"
 BloxstrapButton.TextSize = 9
 BloxstrapButton.Font = Enum.Font.SciFi
-BloxstrapButton.ZIndex = 102
+BloxstrapButton.ZIndex = 22
 BloxstrapButton.Parent = BloxstrapSection
 
 local BloxstrapButtonCorner = Instance.new("UICorner")
@@ -725,7 +848,7 @@ BloxstrapButtonBorder.Color = Color3.fromRGB(200, 100, 255)
 BloxstrapButtonBorder.Thickness = 1
 BloxstrapButtonBorder.Parent = BloxstrapButton
 
--- APPLY BUTTON
+-- APPLY BUTTON (SAMA PERSIS SEPERTI ASLI)
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Size = UDim2.new(1, -16, 0, 22)
 ApplyButton.Position = UDim2.new(0, 8, 0, 268)
@@ -735,7 +858,7 @@ ApplyButton.Text = "APPLY"
 ApplyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ApplyButton.TextSize = 10
 ApplyButton.Font = Enum.Font.SciFi
-ApplyButton.ZIndex = 102
+ApplyButton.ZIndex = 22
 ApplyButton.Parent = SettingsContent
 
 local ApplyButtonCorner = Instance.new("UICorner")
@@ -747,92 +870,21 @@ ApplyButtonBorder.Color = Color3.fromRGB(0, 255, 255)
 ApplyButtonBorder.Thickness = 1
 ApplyButtonBorder.Parent = ApplyButton
 
--- ============ DRAG SYSTEM ============
-local dragging = false
-local dragInput
-local dragStart
-local startPos
-local dragConnection
+-- RESIZE SETTINGS PANEL (KARENA ADA TAMBAHAN DEMON SETTINGS)
+SettingsPanel.Size = UDim2.new(0, 160, 0, 310)
 
-local function updateDragPosition(input)
-    local delta = input.Position - dragStart
-    IceButton.Position = UDim2.new(
-        startPos.X.Scale, 
-        startPos.X.Offset + delta.X, 
-        startPos.Y.Scale, 
-        startPos.Y.Offset + delta.Y
-    )
-end
+-- UPDATE POSISI SEMUA ELEMEN SETELAH DEMON MODE
+-- Soft Landing section position
+SoftLandingSection.Position = UDim2.new(0, 8, 0, 172)
+-- Drag section position
+DragSection.Position = UDim2.new(0, 8, 0, 196)
+-- Fflag section position
+FflagSection.Position = UDim2.new(0, 8, 0, 220)
+-- Bloxstrap section position
+BloxstrapSection.Position = UDim2.new(0, 8, 0, 244)
+-- Apply button position
+ApplyButton.Position = UDim2.new(0, 8, 0, 268)
 
-local function startDrag(input)
-    if not dragEnabled or dragging then return end
-    
-    -- Cek apakah klik pada SettingsPanel atau tombol di dalamnya
-    local guiObjects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
-    local isOnSettingsPanel = false
-    
-    for _, obj in ipairs(guiObjects) do
-        if obj:IsDescendantOf(SettingsPanel) then
-            isOnSettingsPanel = true
-            break
-        end
-    end
-    
-    -- Hanya drag jika tidak klik pada SettingsPanel
-    if not isOnSettingsPanel then
-        dragging = true
-        dragInput = input
-        dragStart = input.Position
-        startPos = IceButton.Position
-        
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragConnection = UserInputService.TouchMoved:Connect(function(touchInput)
-                if touchInput == input and dragging then
-                    updateDragPosition(touchInput)
-                end
-            end)
-            
-            UserInputService.TouchEnded:Connect(function(touchInput)
-                if touchInput == input then
-                    dragging = false
-                    if dragConnection then
-                        dragConnection:Disconnect()
-                        dragConnection = nil
-                    end
-                end
-            end)
-        else
-            local connection
-            connection = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    connection:Disconnect()
-                end
-            end)
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-       input.UserInputType == Enum.UserInputType.Touch then
-        startDrag(input)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if dragging and input == dragInput then
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateDragPosition(input)
-        end
-    end
-end)
-
--- ============ ANIMATIONS ============
 local function AnimateBorderFlow()
     local duration = 4
     
@@ -921,63 +973,7 @@ local function StartIdleAnimation()
     end)()
 end
 
--- ============ FREEZE FUNCTION ============
-local function PerformFreeze()
-    if IsFreezing then return end
-    if tick() - LastFreezeTime < Cooldown then return end
-    
-    if demonModeEnabled then
-        PerformDemonFreeze()
-    else
-        IsFreezing = true
-        LastFreezeTime = tick()
-        
-        ButtonText.Text = "FREEZING"
-        StatusText.Text = "BUSY"
-        StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
-        CyberBorder.Color = Color3.fromRGB(255, 0, 0)
-        
-        if fflagEnabled then SetFFlag(1000) end
-        
-        task.wait(0.05)
-        
-        local startTime = os.clock()
-        while os.clock() - startTime < FreezeDuration do
-            for i = 1, 100000 do
-                local a = math.random(1, 1000000) * math.random(1, 1000000)
-                a = a / math.random(1, 10000)
-            end
-        end
-        
-        ButtonText.Text = originalMainText
-        if not demonModeEnabled then
-            StatusText.Text = originalStatusText
-            StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
-        else
-            StatusText.Text = "DEMON READY"
-            StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
-        end
-        CyberBorder.Color = Color3.fromRGB(0, 255, 255)
-        
-        if fflagEnabled then SetFFlag(1000) end
-        IsFreezing = false
-    end
-end
-
--- ============ CLICK DETECTOR EVENT (HANYA UNTUK BUTTON UTAMA) ============
-ClickDetector.MouseButton1Click:Connect(function()
-    if not SettingsOpen then
-        PerformFreeze()
-    end
-end)
-
-ClickDetector.Activated:Connect(function()
-    if not SettingsOpen then
-        PerformFreeze()
-    end
-end)
-
--- ============ SETTINGS BUTTON EVENT ============
+-- SETTINGS BUTTON EVENT (SAMA PERSIS SEPERTI ASLI, TAPI DITAMBAH DEMON SETTINGS)
 SettingsButton.Activated:Connect(function()
     SettingsOpen = not SettingsOpen
     SettingsPanel.Visible = SettingsOpen
@@ -990,7 +986,7 @@ SettingsButton.Activated:Connect(function()
     end
 end)
 
--- ============ DEMON TOGGLE EVENT ============
+-- DEMON TOGGLE EVENT
 DemonToggleButton.Activated:Connect(function()
     demonModeEnabled = not demonModeEnabled
     
@@ -1011,7 +1007,7 @@ DemonToggleButton.Activated:Connect(function()
     end
 end)
 
--- ============ SOFT LANDING TOGGLE EVENT ============
+-- SOFT LANDING TOGGLE EVENT
 SoftLandingToggleButton.Activated:Connect(function()
     demonSoftLanding = not demonSoftLanding
     
@@ -1026,7 +1022,7 @@ SoftLandingToggleButton.Activated:Connect(function()
     end
 end)
 
--- ============ DRAG TOGGLE EVENT ============
+-- DRAG TOGGLE EVENT (SAMA PERSIS SEPERTI ASLI)
 DragToggleButton.Activated:Connect(function()
     dragEnabled = not dragEnabled
     
@@ -1041,7 +1037,7 @@ DragToggleButton.Activated:Connect(function()
     end
 end)
 
--- ============ FFLAG TOGGLE EVENT ============
+-- FFLAG TOGGLE EVENT (SAMA PERSIS SEPERTI ASLI)
 FflagToggleButton.Activated:Connect(function()
     fflagEnabled = not fflagEnabled
     if fflagEnabled then
@@ -1057,7 +1053,7 @@ FflagToggleButton.Activated:Connect(function()
     end
 end)
 
--- ============ BLOXSTRAP EVENT ============
+-- BLOXSTRAP BUTTON EVENT (SAMA PERSIS SEPERTI ASLI)
 BloxstrapButton.Activated:Connect(function()
     BloxstrapButton.Text = "LOADING.."
     BloxstrapButton.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
@@ -1088,7 +1084,7 @@ BloxstrapButton.Activated:Connect(function()
     end)
 end)
 
--- ============ APPLY BUTTON EVENT ============
+-- APPLY BUTTON EVENT (DITAMBAH DEMON SETTINGS)
 ApplyButton.Activated:Connect(function()
     local hasChanges = false
     
@@ -1164,7 +1160,14 @@ ApplyButton.Activated:Connect(function()
     SettingsPanel.Visible = false
 end)
 
--- ============ KEYBIND ============
+-- CLICK DETECTOR EVENT (SAMA PERSIS SEPERTI ASLI)
+ClickDetector.Activated:Connect(function()
+    if not SettingsOpen then
+        PerformFreeze()
+    end
+end)
+
+-- KEYBIND EVENT (SAMA PERSIS SEPERTI ASLI)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.V then
@@ -1174,29 +1177,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ============ CLOSE SETTINGS WHEN CLICKING OUTSIDE ============
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if SettingsOpen and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-        local guiObjects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
-        local isOnSettings = false
-        
-        for _, obj in ipairs(guiObjects) do
-            if obj:IsDescendantOf(SettingsPanel) or obj == SettingsButton then
-                isOnSettings = true
-                break
-            end
-        end
-        
-        if not isOnSettings then
-            SettingsOpen = false
-            SettingsPanel.Visible = false
-        end
-    end
-end)
-
--- ============ FFLAG MONITOR ============
+-- FFLAG MONITOR (SAMA PERSIS SEPERTI ASLI)
 task.spawn(function()
     while ScreenGui.Parent do
         if fflagEnabled then
@@ -1206,11 +1187,11 @@ task.spawn(function()
     end
 end)
 
--- ============ PANEL POSITION MONITOR ============
+-- PANEL POSITION MONITOR (SAMA PERSIS SEPERTI ASLI)
 task.spawn(function()
     while ScreenGui.Parent do
         if SettingsPanel.Visible then
-            local viewportSize = workspace.CurrentCamera.ViewportSize
+            local viewportSize = workspace.Camera.ViewportSize
             local totalWidth = IceButton.Size.X.Offset + SettingsPanel.Size.X.Offset
             
             if IceButton.Position.X.Offset + totalWidth > viewportSize.X then
@@ -1223,7 +1204,6 @@ task.spawn(function()
     end
 end)
 
--- ============ START ANIMATIONS ============
 PlayBootAnimation()
 task.wait(1.5)
 StartIdleAnimation()
