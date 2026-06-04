@@ -759,9 +759,8 @@ Tabs.Visuals:Toggle({
     Desc = "Tampilkan / sembunyikan tombol Lag Switch",
     Value = false,
     Callback = function(state)
-        local lagGui = player.PlayerGui:FindFirstChild("LagSwitchUI")
-        if lagGui then
-            lagGui.Enabled = state
+        if LagSwitchGui then
+            LagSwitchGui.Enabled = state
         end
     end
 })
@@ -1010,5 +1009,555 @@ Tabs.Main:Button({
         end
     end
 })
+
+-- ==============================================================================
+-- LAG SWITCH (with Demon Mode)
+-- ==============================================================================
+local LagFreezeDuration = 0.4
+local LagCooldown = 0.2
+local LagLastFreezeTime = 0
+local LagIsFreezing = false
+local LagSettingsOpen = false
+local LagFflagEnabled = false
+local LagDragEnabled = true
+local LagSwitchMode = "Normal"
+getgenv().DemonRiseHeight = 100
+getgenv().DemonRiseSpeed = 80
+
+local LagOriginalMainText = "CYBER FREEZE"
+local LagOriginalStatusText = "SYSTEM READY"
+
+local function SetFFlag(val)
+    pcall(function()
+        setfflag("MaxMissedWorldStepsRemembered", tostring(val))
+    end)
+end
+
+if PlayerGui:FindFirstChild("LagSwitchUI") then
+    PlayerGui.LagSwitchUI:Destroy()
+end
+
+LagSwitchGui = Instance.new("ScreenGui")
+LagSwitchGui.Name = "LagSwitchUI"
+LagSwitchGui.ResetOnSpawn = false
+LagSwitchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+LagSwitchGui.Enabled = false
+LagSwitchGui.Parent = PlayerGui
+
+local LagSettingsButton, LagSettingsPanel
+
+local IceButton = Instance.new("Frame")
+IceButton.Name = "IceButton"
+IceButton.Size = UDim2.new(0, 120, 0, 48)
+IceButton.Position = UDim2.new(0, 5, 0, 80)
+IceButton.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
+IceButton.BackgroundTransparency = 0.3
+IceButton.BorderSizePixel = 0
+IceButton.Active = true
+IceButton.Visible = true
+IceButton.ClipsDescendants = false
+IceButton.Parent = LagSwitchGui
+
+local lagDragging = false
+local lagDragInput, lagDragStart, lagStartPos, lagDragConnection
+
+local function lagUpdateDrag(input)
+    local delta = input.Position - lagDragStart
+    IceButton.Position = UDim2.new(lagStartPos.X.Scale, lagStartPos.X.Offset + delta.X, lagStartPos.Y.Scale, lagStartPos.Y.Offset + delta.Y)
+end
+
+local function lagStartDrag(input)
+    if not LagDragEnabled or lagDragging then return end
+    local objects = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+    local canDrag = false
+    for _, obj in ipairs(objects) do
+        if obj:IsDescendantOf(IceButton) and obj ~= LagSettingsButton and obj ~= LagSettingsPanel then
+            canDrag = true; break
+        end
+    end
+    if canDrag then
+        lagDragging = true
+        lagDragInput = input
+        lagDragStart = input.Position
+        lagStartPos = IceButton.Position
+        if input.UserInputType == Enum.UserInputType.Touch then
+            lagDragConnection = UserInputService.TouchMoved:Connect(function(t)
+                if t == input and lagDragging then lagUpdateDrag(t) end
+            end)
+            UserInputService.TouchEnded:Connect(function(t)
+                if t == input then
+                    lagDragging = false
+                    if lagDragConnection then lagDragConnection:Disconnect(); lagDragConnection = nil end
+                end
+            end)
+        else
+            local c; c = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    lagDragging = false; c:Disconnect()
+                end
+            end)
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        lagStartDrag(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gp)
+    if gp then return end
+    if lagDragging and input == lagDragInput and input.UserInputType == Enum.UserInputType.MouseMovement then
+        lagUpdateDrag(input)
+    end
+end)
+
+local LagCyberBorder = Instance.new("UIStroke")
+LagCyberBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+LagCyberBorder.Color = Color3.fromRGB(0, 255, 255)
+LagCyberBorder.Thickness = 1.5
+LagCyberBorder.Transparency = 0.1
+LagCyberBorder.Parent = IceButton
+
+local LagGlowEffect = Instance.new("ImageLabel")
+LagGlowEffect.Size = UDim2.new(1.2, 0, 1.2, 0)
+LagGlowEffect.Position = UDim2.new(-0.1, 0, -0.1, 0)
+LagGlowEffect.BackgroundTransparency = 1
+LagGlowEffect.Image = "rbxassetid://8992231221"
+LagGlowEffect.ImageColor3 = Color3.fromRGB(0, 100, 255)
+LagGlowEffect.ImageTransparency = 0.8
+LagGlowEffect.ScaleType = Enum.ScaleType.Slice
+LagGlowEffect.SliceCenter = Rect.new(100, 100, 100, 100)
+LagGlowEffect.Parent = IceButton
+
+local LagScannerLine = Instance.new("Frame")
+LagScannerLine.Size = UDim2.new(0, 2, 1, 0)
+LagScannerLine.Position = UDim2.new(0, -10, 0, 0)
+LagScannerLine.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+LagScannerLine.BorderSizePixel = 0
+LagScannerLine.Visible = false
+LagScannerLine.Parent = IceButton
+
+local LagBorderFlow = Instance.new("Frame")
+LagBorderFlow.Size = UDim2.new(1, 0, 1, 0)
+LagBorderFlow.BackgroundTransparency = 1
+LagBorderFlow.ClipsDescendants = true
+LagBorderFlow.ZIndex = 3
+LagBorderFlow.Parent = IceButton
+
+local function makeLine(name, size, pos, anchor, parent)
+    local f = Instance.new("Frame")
+    f.Name = name; f.Size = size; f.Position = pos
+    f.AnchorPoint = anchor
+    f.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+    f.BorderSizePixel = 0; f.ZIndex = 4; f.Parent = parent
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(100, 255, 255); s.Thickness = 2; s.Transparency = 0.3; s.Parent = f
+    return f
+end
+
+local LagLineTop    = makeLine("LineTop",    UDim2.new(0,0,0,1), UDim2.new(0,0,0,0),   Vector2.new(0,0), LagBorderFlow)
+local LagLineRight  = makeLine("LineRight",  UDim2.new(0,1,0,0), UDim2.new(1,0,0,0),   Vector2.new(1,0), LagBorderFlow)
+local LagLineBottom = makeLine("LineBottom", UDim2.new(0,0,0,1), UDim2.new(1,0,1,0),   Vector2.new(1,1), LagBorderFlow)
+local LagLineLeft   = makeLine("LineLeft",   UDim2.new(0,1,0,0), UDim2.new(0,0,1,0),   Vector2.new(0,1), LagBorderFlow)
+
+LagSettingsButton = Instance.new("TextButton")
+LagSettingsButton.Size = UDim2.new(0, 18, 0, 18)
+LagSettingsButton.Position = UDim2.new(1, -22, 0, 3)
+LagSettingsButton.BackgroundColor3 = Color3.fromRGB(0, 40, 80)
+LagSettingsButton.BackgroundTransparency = 0.2
+LagSettingsButton.Text = "⚙"
+LagSettingsButton.TextColor3 = Color3.fromRGB(0, 255, 255)
+LagSettingsButton.TextSize = 11
+LagSettingsButton.Font = Enum.Font.GothamBold
+LagSettingsButton.BorderSizePixel = 0
+LagSettingsButton.ZIndex = 10
+LagSettingsButton.Parent = IceButton
+Instance.new("UIStroke", LagSettingsButton).Color = Color3.fromRGB(0, 200, 255)
+Instance.new("UICorner", LagSettingsButton).CornerRadius = UDim.new(0, 3)
+
+local LagButtonText = Instance.new("TextLabel")
+LagButtonText.Size = UDim2.new(0.8, 0, 0, 18)
+LagButtonText.Position = UDim2.new(0.5, 0, 0.2, 0)
+LagButtonText.AnchorPoint = Vector2.new(0.5, 0.5)
+LagButtonText.BackgroundTransparency = 1
+LagButtonText.Text = LagOriginalMainText
+LagButtonText.TextColor3 = Color3.fromRGB(0, 255, 255)
+LagButtonText.TextScaled = true
+LagButtonText.Font = Enum.Font.SciFi
+LagButtonText.TextStrokeTransparency = 0.3
+LagButtonText.TextStrokeColor3 = Color3.fromRGB(0, 100, 255)
+LagButtonText.ZIndex = 5
+LagButtonText.Parent = IceButton
+
+local LagStatusText = Instance.new("TextLabel")
+LagStatusText.Size = UDim2.new(0.8, 0, 0, 10)
+LagStatusText.Position = UDim2.new(0.5, 0, 0.68, 0)
+LagStatusText.AnchorPoint = Vector2.new(0.5, 0.5)
+LagStatusText.BackgroundTransparency = 1
+LagStatusText.Text = LagOriginalStatusText
+LagStatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+LagStatusText.TextScaled = true
+LagStatusText.Font = Enum.Font.Code
+LagStatusText.TextStrokeTransparency = 0.5
+LagStatusText.ZIndex = 5
+LagStatusText.Parent = IceButton
+
+local LagClickDetector = Instance.new("TextButton")
+LagClickDetector.Size = UDim2.new(1, 0, 1, 0)
+LagClickDetector.BackgroundTransparency = 1
+LagClickDetector.Text = ""
+LagClickDetector.ZIndex = 6
+LagClickDetector.Parent = IceButton
+
+-- Settings Panel
+LagSettingsPanel = Instance.new("Frame")
+LagSettingsPanel.Name = "LagSettingsPanel"
+LagSettingsPanel.Size = UDim2.new(0, 140, 0, 310)
+LagSettingsPanel.Position = UDim2.new(0, 125, 0, 0)
+LagSettingsPanel.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
+LagSettingsPanel.BackgroundTransparency = 0.2
+LagSettingsPanel.BorderSizePixel = 0
+LagSettingsPanel.Visible = false
+LagSettingsPanel.ZIndex = 20
+LagSettingsPanel.Parent = IceButton
+Instance.new("UICorner", LagSettingsPanel).CornerRadius = UDim.new(0, 4)
+local spBorder = Instance.new("UIStroke", LagSettingsPanel)
+spBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+spBorder.Color = Color3.fromRGB(0, 200, 255); spBorder.Thickness = 1; spBorder.Transparency = 0.2
+
+local spHeader = Instance.new("Frame", LagSettingsPanel)
+spHeader.Size = UDim2.new(1, 0, 0, 20); spHeader.BackgroundColor3 = Color3.fromRGB(0, 50, 100)
+spHeader.BackgroundTransparency = 0.2; spHeader.BorderSizePixel = 0; spHeader.ZIndex = 21
+Instance.new("UICorner", spHeader).CornerRadius = UDim.new(0, 4)
+local spTitle = Instance.new("TextLabel", spHeader)
+spTitle.Size = UDim2.new(1, 0, 1, 0); spTitle.Text = "SETTINGS"
+spTitle.Font = Enum.Font.SciFi; spTitle.TextSize = 11
+spTitle.TextColor3 = Color3.fromRGB(0, 255, 255); spTitle.BackgroundTransparency = 1
+spTitle.TextStrokeTransparency = 0.3; spTitle.ZIndex = 22
+
+local spContent = Instance.new("Frame", LagSettingsPanel)
+spContent.Size = UDim2.new(1, 0, 1, -20); spContent.Position = UDim2.new(0, 0, 0, 20)
+spContent.BackgroundTransparency = 1; spContent.ZIndex = 21
+
+local function makeLabel(parent, text, posY)
+    local l = Instance.new("TextLabel", parent)
+    l.Size = UDim2.new(1, 0, 0, 12); l.Position = UDim2.new(0, 0, 0, posY)
+    l.Text = text; l.Font = Enum.Font.Code; l.TextSize = 8
+    l.TextColor3 = Color3.fromRGB(200, 255, 255); l.BackgroundTransparency = 1
+    l.TextXAlignment = Enum.TextXAlignment.Left; l.ZIndex = 22
+    return l
+end
+
+local function makeBox(parent, text, posY, placeholder)
+    local b = Instance.new("TextBox", parent)
+    b.Size = UDim2.new(1, 0, 0, 18); b.Position = UDim2.new(0, 0, 0, posY)
+    b.BackgroundColor3 = Color3.fromRGB(0, 50, 100); b.BackgroundTransparency = 0.2
+    b.TextColor3 = Color3.fromRGB(255, 255, 255); b.Text = text
+    b.Font = Enum.Font.Code; b.TextSize = 10; b.PlaceholderText = placeholder
+    b.ZIndex = 22; b.ClearTextOnFocus = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 3)
+    local s = Instance.new("UIStroke", b); s.Color = Color3.fromRGB(0, 150, 200); s.Thickness = 1
+    return b
+end
+
+local function makeSection(parent, posY)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(1, -16, 0, 32); f.Position = UDim2.new(0, 8, 0, posY)
+    f.BackgroundTransparency = 1; f.ZIndex = 21
+    return f
+end
+
+local function makeToggleBtn(parent, posY, text, bgColor, borderColor)
+    local sec = Instance.new("Frame", parent)
+    sec.Size = UDim2.new(1, -16, 0, 20); sec.Position = UDim2.new(0, 8, 0, posY)
+    sec.BackgroundTransparency = 1; sec.ZIndex = 21
+    local btn = Instance.new("TextButton", sec)
+    btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundColor3 = bgColor
+    btn.BackgroundTransparency = 0.2; btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text; btn.TextSize = 9; btn.Font = Enum.Font.SciFi; btn.ZIndex = 22
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3)
+    local s = Instance.new("UIStroke", btn); s.Color = borderColor; s.Thickness = 1
+    return btn, s
+end
+
+-- Duration
+local durSec = makeSection(spContent, 6)
+makeLabel(durSec, "Dur (0.1-100):", 0)
+local LagDurBox = makeBox(durSec, tostring(LagFreezeDuration), 14, "s")
+
+-- Size
+local sizSec = makeSection(spContent, 42)
+makeLabel(sizSec, "Size (60-300):", 0)
+local LagSizeBox = makeBox(sizSec, tostring(IceButton.Size.X.Offset), 14, "px")
+
+-- Drag, FFlag, Bloxstrap toggles
+local LagDragBtn, LagDragBorder = makeToggleBtn(spContent, 78, "DRAG ON", Color3.fromRGB(0,150,100), Color3.fromRGB(0,255,200))
+local LagFflagBtn, LagFflagBorder = makeToggleBtn(spContent, 102, "FFlag OFF", Color3.fromRGB(50,50,50), Color3.fromRGB(100,100,100))
+local LagBloxBtn, _ = makeToggleBtn(spContent, 126, "BLOXSTRAP", Color3.fromRGB(150,0,255), Color3.fromRGB(200,100,255))
+
+-- Apply
+local LagApplyBtn = Instance.new("TextButton", spContent)
+LagApplyBtn.Size = UDim2.new(1, -16, 0, 22); LagApplyBtn.Position = UDim2.new(0, 8, 0, 152)
+LagApplyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255); LagApplyBtn.BorderSizePixel = 0
+LagApplyBtn.Text = "APPLY"; LagApplyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+LagApplyBtn.TextSize = 10; LagApplyBtn.Font = Enum.Font.SciFi; LagApplyBtn.ZIndex = 22
+Instance.new("UICorner", LagApplyBtn).CornerRadius = UDim.new(0, 3)
+local applyBorder = Instance.new("UIStroke", LagApplyBtn)
+applyBorder.Color = Color3.fromRGB(0, 255, 255); applyBorder.Thickness = 1
+
+-- Demon Mode divider & label
+local demonDiv = Instance.new("Frame", spContent)
+demonDiv.Size = UDim2.new(1, -16, 0, 1); demonDiv.Position = UDim2.new(0, 8, 0, 182)
+demonDiv.BackgroundColor3 = Color3.fromRGB(150, 0, 255); demonDiv.BackgroundTransparency = 0.3
+demonDiv.BorderSizePixel = 0; demonDiv.ZIndex = 21
+
+local demonLbl = Instance.new("TextLabel", spContent)
+demonLbl.Size = UDim2.new(1, -16, 0, 12); demonLbl.Position = UDim2.new(0, 8, 0, 187)
+demonLbl.BackgroundTransparency = 1; demonLbl.Text = "⚡ DEMON MODE"
+demonLbl.TextColor3 = Color3.fromRGB(200, 100, 255); demonLbl.Font = Enum.Font.SciFi
+demonLbl.TextSize = 9; demonLbl.TextXAlignment = Enum.TextXAlignment.Left; demonLbl.ZIndex = 22
+
+-- Mode toggle
+local LagModeBtn, LagModeBorder = makeToggleBtn(spContent, 202, "MODE: NORMAL", Color3.fromRGB(0,100,150), Color3.fromRGB(0,200,255))
+
+-- Rise Height & Speed
+local heightSec = makeSection(spContent, 226)
+makeLabel(heightSec, "Rise Height (m):", 0)
+local DemonHeightBox = makeBox(heightSec, tostring(getgenv().DemonRiseHeight), 14, "100")
+DemonHeightBox.BackgroundColor3 = Color3.fromRGB(40, 0, 80)
+DemonHeightBox:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(150, 0, 255)
+
+local speedSec = makeSection(spContent, 262)
+makeLabel(speedSec, "Rise Speed:", 0)
+local DemonSpeedBox = makeBox(speedSec, tostring(getgenv().DemonRiseSpeed), 14, "80")
+DemonSpeedBox.BackgroundColor3 = Color3.fromRGB(40, 0, 80)
+DemonSpeedBox:FindFirstChildOfClass("UIStroke").Color = Color3.fromRGB(150, 0, 255)
+
+-- Demon Mode logic
+local function performDemonLag()
+    local RISE_HEIGHT = tonumber(DemonHeightBox.Text) or getgenv().DemonRiseHeight or 100
+    local BOOST_SPEED = tonumber(DemonSpeedBox.Text) or getgenv().DemonRiseSpeed or 80
+    task.spawn(function()
+        local t = tick()
+        while tick() - t < LagFreezeDuration do
+            for i = 1, 500000 do
+                local a = math.random(1,1000000) * math.random(1,1000000)
+                a = a / math.random(1,10000)
+                local b = math.sqrt(math.random(1,1000000)) * math.pi * math.exp(1)
+            end
+        end
+    end)
+    local character = player.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local startY = hrp.Position.Y
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(0, 500000, 0)
+            bv.Velocity = Vector3.new(0, BOOST_SPEED, 0)
+            bv.Parent = hrp
+            local bt = Instance.new("BodyThrust")
+            bt.Force = Vector3.new(0, BOOST_SPEED * 500, 0)
+            bt.Parent = hrp
+            local waited = 0
+            while waited < 5 do
+                if hrp.Position.Y - startY >= RISE_HEIGHT then break end
+                task.wait(0.1); waited += 0.1
+            end
+            bv:Destroy(); bt:Destroy()
+        end
+    end
+end
+
+-- Animations
+local function LagAnimateBorderFlow()
+    local d = 4
+    task.spawn(function()
+        while IceButton and IceButton.Parent do
+            TweenService:Create(LagLineTop, TweenInfo.new(d, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,1)}):Play(); task.wait(d)
+            TweenService:Create(LagLineRight, TweenInfo.new(d, Enum.EasingStyle.Linear), {Size = UDim2.new(0,1,1,0)}):Play(); task.wait(d)
+            TweenService:Create(LagLineBottom, TweenInfo.new(d, Enum.EasingStyle.Linear), {Size = UDim2.new(1,0,0,1)}):Play(); task.wait(d)
+            TweenService:Create(LagLineLeft, TweenInfo.new(d, Enum.EasingStyle.Linear), {Size = UDim2.new(0,1,1,0)}):Play(); task.wait(d)
+            LagLineTop.Size = UDim2.new(0,0,0,1); LagLineRight.Size = UDim2.new(0,1,0,0)
+            LagLineBottom.Size = UDim2.new(0,0,0,1); LagLineLeft.Size = UDim2.new(0,1,0,0)
+            task.wait(0.5)
+        end
+    end)
+end
+
+local function LagPlayBoot()
+    for i = 1, 2 do
+        IceButton.BackgroundTransparency = 0.5; task.wait(0.1)
+        IceButton.BackgroundTransparency = 0.3; task.wait(0.1)
+    end
+    LagScannerLine.Visible = true
+    local sw = TweenService:Create(LagScannerLine, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {Position = UDim2.new(1,10,0,0)})
+    sw:Play()
+    sw.Completed:Connect(function() LagScannerLine.Visible = false; LagScannerLine.Position = UDim2.new(0,-10,0,0) end)
+    local function typeIt(lbl, txt, d)
+        lbl.Text = ""
+        for i = 1, #txt do lbl.Text = string.sub(txt,1,i); task.wait(d) end
+    end
+    task.wait(0.3); task.spawn(typeIt, LagButtonText, LagOriginalMainText, 0.1)
+    task.wait(0.3); task.spawn(typeIt, LagStatusText, LagOriginalStatusText, 0.05)
+end
+
+local function LagStartIdle()
+    coroutine.wrap(function()
+        while IceButton and IceButton.Parent do
+            local i = TweenService:Create(LagCyberBorder, TweenInfo.new(3, Enum.EasingStyle.Sine), {Color = Color3.fromRGB(100,255,255)})
+            local o = TweenService:Create(LagCyberBorder, TweenInfo.new(3, Enum.EasingStyle.Sine), {Color = Color3.fromRGB(0,150,255)})
+            i:Play(); i.Completed:Wait(); o:Play(); o.Completed:Wait()
+        end
+    end)()
+    coroutine.wrap(function()
+        while IceButton and IceButton.Parent do
+            local i = TweenService:Create(LagButtonText, TweenInfo.new(2, Enum.EasingStyle.Sine), {TextStrokeTransparency = 0.1})
+            local o = TweenService:Create(LagButtonText, TweenInfo.new(2, Enum.EasingStyle.Sine), {TextStrokeTransparency = 0.3})
+            i:Play(); i.Completed:Wait(); o:Play(); o.Completed:Wait()
+        end
+    end)()
+    coroutine.wrap(function()
+        while IceButton and IceButton.Parent do
+            local i = TweenService:Create(LagGlowEffect, TweenInfo.new(3, Enum.EasingStyle.Sine), {ImageTransparency = 0.6})
+            local o = TweenService:Create(LagGlowEffect, TweenInfo.new(3, Enum.EasingStyle.Sine), {ImageTransparency = 0.8})
+            i:Play(); i.Completed:Wait(); o:Play(); o.Completed:Wait()
+        end
+    end)()
+end
+
+-- Callbacks
+LagSettingsButton.Activated:Connect(function()
+    LagSettingsOpen = not LagSettingsOpen
+    LagSettingsPanel.Visible = LagSettingsOpen
+    if LagSettingsOpen then
+        LagDurBox.Text = tostring(LagFreezeDuration)
+        LagSizeBox.Text = tostring(IceButton.Size.X.Offset)
+        DemonHeightBox.Text = tostring(getgenv().DemonRiseHeight)
+        DemonSpeedBox.Text = tostring(getgenv().DemonRiseSpeed)
+        TweenService:Create(LagSettingsPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2}):Play()
+    end
+end)
+
+LagDragBtn.Activated:Connect(function()
+    LagDragEnabled = not LagDragEnabled
+    LagDragBtn.Text = LagDragEnabled and "DRAG ON" or "DRAG OFF"
+    LagDragBtn.BackgroundColor3 = LagDragEnabled and Color3.fromRGB(0,150,100) or Color3.fromRGB(150,50,50)
+    LagDragBorder.Color = LagDragEnabled and Color3.fromRGB(0,255,200) or Color3.fromRGB(255,100,100)
+end)
+
+LagFflagBtn.Activated:Connect(function()
+    LagFflagEnabled = not LagFflagEnabled
+    LagFflagBtn.Text = LagFflagEnabled and "FFlag ON" or "FFlag OFF"
+    LagFflagBtn.BackgroundColor3 = LagFflagEnabled and Color3.fromRGB(0,150,100) or Color3.fromRGB(50,50,50)
+    LagFflagBorder.Color = LagFflagEnabled and Color3.fromRGB(0,255,200) or Color3.fromRGB(100,100,100)
+    if LagFflagEnabled then SetFFlag(1000) else SetFFlag(1) end
+end)
+
+LagBloxBtn.Activated:Connect(function()
+    LagBloxBtn.Text = "LOADING.."; LagBloxBtn.BackgroundColor3 = Color3.fromRGB(100,50,150)
+    task.spawn(function()
+        getgenv().autosetup = { path = 'Bloxstrap', setup = true }
+        local ok = pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/qwertyui-is-back/Bloxstrap/main/Initiate.lua'),'lol')() end)
+        LagBloxBtn.Text = ok and "LOADED" or "FAILED"
+        LagBloxBtn.BackgroundColor3 = ok and Color3.fromRGB(0,150,100) or Color3.fromRGB(150,50,50)
+        task.wait(2); LagBloxBtn.Text = "BLOXSTRAP"; LagBloxBtn.BackgroundColor3 = Color3.fromRGB(150,0,255)
+    end)
+end)
+
+LagModeBtn.Activated:Connect(function()
+    if LagSwitchMode == "Normal" then
+        LagSwitchMode = "Demon"
+        LagModeBtn.Text = "MODE: DEMON"; LagModeBtn.BackgroundColor3 = Color3.fromRGB(80,0,150)
+        LagModeBorder.Color = Color3.fromRGB(200,0,255); LagModeBtn.TextColor3 = Color3.fromRGB(255,100,255)
+    else
+        LagSwitchMode = "Normal"
+        LagModeBtn.Text = "MODE: NORMAL"; LagModeBtn.BackgroundColor3 = Color3.fromRGB(0,100,150)
+        LagModeBorder.Color = Color3.fromRGB(0,200,255); LagModeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    end
+end)
+
+LagApplyBtn.Activated:Connect(function()
+    local newDur = tonumber(LagDurBox.Text)
+    if not newDur or newDur < 0.1 or newDur > 100 then
+        LagStatusText.Text = "BAD DUR"; LagStatusText.TextColor3 = Color3.fromRGB(255,0,0)
+        task.wait(2); if not LagIsFreezing then LagStatusText.Text = LagOriginalStatusText; LagStatusText.TextColor3 = Color3.fromRGB(100,255,255) end; return
+    end
+    local newSize = tonumber(LagSizeBox.Text)
+    if not newSize or newSize < 60 or newSize > 300 then
+        LagStatusText.Text = "BAD SIZE"; LagStatusText.TextColor3 = Color3.fromRGB(255,0,0)
+        task.wait(2); if not LagIsFreezing then LagStatusText.Text = LagOriginalStatusText; LagStatusText.TextColor3 = Color3.fromRGB(100,255,255) end; return
+    end
+    LagFreezeDuration = newDur
+    IceButton.Size = UDim2.new(0, newSize, 0, newSize * 0.4)
+    LagSettingsPanel.Position = UDim2.new(0, newSize + 5, 0, 0)
+    local h = tonumber(DemonHeightBox.Text); if h and h > 0 then getgenv().DemonRiseHeight = h end
+    local s = tonumber(DemonSpeedBox.Text); if s and s > 0 then getgenv().DemonRiseSpeed = s end
+    LagStatusText.Text = "APPLIED"; LagStatusText.TextColor3 = Color3.fromRGB(0,255,0)
+    LagApplyBtn.BackgroundColor3 = Color3.fromRGB(0,255,150); task.wait(0.2); LagApplyBtn.BackgroundColor3 = Color3.fromRGB(0,150,255)
+    task.wait(1.5); if not LagIsFreezing then LagStatusText.Text = LagOriginalStatusText; LagStatusText.TextColor3 = Color3.fromRGB(100,255,255) end
+    LagSettingsOpen = false; LagSettingsPanel.Visible = false
+end)
+
+task.spawn(function()
+    while LagSwitchGui.Parent do
+        if LagFflagEnabled then SetFFlag(1000) end
+        task.wait(1)
+    end
+end)
+
+task.spawn(function()
+    while LagSwitchGui.Parent do
+        if LagSettingsPanel.Visible then
+            local vp = workspace.Camera.ViewportSize
+            if IceButton.Position.X.Offset + IceButton.Size.X.Offset + LagSettingsPanel.Size.X.Offset > vp.X then
+                LagSettingsPanel.Position = UDim2.new(0, -LagSettingsPanel.Size.X.Offset - 5, 0, 0)
+            else
+                LagSettingsPanel.Position = UDim2.new(0, IceButton.Size.X.Offset + 5, 0, 0)
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+local function PerformFreeze()
+    if LagIsFreezing then return end
+    if tick() - LagLastFreezeTime < LagCooldown then return end
+    LagIsFreezing = true; LagLastFreezeTime = tick()
+    if LagSwitchMode == "Demon" then
+        LagButtonText.Text = "DEMON"; LagStatusText.Text = "RISING"
+        LagStatusText.TextColor3 = Color3.fromRGB(200,50,255); LagCyberBorder.Color = Color3.fromRGB(200,0,255)
+        if LagFflagEnabled then SetFFlag(1000) end
+        task.spawn(function()
+            performDemonLag()
+            LagButtonText.Text = LagOriginalMainText; LagStatusText.Text = LagOriginalStatusText
+            LagStatusText.TextColor3 = Color3.fromRGB(100,255,255); LagCyberBorder.Color = Color3.fromRGB(0,255,255)
+            if LagFflagEnabled then SetFFlag(1000) end; LagIsFreezing = false
+        end)
+    else
+        LagButtonText.Text = "FREEZING"; LagStatusText.Text = "BUSY"
+        LagStatusText.TextColor3 = Color3.fromRGB(255,50,50); LagCyberBorder.Color = Color3.fromRGB(255,0,0)
+        if LagFflagEnabled then SetFFlag(1000) end
+        task.wait(0.05)
+        local t = os.clock(); while os.clock() - t < LagFreezeDuration do end
+        LagButtonText.Text = LagOriginalMainText; LagStatusText.Text = LagOriginalStatusText
+        LagStatusText.TextColor3 = Color3.fromRGB(100,255,255); LagCyberBorder.Color = Color3.fromRGB(0,255,255)
+        if LagFflagEnabled then SetFFlag(1000) end; LagIsFreezing = false
+    end
+end
+
+LagClickDetector.Activated:Connect(function()
+    if not LagSettingsOpen then PerformFreeze() end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.V and not LagSettingsOpen then PerformFreeze() end
+end)
+
+LagPlayBoot(); task.wait(1.5); LagStartIdle(); LagAnimateBorderFlow()
 
 Window:SelectTab(1)
