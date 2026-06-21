@@ -16,11 +16,9 @@ end
 
 local screenGui = Instance.new('ScreenGui')
 screenGui.Parent = game.CoreGui
-screenGui.IgnoreGuiInset = true -- Tambahan agar UI benar-benar full screen tanpa batas atas
+screenGui.IgnoreGuiInset = true 
 local frame = Instance.new('Frame')
 frame.Size = UDim2.new(0, 35, 0, 35)
-
--- PERBAIKAN: Gunakan Scale 0.5, 0.5 agar selalu di tengah layar (PC & Mobile)
 frame.Position = UDim2.new(0.5, 0, 0.5, 0) 
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.BackgroundTransparency = 1
@@ -84,7 +82,6 @@ end
 local v31 = v11('mainFrame', screenGui, UDim2.new(0, 202, 0, -10), UDim2.new(0, 250, 0, 43), true, 0.1)
 v31.BorderSizePixel = 0
 
--- Menggunakan Drag Style ButtonLib
 local dragDetector = Instance.new("UIDragDetector")
 dragDetector.Parent = v31
 v31.Active = true
@@ -102,7 +99,6 @@ u36.Active = false
 local u37 = v11('sliderFill', u35, UDim2.new(0, 0, 0, 0), UDim2.new(0, 0, 1, 0), true, 0)
 u37.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 
--- Tambahan UI Slider untuk Smoothness
 local smoothFrame = v11('sliderFrameSmooth', u34, UDim2.new(0, 10, 0, 160), UDim2.new(0, 227, 0, 20), true, 0)
 smoothFrame.Active = false
 smoothFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -143,7 +139,6 @@ u51.Font = Enum.Font.ArimoBold
 u51.TextSize = 23
 u51.TextScaled = false
 
--- Text Smoothness
 local sText = v18('TextSmooth', u34, UDim2.new(0, 10, 0, 125), UDim2.new(0, 100, 0, 20), 'Smoothness: ', 0)
 sText.Font = Enum.Font.ArimoBold
 sText.TextSize = 14
@@ -170,7 +165,6 @@ u59.Font = Enum.Font.ArialBold
 u59.TextSize = 10
 u59.BorderSizePixel = 0
 
--- Tambahan Tombol POV & Team Check
 local povBtn = v26('povBtn', u34, UDim2.new(0, 10, 0, 185), UDim2.new(0, 110, 0, 30), true, 'POV: ON', 0)
 povBtn.Font = Enum.Font.ArimoBold
 povBtn.TextScaled = false
@@ -352,6 +346,8 @@ local function u74()
             if not skipPlayer then
                 local v70, v71 = currentCamera:WorldToScreenPoint(v69.Character.Head.Position)
                 local magnitude = (Vector2.new(v70.X, v70.Y) - Vector2.new(currentCamera.ViewportSize.X / 2, currentCamera.ViewportSize.Y / 2)).Magnitude
+                -- Logika FOV diperbaiki: frame.Size.X.Offset sekarang adalah diameter (v94 * 2)
+                -- sehingga radiusnya adalah frame.Size.X.Offset / 2 = v94. Aimbot akan merespons POV dengan akurat.
                 if v71 and (magnitude < magnitude2 and magnitude <= frame.Size.X.Offset / 2) then
                     local v72 = Ray.new(currentCamera.CFrame.Position, (v69.Character.Head.Position - currentCamera.CFrame.Position).unit * 3000)
                     local v73 = game.Workspace:FindPartOnRay(v72, localPlayer.Character, false, true)
@@ -436,13 +432,15 @@ u59.FocusLost:Connect(function(p86)
     end
 end)
 
+-- PERBAIKAN: Mengalikan ukuran POV dengan 2
 local function u95(p92)
     local v93 = math.clamp((p92.Position.X - u35.AbsolutePosition.X) / u35.AbsoluteSize.X, 0, 1)
     local v94 = math.floor(v93 * 500)
     u36.Position = UDim2.new(v93, -5, 0, -5)
     u37.Size = UDim2.new(v93, 0, 1, 0)
     u51.Text = tostring(v94)
-    frame.Size = UDim2.new(0, v94, 0, v94)
+    -- Saat ini nilai v94 dijadikan Radius, sehingga ukuran lingkaran (diameter) adalah v94 * 2
+    frame.Size = UDim2.new(0, v94 * 2, 0, v94 * 2)
 end
 
 local u96 = false
