@@ -1,0 +1,196 @@
+repeat
+    task.wait()
+until game:IsLoaded()
+
+local UserInputService = game:GetService('UserInputService')
+local RunService = game:GetService('RunService')
+local Teams = game:GetService("Teams")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Obfuscator Nama UI
+local u1 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?/`~'
+local function v4(p2)
+    local v3 = ''
+    for _ = 1, p2 do
+        v3 = v3 .. string.sub(u1, math.random(1, #u1), math.random(1, #u1))
+    end
+    return v3
+end
+
+local screenGui = Instance.new('ScreenGui')
+screenGui.Parent = game.CoreGui
+screenGui.IgnoreGuiInset = true 
+screenGui.ResetOnSpawn = false
+
+-- Frame FOV (Invisible)
+local frame = Instance.new('Frame')
+frame.Size = UDim2.new(0, 140, 0, 140) -- FOV 70 (Radius 70 = Diameter 140)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0) 
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundTransparency = 1
+frame.Visible = false -- Tetap invisible
+frame.Parent = screenGui
+
+local uIStroke = Instance.new('UIStroke')
+uIStroke.Thickness = 5
+uIStroke.Color = Color3.fromRGB(0, 0, 0)
+uIStroke.Parent = frame
+
+-- Tombol Toggle 30x30 di pojok kiri atas
+local toggleBtn = Instance.new('TextButton')
+toggleBtn.Size = UDim2.new(0, 30, 0, 30)
+toggleBtn.Position = UDim2.new(0, 0, 0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = Mati
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "OFF"
+toggleBtn.Font = Enum.Font.ArialBold
+toggleBtn.TextSize = 10
+toggleBtn.Parent = screenGui
+
+local corner = Instance.new('UICorner')
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = toggleBtn
+
+-- Variabel Default
+local Smoothness = 0.15 -- 15%
+local aimbotActive = false
+local lockedTarget = nil
+local aimPartMode = "Head" -- Bisa diubah ke "Chest" atau "Pelvis" jika perlu
+
+-- SISTEM AUTO TEAM CHECK
+local function isTeamGame()
+    local activeTeams = Teams:GetTeams()
+    local validTeamCount = 0
+    for _, team in ipairs(activeTeams) do
+        if team.Name ~= "Spectators" and #team:GetPlayers() > 0 then
+            validTeamCount = validTeamCount + 1
+        end
+    end
+    return validTeamCount > 1
+end
+
+local function canTargetPlayer(targetPlayer)
+    if targetPlayer == LocalPlayer then return false end
+    if isTeamGame() then
+        if targetPlayer.Team == LocalPlayer.Team then
+            return false -- Rekan satu tim
+        else
+            return true -- Musuh
+        end
+    else
+        return true -- FFA (Semua musuh)
+    end
+end
+
+-- FUNGSI AIMBOT
+local currentCamera = workspace.CurrentCamera
+
+local function getAimPart(character)
+    if aimPartMode == "Head" and character:FindFirstChild('Head') then
+        return character.Head
+    elseif aimPartMode == "Chest" and character:FindFirstChild('HumanoidRootPart') then
+        return character.HumanoidRootPart
+    elseif aimPartMode == "Pelvis" and character:FindFirstChild('LowerTorso') then
+        return character.LowerTorso
+    elseif character:FindFirstChild('Head') then
+        return character.Head
+    end
+    return nil
+end
+
+local function findTarget()
+    local centerScreen = Vector2.new(currentCamera.ViewportSize.X / 2, currentCamera.ViewportSize.Y / 2)
+    local radius = frame.Size.X.Offset / 2
+    local ignoreChar = LocalPlayer.Character
+    
+    -- 1. Cek Target Lock yang sudah ada
+    if lockedTarget and lockedTarget.Character and lockedTarget.Character:FindFirstChild('Humanoid') and lockedTarget.Character.Humanoid.Health > 0 then
+        local part = getAimPart(lockedTarget.Character)
+        if part then
+            local screenPos, onScreen = currentCamera:WorldToScreenPoint(part.Position)
+            local magnitude = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
+            
+            if canTargetPlayer(lockedTarget) and onScreen and magnitude <= radius then
+                local ray = Ray.new(currentCamera.CFrame.Position, (part.Position - currentCamera.CFrame.Position).Unit * 3000)
+                local hit = game.Workspace:FindPartOnRay(ray, ignoreChar, false, true)
+                if hit and hit:IsDescendantOf(lockedTarget.Character) then
+                    return lockedTarget
+                end
+            end
+        end
+    end
+    
+    -- 2. Cari Target Baru
+    lockedTarget = nil
+    local closestMagnitude = math.huge
+    local newTarget = nil
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild('Humanoid') and player.Character.Humanoid.Health > 0 then
+            local part = getAimPart(player.Character)
+            
+            if part and canTargetPlayer(player) then
+                local screenPos, onScreen = currentCamera:WorldToScreenPoint(part.Position)
+                local magnitude = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
+                
+                if onScreen and magnitude < closestMagnitude and magnitude <= radius then
+                    local ray = Ray.new(currentCamera.CFrame.Position, (part.Position - currentCamera.CFrame.Position).Unit * 3000)
+                    local hit = game.Workspace:FindPartOnRay(ray, ignoreChar, false, true)
+                    if hit and hit:IsDescendantOf(player.Character) then
+                        newTarget = player
+                        closestMagnitude = magnitude
+                    end
+                end
+            end
+        end
+    end
+    
+    lockedTarget = newTarget
+    return newTarget
+end
+
+-- LOOP RENDERSTEPPED
+RunService.RenderStepped:Connect(function()
+    if aimbotActive then
+        local target = findTarget()
+        if target and target.Character then
+            local aimPart = getAimPart(target.Character)
+            if aimPart then
+                local targetCFrame = CFrame.new(currentCamera.CFrame.Position, aimPart.Position)
+                if Smoothness >= 0.99 then
+                    currentCamera.CFrame = targetCFrame
+                else
+                    currentCamera.CFrame = currentCamera.CFrame:Lerp(targetCFrame, Smoothness)
+                end
+            end
+        end
+    end
+end)
+
+-- EVENT TOGGLE TOMBOL
+toggleBtn.MouseButton1Click:Connect(function()
+    aimbotActive = not aimbotActive
+    if aimbotActive then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Hijau = Nyala
+        toggleBtn.Text = "ON"
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = Mati
+        toggleBtn.Text = "OFF"
+        lockedTarget = nil -- Reset lock saat dimatikan
+    end
+end)
+
+-- RANDOMIZER NAMA UI ANTI BYPASS
+local v100 = { screenGui }
+while task.wait(2) do
+    local v101, v102, v103 = pairs(v100)
+    while true do
+        local v104
+        v103, v104 = v101(v102, v103)
+        if v103 == nil then
+            break
+        end
+        v104.Name = v4(15)
+    end
+end
