@@ -11,8 +11,8 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
-local FOV_RADIUS = 70
-local SMOOTHNESS_VALUE = 1 -- Di-set ke 1 (1/1 = 100% Snap langsung ke target)
+local FOV_RADIUS = 20
+local SMOOTHNESS_VALUE = 15 -- Di-set ke 1 (1/1 = 100% Snap langsung ke target)
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
 local wallCheckEnabled = true -- Selalu aktif
