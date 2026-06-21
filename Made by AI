@@ -1,4 +1,4 @@
--- UNIVERSAL AIMBOT (SINGLE BUTTON & MOBILE FRIENDLY)
+-- AIMBOT (ADAPTED FROM DARA HUB - 100% MOBILE FRIENDLY)
 -- Fitur: 1 Tombol (30x30), FOV 5 (Visible Center), Smoothness 30, Wall Check, Auto Team Check
 
 local Players = game:GetService("Players")
@@ -11,10 +11,11 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
-local FOV_RADIUS = 5         -- FOV 5 (Sangat kecil, presisi di tengah)
-local SMOOTHNESS = 0.30      -- Smoothness 30%
+local FOV_RADIUS = 5
+local SMOOTHNESS_VALUE = 30 -- Mengikuti sistem Darahub (semakin tinggi semakin halus)
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
+local wallCheckEnabled = true -- Selalu aktif
 
 -- ==================== AUTO TEAM CHECK SYSTEM ====================
 local function isTeamGame()
@@ -43,11 +44,11 @@ local function canTargetPlayer(targetPlayer)
     end
 end
 
--- ==================== UI SETUP ====================
+-- ==================== UI SETUP (MOBILE FRIENDLY) ====================
 local parentGui = (gethui and gethui()) or CoreGui
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SimpleAimbotUI"
+screenGui.Name = "DaraAimbotMobileUI"
 screenGui.Parent = parentGui
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
@@ -67,7 +68,7 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = toggleBtn
 
--- Visual FOV Lingkaran di tengah layar (Radius 5 = Diameter 10)
+-- Visual FOV Lingkaran di tengah layar (Menggunakan UI Frame agar work di Mobile)
 local fovCircle = Instance.new("Frame")
 fovCircle.Size = UDim2.new(0, FOV_RADIUS * 2, 0, FOV_RADIUS * 2)
 fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -86,111 +87,82 @@ fovStroke.Color = Color3.fromRGB(255, 0, 0) -- Default Merah
 fovStroke.Thickness = 1.5
 fovStroke.Parent = fovCircle
 
--- ==================== AIMBOT LOGIC ====================
+-- ==================== AIMBOT LOGIC (DARI DARA HUB) ====================
 local function getAimPart(character)
     return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
 end
 
-local function isTargetValid(target)
-    if not target or not target.Character then return false end
-    local humanoid = target.Character:FindFirstChild("Humanoid")
-    local aimPart = getAimPart(target.Character)
+local function isVisible(part)
+    if not wallCheckEnabled or not part then return true end
+    local character = LocalPlayer.Character
+    if not character then return false end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return false end
     
-    -- Dead Check
-    if not humanoid or humanoid.Health <= 0 then return false end
-    if not aimPart then return false end
-    
-    -- Team Check
-    if not canTargetPlayer(target) then return false end
-    
-    -- FOV Check (PENTING: Center Screen agar mobile & pc sama)
-    local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
-    if not onScreen then return false end
-    
-    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
-    
-    if distance > FOV_RADIUS then return false end
-    
-    -- Wall Check
-    local char = LocalPlayer.Character
-    if not char then return false end
+    local origin = Camera.CFrame.Position
+    local target = part.Position
+    local direction = (target - origin)
     
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {char}
+    rayParams.FilterDescendantsInstances = {character}
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
     
-    local rayOrigin = Camera.CFrame.Position
-    local rayDirection = (aimPart.Position - rayOrigin)
-    local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+    local rayResult = Workspace:Raycast(origin, direction, rayParams)
     
-    if rayResult and not rayResult.Instance:IsDescendantOf(target.Character) then
+    if rayResult and not rayResult.Instance:IsDescendantOf(part.Parent) then
         return false -- Kena tembok
     end
-    
     return true
 end
 
-local function findNewTarget()
-    local closestDistance = FOV_RADIUS
-    local bestTarget = nil
-    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {char}
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+local function lookAt(position)
+    if not position then return end
+    local currentCFrame = Camera.CFrame
+    local lookVector = (position - currentCFrame.Position).Unit
+    local targetCFrame = CFrame.new(currentCFrame.Position, currentCFrame.Position + lookVector)
+    -- Sistem smoothness bawaan Darahub
+    local smoothFactor = SMOOTHNESS_VALUE > 0 and (1 / SMOOTHNESS_VALUE) or 1
+    Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothFactor)
+end
+
+local function getClosestEnemyInFOV()
+    if not Camera then return nil end
+    local closestTarget = nil
+    local closestDistance = math.huge
+    -- FOV selalu di tengah layar (Support Mobile)
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     for _, player in ipairs(Players:GetPlayers()) do
         if canTargetPlayer(player) and player.Character then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            local aimPart = getAimPart(player.Character)
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local aimPartInstance = getAimPart(player.Character)
             
             -- Dead Check
-            if humanoid and humanoid.Health > 0 and aimPart then
-                local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
+            if humanoid and humanoid.Health > 0 and aimPartInstance then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(aimPartInstance.Position)
                 if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
-                    if distance <= closestDistance then
-                        -- Wall Check
-                        local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (aimPart.Position - rayOrigin)
-                        local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
-                        
-                        if not rayResult or rayResult.Instance:IsDescendantOf(player.Character) then
-                            closestDistance = distance
-                            bestTarget = player
-                        end
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                    if distance <= FOV_RADIUS and distance < closestDistance and isVisible(aimPartInstance) then
+                        closestDistance = distance
+                        closestTarget = player
                     end
                 end
             end
         end
     end
-    
-    return bestTarget
+    return closestTarget
 end
 
 -- Loop Utama Aimbot
 RunService.RenderStepped:Connect(function()
     if not AIMBOT_ACTIVE then return end
     
-    -- Cek target saat ini, jika tidak valid cari yang baru
-    if currentTarget and not isTargetValid(currentTarget) then
-        currentTarget = nil
-    end
+    currentTarget = getClosestEnemyInFOV()
     
-    if not currentTarget then
-        currentTarget = findNewTarget()
-    end
-    
-    -- Lakukan Smoothing ke target dan ubah warna FOV
     if currentTarget and currentTarget.Character then
         local aimPart = getAimPart(currentTarget.Character)
         if aimPart then
-            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPart.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
+            lookAt(aimPart.Position)
             fovStroke.Color = Color3.fromRGB(0, 255, 0) -- Hijau saat terkunci
         end
     else
