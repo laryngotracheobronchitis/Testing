@@ -1,5 +1,5 @@
--- AIMBOT SCRIPT FIX
--- Fitur: 1 Tombol Toggle (30x30), FOV 30 (Visible), Smoothness 15, Wall Check, Dead Check, Auto Team Check
+-- UNIVERSAL AIMBOT (SINGLE BUTTON & MOBILE FRIENDLY)
+-- Fitur: 1 Tombol (30x30), FOV 5 (Visible Center), Smoothness 30, Wall Check, Auto Team Check
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,8 +11,8 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
-local FOV_RADIUS = 30        -- FOV diubah menjadi 30 (Visible)
-local SMOOTHNESS = 0.15      -- Terkunci di 15%
+local FOV_RADIUS = 5         -- FOV 5 (Sangat kecil, presisi di tengah)
+local SMOOTHNESS = 0.30      -- Smoothness 30%
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
 
@@ -34,12 +34,12 @@ local function canTargetPlayer(targetPlayer)
     
     if isTeamGame() then
         if LocalPlayer.Team ~= nil and targetPlayer.Team == LocalPlayer.Team then
-            return false -- Rekan satu tim, JANGAN TEMBAK
+            return false -- Rekan satu tim
         else
-            return true -- Musuh, SILAHKAN TEMBAK
+            return true -- Musuh
         end
     else
-        return true -- Mode FFA, SEMUA ORANG MUSUH
+        return true -- Mode FFA, semua musuh
     end
 end
 
@@ -56,7 +56,7 @@ screenGui.IgnoreGuiInset = true
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0, 30, 0, 30)
 toggleBtn.Position = UDim2.new(0, 0, 0, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = OFF
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Text = "OFF"
 toggleBtn.Font = Enum.Font.ArialBold
@@ -67,14 +67,14 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = toggleBtn
 
--- Visual FOV Lingkaran di tengah layar
+-- Visual FOV Lingkaran di tengah layar (Radius 5 = Diameter 10)
 local fovCircle = Instance.new("Frame")
 fovCircle.Size = UDim2.new(0, FOV_RADIUS * 2, 0, FOV_RADIUS * 2)
 fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
 fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
 fovCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 fovCircle.BackgroundTransparency = 1
-fovCircle.Visible = false -- Hanya terlihat saat aimbot aktif
+fovCircle.Visible = false
 fovCircle.Parent = screenGui
 
 local fovCorner = Instance.new("UICorner")
@@ -96,10 +96,14 @@ local function isTargetValid(target)
     local humanoid = target.Character:FindFirstChild("Humanoid")
     local aimPart = getAimPart(target.Character)
     
+    -- Dead Check
     if not humanoid or humanoid.Health <= 0 then return false end
     if not aimPart then return false end
+    
+    -- Team Check
     if not canTargetPlayer(target) then return false end
     
+    -- FOV Check (PENTING: Center Screen agar mobile & pc sama)
     local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
     if not onScreen then return false end
     
@@ -108,6 +112,7 @@ local function isTargetValid(target)
     
     if distance > FOV_RADIUS then return false end
     
+    -- Wall Check
     local char = LocalPlayer.Character
     if not char then return false end
     
@@ -143,11 +148,13 @@ local function findNewTarget()
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local aimPart = getAimPart(player.Character)
             
+            -- Dead Check
             if humanoid and humanoid.Health > 0 and aimPart then
                 local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
                 if onScreen then
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
                     if distance <= closestDistance then
+                        -- Wall Check
                         local rayOrigin = Camera.CFrame.Position
                         local rayDirection = (aimPart.Position - rayOrigin)
                         local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
@@ -184,10 +191,10 @@ RunService.RenderStepped:Connect(function()
         if aimPart then
             local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPart.Position)
             Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
-            fovStroke.Color = Color3.fromRGB(0, 255, 0) -- Berubah Hijau saat terkunci
+            fovStroke.Color = Color3.fromRGB(0, 255, 0) -- Hijau saat terkunci
         end
     else
-        fovStroke.Color = Color3.fromRGB(255, 0, 0) -- Berubah Merah saat tidak ada target
+        fovStroke.Color = Color3.fromRGB(255, 0, 0) -- Merah saat tidak ada target
     end
 end)
 
