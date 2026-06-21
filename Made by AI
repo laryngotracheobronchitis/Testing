@@ -1,5 +1,5 @@
 -- AIMBOT (ADAPTED FROM DARA HUB - 100% MOBILE FRIENDLY)
--- Fitur: 1 Tombol (30x30), FOV 5 (Visible Center), Smoothness 15, Wall Check, Auto Team Check
+-- Fitur: 1 Tombol (30x30), FOV 5 (Visible Center), Smoothness 1 (Snap), Wall Check, Auto Team Check
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,7 +12,7 @@ local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
 local FOV_RADIUS = 5
-local SMOOTHNESS_VALUE = 15 -- Konsep DaraHub: 15 (Sedikit kasar/cepat), 30 (Halus/lambat)
+local SMOOTHNESS_VALUE = 1 -- Di-set ke 1 (1/1 = 100% Snap langsung ke target)
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
 local wallCheckEnabled = true -- Selalu aktif
@@ -121,6 +121,7 @@ local function lookAt(position)
     local lookVector = (position - currentCFrame.Position).Unit
     local targetCFrame = CFrame.new(currentCFrame.Position, currentCFrame.Position + lookVector)
     -- Sistem smoothness bawaan Darahub: 1 / Nilai
+    -- Jika 1, maka 1/1 = 1.0 (Snap 100% langsung ke target)
     local smoothFactor = SMOOTHNESS_VALUE > 0 and (1 / SMOOTHNESS_VALUE) or 1
     Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothFactor)
 end
