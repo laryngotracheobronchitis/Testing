@@ -12,7 +12,7 @@ local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
 local FOV_RADIUS = 20
-local SMOOTHNESS_VALUE = 15 -- Di-set ke 1 (1/1 = 100% Snap langsung ke target)
+local SMOOTHNESS_VALUE = 30 -- Di-set ke 1 (1/1 = 100% Snap langsung ke target)
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
 local wallCheckEnabled = true -- Selalu aktif
