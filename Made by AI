@@ -1,3 +1,6 @@
+-- AIMBOT SCRIPT FIX
+-- Fitur: 1 Tombol Toggle (30x30), FOV 5, Smoothness 15, Wall Check, Dead Check, Auto Team Check
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Teams = game:GetService("Teams")
@@ -7,8 +10,8 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Pengaturan Default
-local FOV_RADIUS = 5         -- FOV sangat kecil (5 pixel)
+-- ==================== PENGATURAN ====================
+local FOV_RADIUS = 5         -- FOV 5 (Sangat kecil). Jika susah lock, ubah angka ini jadi 50 atau 100.
 local SMOOTHNESS = 0.15      -- Terkunci di 15%
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
@@ -23,7 +26,6 @@ local function isTeamGame()
             validTeamCount = validTeamCount + 1
         end
     end
-    
     return validTeamCount > 1
 end
 
@@ -31,7 +33,8 @@ local function canTargetPlayer(targetPlayer)
     if targetPlayer == LocalPlayer then return false end
     
     if isTeamGame() then
-        if targetPlayer.Team == LocalPlayer.Team then
+        -- FIX: Pastikan Team tidak nil. Jika nil, anggap musuh (true)
+        if LocalPlayer.Team ~= nil and targetPlayer.Team == LocalPlayer.Team then
             return false -- Rekan satu tim, JANGAN TEMBAK
         else
             return true -- Musuh, SILAHKAN TEMBAK
@@ -42,9 +45,11 @@ local function canTargetPlayer(targetPlayer)
 end
 
 -- ==================== UI SETUP ====================
+local parentGui = (gethui and gethui()) or CoreGui -- Anti-bypass UI
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SimpleAimbotUI"
-screenGui.Parent = CoreGui
+screenGui.Parent = parentGui
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 
@@ -65,7 +70,8 @@ corner.Parent = toggleBtn
 
 -- ==================== AIMBOT LOGIC ====================
 local function getAimPart(character)
-    return character:FindFirstChild("Head")
+    -- Fallback jika tidak ada Head
+    return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
 end
 
 -- Cek apakah target masih valid untuk dikunci
@@ -91,12 +97,15 @@ local function isTargetValid(target)
     if distance > FOV_RADIUS then return false end
     
     -- Wall Check
-    local rayOrigin = Camera.CFrame.Position
-    local rayDirection = (aimPart.Position - rayOrigin)
+    local char = LocalPlayer.Character
+    if not char then return false end
     
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterDescendantsInstances = {char}
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local rayOrigin = Camera.CFrame.Position
+    local rayDirection = (aimPart.Position - rayOrigin)
     
     local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
     
@@ -113,8 +122,11 @@ local function findNewTarget()
     local bestTarget = nil
     local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterDescendantsInstances = {char}
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
     
     for _, player in ipairs(Players:GetPlayers()) do
@@ -133,7 +145,7 @@ local function findNewTarget()
                         local rayDirection = (aimPart.Position - rayOrigin)
                         local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
                         
-                        if rayResult and rayResult.Instance:IsDescendantOf(player.Character) then
+                        if not rayResult or rayResult.Instance:IsDescendantOf(player.Character) then
                             closestDistance = distance
                             bestTarget = player
                         end
