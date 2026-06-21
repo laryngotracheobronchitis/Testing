@@ -16,9 +16,12 @@ end
 
 local screenGui = Instance.new('ScreenGui')
 screenGui.Parent = game.CoreGui
+screenGui.IgnoreGuiInset = true -- Tambahan agar UI benar-benar full screen tanpa batas atas
 local frame = Instance.new('Frame')
 frame.Size = UDim2.new(0, 35, 0, 35)
-frame.Position = UDim2.new(0, 399.871, 0, 161)
+
+-- PERBAIKAN: Gunakan Scale 0.5, 0.5 agar selalu di tengah layar (PC & Mobile)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0) 
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.BackgroundTransparency = 1
 frame.Visible = false
@@ -89,7 +92,7 @@ v31.Draggable = true
 
 local u32 = v11('mainFrame1', v31, UDim2.new(0, 1.5, 0, 53), UDim2.new(0, 247, 0, 190), false, 0.1)
 local u33 = v11('AimTargetFrame', u32, UDim2.new(0, 10, 0, 115), UDim2.new(0, 195, 0, 60), false, 0.05)
-local u34 = v11('settingsFrame', v31, UDim2.new(0, 317, 0, 53), UDim2.new(0, 247, 0, 230), false, 0.05) -- Ukuran diperbesar untuk fitur baru
+local u34 = v11('settingsFrame', v31, UDim2.new(0, 317, 0, 53), UDim2.new(0, 247, 0, 230), false, 0.05)
 
 local u35 = v11('sliderFrame', u34, UDim2.new(0, 10, 0, 105), UDim2.new(0, 227, 0, 20), true, 0)
 u35.Active = false
@@ -209,7 +212,7 @@ local u60 = {
 local u61 = false
 local u62 = false
 local u64 = false
-local Smoothness = 0.2 -- Nilai default (0.2 = 20%)
+local Smoothness = 0.2
 local povVisible = true
 local teamCheckEnabled = true
 
@@ -302,7 +305,6 @@ u41.MouseButton1Click:Connect(function()
     u33.Visible = false
 end)
 
--- Toggle untuk POV
 povBtn.MouseButton1Click:Connect(function()
     povVisible = not povVisible
     if u64 then
@@ -317,7 +319,6 @@ povBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Toggle untuk Team Check
 teamBtn.MouseButton1Click:Connect(function()
     teamCheckEnabled = not teamCheckEnabled
     if teamCheckEnabled then
@@ -343,7 +344,6 @@ local function u74()
             break
         end
         if v69 ~= localPlayer and v69.Character and v69.Character:FindFirstChild('Head') then
-            -- Cek Tim
             local skipPlayer = false
             if teamCheckEnabled and localPlayer.Team and v69.Team == localPlayer.Team then
                 skipPlayer = true
@@ -385,7 +385,6 @@ local function v76()
                 head = v75.Character.Head
             end
             if head then
-                -- Logika Smoother Aimbot menggunakan Lerp
                 local targetCFrame = CFrame.new(currentCamera.CFrame.Position, head.Position)
                 if Smoothness >= 0.99 then
                     currentCamera.CFrame = targetCFrame
@@ -408,7 +407,7 @@ v39.MouseButton1Click:Connect(function()
         u45.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     else
         u77 = true
-        frame.Visible = povVisible -- Menggunakan variabel POV
+        frame.Visible = povVisible
         u64 = true
         u45.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     end
@@ -464,7 +463,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Logika Slider Smoothness
 local function updateSmooth(input)
     local rel = math.clamp((input.Position.X - smoothFrame.AbsolutePosition.X) / smoothFrame.AbsoluteSize.X, 0, 1)
     local val = math.floor(rel * 100)
