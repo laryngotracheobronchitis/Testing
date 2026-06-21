@@ -1,5 +1,5 @@
 -- AIMBOT SCRIPT FIX
--- Fitur: 1 Tombol Toggle (30x30), FOV 5, Smoothness 15, Wall Check, Dead Check, Auto Team Check
+-- Fitur: 1 Tombol Toggle (30x30), FOV 30 (Visible), Smoothness 15, Wall Check, Dead Check, Auto Team Check
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,7 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ==================== PENGATURAN ====================
-local FOV_RADIUS = 5         -- FOV 5 (Sangat kecil). Jika susah lock, ubah angka ini jadi 50 atau 100.
+local FOV_RADIUS = 30        -- FOV diubah menjadi 30 (Visible)
 local SMOOTHNESS = 0.15      -- Terkunci di 15%
 local AIMBOT_ACTIVE = false
 local currentTarget = nil
@@ -33,7 +33,6 @@ local function canTargetPlayer(targetPlayer)
     if targetPlayer == LocalPlayer then return false end
     
     if isTeamGame() then
-        -- FIX: Pastikan Team tidak nil. Jika nil, anggap musuh (true)
         if LocalPlayer.Team ~= nil and targetPlayer.Team == LocalPlayer.Team then
             return false -- Rekan satu tim, JANGAN TEMBAK
         else
@@ -45,7 +44,7 @@ local function canTargetPlayer(targetPlayer)
 end
 
 -- ==================== UI SETUP ====================
-local parentGui = (gethui and gethui()) or CoreGui -- Anti-bypass UI
+local parentGui = (gethui and gethui()) or CoreGui
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SimpleAimbotUI"
@@ -57,7 +56,7 @@ screenGui.IgnoreGuiInset = true
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0, 30, 0, 30)
 toggleBtn.Position = UDim2.new(0, 0, 0, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = OFF
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Text = "OFF"
 toggleBtn.Font = Enum.Font.ArialBold
@@ -68,26 +67,39 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = toggleBtn
 
+-- Visual FOV Lingkaran di tengah layar
+local fovCircle = Instance.new("Frame")
+fovCircle.Size = UDim2.new(0, FOV_RADIUS * 2, 0, FOV_RADIUS * 2)
+fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+fovCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+fovCircle.BackgroundTransparency = 1
+fovCircle.Visible = false -- Hanya terlihat saat aimbot aktif
+fovCircle.Parent = screenGui
+
+local fovCorner = Instance.new("UICorner")
+fovCorner.CornerRadius = UDim.new(1, 0) -- Membuatnya jadi lingkaran sempurna
+fovCorner.Parent = fovCircle
+
+local fovStroke = Instance.new("UIStroke")
+fovStroke.Color = Color3.fromRGB(255, 0, 0) -- Default Merah
+fovStroke.Thickness = 1.5
+fovStroke.Parent = fovCircle
+
 -- ==================== AIMBOT LOGIC ====================
 local function getAimPart(character)
-    -- Fallback jika tidak ada Head
     return character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
 end
 
--- Cek apakah target masih valid untuk dikunci
 local function isTargetValid(target)
     if not target or not target.Character then return false end
     local humanoid = target.Character:FindFirstChild("Humanoid")
     local aimPart = getAimPart(target.Character)
     
-    -- Dead Check
     if not humanoid or humanoid.Health <= 0 then return false end
     if not aimPart then return false end
-    
-    -- Team Check
     if not canTargetPlayer(target) then return false end
     
-    -- FOV Check
     local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
     if not onScreen then return false end
     
@@ -96,7 +108,6 @@ local function isTargetValid(target)
     
     if distance > FOV_RADIUS then return false end
     
-    -- Wall Check
     local char = LocalPlayer.Character
     if not char then return false end
     
@@ -106,7 +117,6 @@ local function isTargetValid(target)
     
     local rayOrigin = Camera.CFrame.Position
     local rayDirection = (aimPart.Position - rayOrigin)
-    
     local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
     
     if rayResult and not rayResult.Instance:IsDescendantOf(target.Character) then
@@ -116,7 +126,6 @@ local function isTargetValid(target)
     return true
 end
 
--- Mencari target baru terdekat
 local function findNewTarget()
     local closestDistance = FOV_RADIUS
     local bestTarget = nil
@@ -134,13 +143,11 @@ local function findNewTarget()
             local humanoid = player.Character:FindFirstChild("Humanoid")
             local aimPart = getAimPart(player.Character)
             
-            -- Dead Check
             if humanoid and humanoid.Health > 0 and aimPart then
                 local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
                 if onScreen then
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
                     if distance <= closestDistance then
-                        -- Wall Check
                         local rayOrigin = Camera.CFrame.Position
                         local rayDirection = (aimPart.Position - rayOrigin)
                         local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
@@ -171,13 +178,16 @@ RunService.RenderStepped:Connect(function()
         currentTarget = findNewTarget()
     end
     
-    -- Lakukan Smoothing ke target
+    -- Lakukan Smoothing ke target dan ubah warna FOV
     if currentTarget and currentTarget.Character then
         local aimPart = getAimPart(currentTarget.Character)
         if aimPart then
             local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPart.Position)
             Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
+            fovStroke.Color = Color3.fromRGB(0, 255, 0) -- Berubah Hijau saat terkunci
         end
+    else
+        fovStroke.Color = Color3.fromRGB(255, 0, 0) -- Berubah Merah saat tidak ada target
     end
 end)
 
@@ -187,9 +197,11 @@ toggleBtn.MouseButton1Click:Connect(function()
     if AIMBOT_ACTIVE then
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Hijau = ON
         toggleBtn.Text = "ON"
+        fovCircle.Visible = true -- Tampilkan lingkaran FOV
     else
         toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = OFF
         toggleBtn.Text = "OFF"
-        currentTarget = nil -- Reset target saat dimatikan
+        fovCircle.Visible = false -- Sembunyikan lingkaran FOV
+        currentTarget = nil
     end
 end)
