@@ -1,0 +1,183 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Teams = game:GetService("Teams")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Pengaturan Default
+local FOV_RADIUS = 5         -- FOV sangat kecil (5 pixel)
+local SMOOTHNESS = 0.15      -- Terkunci di 15%
+local AIMBOT_ACTIVE = false
+local currentTarget = nil
+
+-- ==================== AUTO TEAM CHECK SYSTEM ====================
+local function isTeamGame()
+    local activeTeams = Teams:GetTeams()
+    local validTeamCount = 0
+    
+    for _, team in ipairs(activeTeams) do
+        if team.Name ~= "Spectators" and #team:GetPlayers() > 0 then
+            validTeamCount = validTeamCount + 1
+        end
+    end
+    
+    return validTeamCount > 1
+end
+
+local function canTargetPlayer(targetPlayer)
+    if targetPlayer == LocalPlayer then return false end
+    
+    if isTeamGame() then
+        if targetPlayer.Team == LocalPlayer.Team then
+            return false -- Rekan satu tim, JANGAN TEMBAK
+        else
+            return true -- Musuh, SILAHKAN TEMBAK
+        end
+    else
+        return true -- Mode FFA, SEMUA ORANG MUSUH
+    end
+end
+
+-- ==================== UI SETUP ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SimpleAimbotUI"
+screenGui.Parent = CoreGui
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+
+-- Tombol 30x30 di pojok kiri atas (0,0)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 30, 0, 30)
+toggleBtn.Position = UDim2.new(0, 0, 0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = OFF
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "OFF"
+toggleBtn.Font = Enum.Font.ArialBold
+toggleBtn.TextSize = 10
+toggleBtn.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = toggleBtn
+
+-- ==================== AIMBOT LOGIC ====================
+local function getAimPart(character)
+    return character:FindFirstChild("Head")
+end
+
+-- Cek apakah target masih valid untuk dikunci
+local function isTargetValid(target)
+    if not target or not target.Character then return false end
+    local humanoid = target.Character:FindFirstChild("Humanoid")
+    local aimPart = getAimPart(target.Character)
+    
+    -- Dead Check
+    if not humanoid or humanoid.Health <= 0 then return false end
+    if not aimPart then return false end
+    
+    -- Team Check
+    if not canTargetPlayer(target) then return false end
+    
+    -- FOV Check
+    local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
+    if not onScreen then return false end
+    
+    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
+    
+    if distance > FOV_RADIUS then return false end
+    
+    -- Wall Check
+    local rayOrigin = Camera.CFrame.Position
+    local rayDirection = (aimPart.Position - rayOrigin)
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+    
+    if rayResult and not rayResult.Instance:IsDescendantOf(target.Character) then
+        return false -- Kena tembok
+    end
+    
+    return true
+end
+
+-- Mencari target baru terdekat
+local function findNewTarget()
+    local closestDistance = FOV_RADIUS
+    local bestTarget = nil
+    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if canTargetPlayer(player) and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local aimPart = getAimPart(player.Character)
+            
+            -- Dead Check
+            if humanoid and humanoid.Health > 0 and aimPart then
+                local screenPos, onScreen = Camera:WorldToScreenPoint(aimPart.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
+                    if distance <= closestDistance then
+                        -- Wall Check
+                        local rayOrigin = Camera.CFrame.Position
+                        local rayDirection = (aimPart.Position - rayOrigin)
+                        local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+                        
+                        if rayResult and rayResult.Instance:IsDescendantOf(player.Character) then
+                            closestDistance = distance
+                            bestTarget = player
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return bestTarget
+end
+
+-- Loop Utama Aimbot
+RunService.RenderStepped:Connect(function()
+    if not AIMBOT_ACTIVE then return end
+    
+    -- Cek target saat ini, jika tidak valid cari yang baru
+    if currentTarget and not isTargetValid(currentTarget) then
+        currentTarget = nil
+    end
+    
+    if not currentTarget then
+        currentTarget = findNewTarget()
+    end
+    
+    -- Lakukan Smoothing ke target
+    if currentTarget and currentTarget.Character then
+        local aimPart = getAimPart(currentTarget.Character)
+        if aimPart then
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPart.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, SMOOTHNESS)
+        end
+    end
+end)
+
+-- ==================== TOGGLE BUTTON ====================
+toggleBtn.MouseButton1Click:Connect(function()
+    AIMBOT_ACTIVE = not AIMBOT_ACTIVE
+    if AIMBOT_ACTIVE then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Hijau = ON
+        toggleBtn.Text = "ON"
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Merah = OFF
+        toggleBtn.Text = "OFF"
+        currentTarget = nil -- Reset target saat dimatikan
+    end
+end)
