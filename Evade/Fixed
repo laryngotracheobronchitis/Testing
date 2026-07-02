@@ -1,0 +1,1070 @@
+-- ==============================================================================
+-- 1. BUTTON LIBRARY
+-- ==============================================================================
+local ButtonLib = {}
+local CoreGui = game:GetService("CoreGui")
+local camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+_G.DarahubLibBtn = {}
+
+local function getDPIScale()
+    return camera.ViewportSize.Y / 1080
+end
+
+ButtonLib.Create = {}
+
+local function buildBaseFrame(config)
+    local darahubGui = CoreGui:FindFirstChild("Darahub") or Instance.new("ScreenGui", CoreGui)
+    darahubGui.Name = "Darahub"
+    darahubGui.IgnoreGuiInset = true
+    darahubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local frame = Instance.new("Frame")
+    local flag = config.Flag or config.Text or "Element"
+    if _G.DarahubLibBtn[flag] then pcall(function() _G.DarahubLibBtn[flag]:Destroy() end) end
+    local targetSizeX = config.SizeX or 250
+    local targetSizeY = config.SizeY or 90
+    frame.Name = flag
+    frame.Parent = darahubGui
+    frame.Visible = config.Visible ~= false
+    frame.Draggable = true
+    frame.Active = true
+    frame.Size = UDim2.new(0, targetSizeX, 0, targetSizeY)
+    frame.Position = config.Position or UDim2.new(0.5, -125, 0.5, -45)
+    frame.BackgroundColor3 = Color3.new(1, 1, 1)
+    frame.BackgroundTransparency = 0.2
+    local uiScale = Instance.new("UIScale", frame)
+    uiScale.Scale = getDPIScale()
+    local corner = Instance.new("UICorner", frame)
+    corner.CornerRadius = UDim.new(0, 10)
+    local strokeB = Instance.new("UIStroke", frame)
+    strokeB.Thickness = 2
+    strokeB.Color = Color3.new(0,0,0); strokeB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local strokeW = Instance.new("UIStroke", frame)
+    strokeW.Thickness = 1
+    strokeW.Color = Color3.new(1,1,1); strokeW.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local grad = Instance.new("UIGradient", frame)
+    grad.Rotation = 90
+    grad.Color = ColorSequence.new(Color3.fromRGB(47,47,47), Color3.new(0,0,0))
+    local label = Instance.new("TextLabel", frame)
+    label.Name = "Label"
+    label.Size = UDim2.new(1,-20,1,0)
+    label.Position = UDim2.new(0,10,0,0)
+    label.BackgroundTransparency = 1; label.TextColor3 = Color3.new(1,1,1)
+    label.TextScaled = true
+    label.Font = Enum.Font.FredokaOne; label.ZIndex = 5
+    local drag = Instance.new("UIDragDetector", frame)
+    drag.Parent.Draggable = true
+    local HOLD_TIME_FRAME = 1.5
+    local isHoldingFrame, holdStartTimeFrame, holdCheckConnectionFrame, holdStartPositionFrame, resettingDragDetectorFrame = false, nil, nil, nil, false
+    local function reinsertDragDetectorFrame()
+        resettingDragDetectorFrame = true
+        if drag then drag.Parent.Draggable = false drag.Enabled = false task.wait(0.01) drag.Enabled = true drag.Parent.Draggable = true end
+        task.wait(0.2)
+        resettingDragDetectorFrame = false
+    end
+    local function startHoldCheckFrame()
+        holdStartTimeFrame = tick()
+        holdStartPositionFrame = frame.Position; isHoldingFrame = true
+        holdCheckConnectionFrame = RunService.Heartbeat:Connect(function()
+            if not isHoldingFrame then holdCheckConnectionFrame:Disconnect() return end
+            local cp = frame.Position
+            if cp.X.Offset ~= holdStartPositionFrame.X.Offset or cp.Y.Offset ~= holdStartPositionFrame.Y.Offset then
+                isHoldingFrame = false; holdCheckConnectionFrame:Disconnect() return
+            end
+            if tick() - holdStartTimeFrame >= HOLD_TIME_FRAME then
+                isHoldingFrame = false; holdCheckConnectionFrame:Disconnect(); reinsertDragDetectorFrame()
+            end
+        end)
+    end
+    frame.InputBegan:Connect(function(input)
+        if resettingDragDetectorFrame then return end
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then startHoldCheckFrame() end
+    end)
+    frame.InputEnded:Connect(function(input)
+        if resettingDragDetectorFrame then return end
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isHoldingFrame = false
+            if holdCheckConnectionFrame then holdCheckConnectionFrame:Disconnect() end
+        end
+    end)
+    drag.DragStart:Connect(function()
+        if resettingDragDetectorFrame then return end
+        isHoldingFrame = false
+        if holdCheckConnectionFrame then holdCheckConnectionFrame:Disconnect() end
+    end)
+    local api = {}
+    function api:Destroy() if _G.DarahubLibBtn[flag] then _G.DarahubLibBtn[flag] = nil end frame:Destroy() end
+    function api:SetVisible(visible) frame.Visible = visible end
+    return api, frame, label, drag, flag, targetSizeX, targetSizeY
+end
+
+function ButtonLib.Create:Toggle(config)
+    local api, frame, label, drag, flag, targetSizeX, targetSizeY = buildBaseFrame(config)
+    local callback = config.Callback or config[1] or function() end
+    local baseText = config.Text or "Toggle"
+    local state = config.Default or false
+    local function updateUI() label.Text = baseText .. (state and " : ON" or " : OFF") end
+    updateUI()
+    function api:Set(val)
+        if state ~= val then state = val updateUI() pcall(callback, state) end
+    end
+    function api:GetState() return state end
+    local startPos
+    drag.DragStart:Connect(function() startPos = frame.Position end)
+    drag.DragEnd:Connect(function()
+        if not startPos then return end
+        local cp = frame.Position
+        local dist = math.sqrt((cp.X.Offset-startPos.X.Offset)^2+(cp.Y.Offset-startPos.Y.Offset)^2)
+        if dist < 5 then
+            frame:TweenSize(UDim2.new(0,targetSizeX-10,0,targetSizeY-5),"Out","Quad",0.05,true)
+            task.wait(0.05)
+            frame:TweenSize(UDim2.new(0,targetSizeX,0,targetSizeY),"Out","Quad",0.05,true)
+            api:Set(not state)
+        end
+        startPos = nil
+    end)
+    _G.DarahubLibBtn[flag] = api
+    return api
+end
+
+-- ==============================================================================
+-- 2. INIT UI & SERVICES (WindUI)
+-- ==============================================================================
+loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))()
+local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    NewElements = true,
+    Title = "Patpat | Evade",
+    Icon = "rbxassetid://137330250139083",
+    Author = "Made by: Patpat",
+    Folder = "Patpat/Games/Evade",
+    Size = UDim2.fromOffset(580, 490),
+    Theme = "Dark",
+    HidePanelBackground = false,
+    Acrylic = false,
+    HideSearchBar = false,
+    SideBarWidth = 200,
+    OpenButton = {
+        Enabled = false,
+        Scale = 0
+    },
+})
+
+WindUI.TransparencyValue = 0.7
+Window:ToggleTransparency(true)
+Window:DisableTopbarButtons({ "Fullscreen" })
+Window:SetIconSize(48)
+
+local executor = identifyexecutor()
+if type(executor) == "table" then
+    for key, value in pairs(executor) do
+        print(key .. ": " .. tostring(value))
+    end
+elseif type(executor) == "string" then
+    Window:Tag({
+        Title = "" .. executor
+    })
+else
+    print("The injector does not support identifyexecutor()")
+end
+
+local Tabs = {
+    Main = Window:Tab({ Title = "Main", Icon = "layout-grid" }),
+    Visuals = Window:Tab({ Title = "Visuals & Utility", Icon = "eye" }),
+}
+
+-- ==============================================================================
+-- UI TOGGLE BUTTON (Custom, bukan WindUI OpenButton)
+-- ==============================================================================
+local function mouseUnlock(enabled)
+    game.Players.LocalPlayer.PlayerScripts.Camera.MouseEnableStats:SetAttribute("MouseLockEnabled", enabled)
+end
+
+local isUIVisible = true
+local WindUIScreenGui = nil
+
+-- Cari WindUI ScreenGui
+local function findWindUIGui()
+    local folder = CoreGui:FindFirstChild("Patpat")
+    if folder then
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("ScreenGui") then
+                return child
+            end
+        end
+    end
+    -- Fallback: cari semua ScreenGui yang mungkin dari WindUI
+    for _, child in ipairs(CoreGui:GetChildren()) do
+        if child:IsA("ScreenGui") and child.Name ~= "Darahub" then
+            local hasWindow = child:FindFirstChildWhichIsA("Frame") or child:FindFirstChildWhichIsA("ViewportFrame")
+            if hasWindow then
+                return child
+            end
+        end
+    end
+    return nil
+end
+
+-- Retry mencari WindUI GUI karena mungkin belum terbuat
+task.spawn(function()
+    for i = 1, 20 do
+        WindUIScreenGui = findWindUIGui()
+        if WindUIScreenGui then break end
+        task.wait(0.5)
+    end
+end)
+
+local function setUIVisible(visible)
+    isUIVisible = visible
+    -- Cari ulang jika belum ketemu
+    if not WindUIScreenGui then
+        WindUIScreenGui = findWindUIGui()
+    end
+    
+    if WindUIScreenGui then
+        WindUIScreenGui.Enabled = visible
+    else
+        -- Fallback: toggle semua ScreenGui kecuali Darahub
+        local folder = CoreGui:FindFirstChild("Patpat")
+        if folder then
+            for _, child in ipairs(folder:GetChildren()) do
+                if child:IsA("ScreenGui") then
+                    child.Enabled = visible
+                end
+            end
+        end
+    end
+    mouseUnlock(visible)
+end
+
+-- Buat UI Toggle Button
+local UIToggleButton = ButtonLib.Create:Toggle({
+    Text = "UI",
+    Flag = "UIToggleButton",
+    Default = true,
+    Visible = true,
+    SizeX = 90,
+    SizeY = 50,
+    Position = UDim2.new(0, 15, 0.5, -25),
+    Callback = function(state)
+        setUIVisible(state)
+    end
+})
+
+-- ==============================================================================
+-- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC
+-- ==============================================================================
+local m = require(game.ReplicatedStorage.Modules.Character.CharacterTable.CharacterController.Local.Movement.returnValues)
+local originalReturnTable = m.returnTable
+local movementInstances = {}
+
+local savedMovementStats = { AirStrafeAcceleration = 182, JumpCap = 1 }
+local infiniteSlide = false
+local slideFriction = -8
+
+local function findMovementInstances()
+    movementInstances = {}
+    for _, v in pairs(getgc(true)) do
+        if type(v) == "table" and rawget(v, "defaultMovementStats") then
+            table.insert(movementInstances, v)
+        end
+    end
+    return #movementInstances > 0
+end
+
+local function applySavedMovementStats()
+    task.spawn(function()
+        for i = 1, 10 do
+            task.wait(0.5)
+            if findMovementInstances() then
+                for _, instance in ipairs(movementInstances) do
+                    if instance and instance.overrideMovementStats then
+                        instance.overrideMovementStats["AirStrafeAcceleration"] = tonumber(savedMovementStats.AirStrafeAcceleration)
+                        instance.overrideMovementStats["JumpCap"] = tonumber(savedMovementStats.JumpCap)
+                    end
+                end
+                break
+            end
+        end
+    end)
+end
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local localPlayer = player
+
+player.CharacterAdded:Connect(function(character)
+    applySavedMovementStats()
+end)
+
+m.returnTable = function(s, p28, p29)
+    local t = originalReturnTable(s, p28, p29)
+    if infiniteSlide then
+        local char = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Players") and workspace.Game.Players:FindFirstChild(player.Name)
+        local st = (char and char:GetAttribute("State")) or (p29 and p29.State)
+        if st == "Slide" or st == "EmotingSlide" or st == "CarryingSlide" then
+            t.Friction = slideFriction
+        end
+    end
+    return t
+end
+
+getgenv().autoJumpType = "Bounce"
+getgenv().bhopMode = "Acceleration"
+getgenv().bhopAccelValue = -0.5
+getgenv().bhopHoldActive = false
+getgenv().autoJumpEnabled = false
+
+featureStates = featureStates or {}
+featureStates.Bhop = false
+featureStates.BhopHold = false
+
+local bhopConnection = nil
+local bhopLoaded = false
+local frictionTables = {}
+local Character = nil
+local Humanoid = nil
+local HumanoidRootPart = nil
+local LastJump = 0
+local GROUND_CHECK_OFFSET = 3.5
+local GROUND_CHECK_RAY_LENGTH = 4
+local MAX_SLOPE_ANGLE = 45
+local bhopButtonScreenGui = nil
+
+local FloatingBhopToggle = ButtonLib.Create:Toggle({
+    Text = "Bhop", Flag = "FloatingBhop", Default = false, Visible = false,
+    SizeX = 300, SizeY = 110, Position = UDim2.new(0.5, -150, 0.2, 0),
+    Callback = function(state)
+        getgenv().autoJumpEnabled = state
+        featureStates.Bhop = state
+        checkBhopState()
+    end
+})
+
+local function IsOnGround()
+    if not Character or not HumanoidRootPart or not Humanoid then
+        return false
+    end
+    local state = Humanoid:GetState()
+    if state == Enum.HumanoidStateType.Jumping or
+       state == Enum.HumanoidStateType.Freefall or
+       state == Enum.HumanoidStateType.Swimming then
+        return false
+    end
+    if Humanoid:GetState() == Enum.HumanoidStateType.Running then
+        return true
+    end
+    local rayOrigin = HumanoidRootPart.Position
+    local rayDirection = Vector3.new(0, -GROUND_CHECK_RAY_LENGTH, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {Character}
+    raycastParams.IgnoreWater = true
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    if raycastResult then
+        local surfaceNormal = raycastResult.Normal
+        local angle = math.deg(math.acos(surfaceNormal:Dot(Vector3.new(0, 1, 0))))
+        if angle <= MAX_SLOPE_ANGLE then
+            local heightDiff = math.abs(rayOrigin.Y - raycastResult.Position.Y)
+            return heightDiff <= GROUND_CHECK_OFFSET
+        end
+    end
+    if HumanoidRootPart.Velocity.Y > -1 and HumanoidRootPart.Velocity.Y < 1 then
+        return true
+    end
+    return false
+end
+
+local function findFrictionTables()
+    frictionTables = {}
+    for _, obj in pairs(getgc(true)) do
+        if type(obj) == "table" and rawget(obj, "Friction") then
+            table.insert(frictionTables, {
+                obj = obj,
+                original = obj.Friction
+            })
+        end
+    end
+end
+
+local function applyBhopFriction()
+    local isActive = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+    if isActive and getgenv().bhopMode == "Acceleration" then
+        if #frictionTables == 0 then
+            findFrictionTables()
+        end
+        for _, tableData in ipairs(frictionTables) do
+            if tableData.obj and type(tableData.obj) == "table" then
+                pcall(function()
+                    tableData.obj.Friction = getgenv().bhopAccelValue or -0.5
+                end)
+            end
+        end
+    else
+        for _, tableData in ipairs(frictionTables) do
+            if tableData.obj and type(tableData.obj) == "table" and tableData.original then
+                pcall(function()
+                    tableData.obj.Friction = tableData.original
+                end)
+            end
+        end
+    end
+end
+
+local function updateBhop()
+    if not bhopLoaded then return end
+    local isActive = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+    if isActive then
+        local currentChar = player.Character
+        if currentChar ~= Character then
+            Character = currentChar
+            Humanoid = currentChar and currentChar:FindFirstChildOfClass("Humanoid")
+            HumanoidRootPart = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+        end
+        if not Character or not Humanoid or not HumanoidRootPart then return end
+        if Humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
+        local now = tick()
+        if getgenv().autoJumpType == "Realistic" then
+            pcall(function()
+                player.PlayerScripts.Events.temporary_events.JumpReact:Fire()
+                player.PlayerScripts.Events.temporary_events.EndJump:Fire()
+            end)
+        else
+            if IsOnGround() and (now - LastJump) > 0.25 then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                LastJump = now
+            end
+        end
+    end
+end
+
+local function loadBhop()
+    if bhopLoaded then return end
+    bhopLoaded = true
+    Character = player.Character
+    if Character then
+        Humanoid = Character:FindFirstChildOfClass("Humanoid")
+        HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    end
+    findFrictionTables()
+    applyBhopFriction()
+    if bhopConnection then bhopConnection:Disconnect() end
+    bhopConnection = RunService.Heartbeat:Connect(function()
+        updateBhop()
+    end)
+end
+
+local function unloadBhop()
+    if not bhopLoaded then return end
+    bhopLoaded = false
+    if bhopConnection then
+        bhopConnection:Disconnect()
+        bhopConnection = nil
+    end
+    getgenv().bhopHoldActive = false
+    applyBhopFriction()
+end
+
+function checkBhopState()
+    local shouldLoad = getgenv().autoJumpEnabled or getgenv().bhopHoldActive
+    if shouldLoad then
+        loadBhop()
+    else
+        unloadBhop()
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    applySavedMovementStats()
+    if getgenv().autoJumpEnabled or getgenv().bhopHoldActive then
+        task.wait(1)
+        Character = char
+        Humanoid = char:FindFirstChildOfClass("Humanoid")
+        HumanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+        checkBhopState()
+    end
+end)
+
+-- ==============================================================================
+-- 4. VISUALS (Fullbright)
+-- ==============================================================================
+local Lighting = game:GetService("Lighting")
+local fullbrightEnabled = false
+RunService.RenderStepped:Connect(function()
+    if fullbrightEnabled then
+        Lighting.Ambient = Color3.new(1,1,1)
+        Lighting.ColorShift_Bottom = Color3.new(1,1,1)
+        Lighting.ColorShift_Top = Color3.new(1,1,1)
+        Lighting.GlobalShadows = false
+    end
+end)
+
+-- ==============================================================================
+-- 5. TIMER DISPLAY
+-- ==============================================================================
+local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+local TimerGUI = nil
+local TimerEnabled = false
+local OriginalTimerVisible = false
+local CheckingGameTimer = false
+local _attributeConnection = nil
+local _attributeConnection2 = nil
+
+local function createTimerGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TimerGUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.Parent = PlayerGui
+    local Timer = Instance.new("Frame")
+    Timer.BackgroundTransparency = 1
+    Timer.Size = UDim2.new(1,0,1,0); Timer.Parent = ScreenGui
+    local Top = Instance.new("Frame")
+    Top.AnchorPoint = Vector2.new(0.5,0)
+    Top.BackgroundTransparency = 1; Top.Position = UDim2.new(0.5,0,0,0)
+    Top.Size = UDim2.new(1,0,1,0)
+    Top.Parent = Timer
+    Instance.new("UIAspectRatioConstraint").Parent = Top
+    local sc = Instance.new("UISizeConstraint"); sc.MaxSize = Vector2.new(900,900)
+    sc.Parent = Top
+    local MainTimer = Instance.new("Frame"); MainTimer.Name = "MainTimer"
+    MainTimer.AnchorPoint = Vector2.new(0.5,0)
+    MainTimer.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    MainTimer.BackgroundTransparency = 0.6; MainTimer.BorderSizePixel = 0
+    MainTimer.Position = UDim2.new(0.5,0,0.04,0)
+    MainTimer.Size = UDim2.new(0.25,0,0.1,0)
+    MainTimer.Visible = false; MainTimer.Parent = Top
+    Instance.new("UICorner", MainTimer).CornerRadius = UDim.new(0,4)
+    local ms = Instance.new("UIStroke")
+    ms.Transparency = 0.8; ms.Parent = MainTimer
+    local bg = Instance.new("ImageLabel")
+    bg.Image = "rbxassetid://196969716"
+    bg.ImageColor3 = Color3.fromRGB(21,21,21); bg.ImageTransparency = 0.7
+    bg.AnchorPoint = Vector2.new(0.5,0.5)
+    bg.BackgroundTransparency = 1
+    bg.Position = UDim2.new(0.5,0,0.5,0); bg.Size = UDim2.new(1,0,1,0); bg.ZIndex = 0
+    bg.Parent = MainTimer
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0,4)
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "Status"
+    StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    StatusLabel.Text = "ROUND ACTIVE"
+    StatusLabel.TextColor3 = Color3.fromRGB(165,194,255)
+    StatusLabel.TextScaled = true; StatusLabel.TextStrokeTransparency = 0.95
+    StatusLabel.TextWrapped = true
+    StatusLabel.AnchorPoint = Vector2.new(0.5,0.5); StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Position = UDim2.new(0.5,0,0.25,0)
+    StatusLabel.Size = UDim2.new(0.8,0,0.25,0)
+    StatusLabel.ZIndex = 3; StatusLabel.Parent = MainTimer
+    local ss = Instance.new("UIStroke")
+    ss.Thickness = 2; ss.Transparency = 0.7; ss.Parent = StatusLabel
+    local sg = Instance.new("UIGradient")
+    sg.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,255,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(194,194,194))})
+    sg.Rotation = 90
+    sg.Parent = StatusLabel
+    local TimeDisplay = Instance.new("TextLabel")
+    TimeDisplay.Name = "TimeDisplay"
+    TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+    TimeDisplay.Text = "0:00"
+    TimeDisplay.TextColor3 = Color3.fromRGB(165,194,255)
+    TimeDisplay.TextScaled = true; TimeDisplay.TextStrokeTransparency = 0.95
+    TimeDisplay.TextWrapped = true
+    TimeDisplay.AnchorPoint = Vector2.new(0.5,0.5); TimeDisplay.BackgroundTransparency = 1
+    TimeDisplay.Position = UDim2.new(0.5,0,0.65,0)
+    TimeDisplay.Size = UDim2.new(0.5,0,0.5,0)
+    TimeDisplay.ZIndex = 3; TimeDisplay.Parent = MainTimer
+    local ts = Instance.new("UIStroke")
+    ts.Thickness = 3; ts.Transparency = 0.7; ts.Parent = TimeDisplay
+    local tg = Instance.new("UIGradient")
+    tg.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,255,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(194,194,194))})
+    tg.Rotation = 90
+    tg.Parent = TimeDisplay
+    return { ScreenGui = ScreenGui, TimeDisplay = TimeDisplay, StatusLabel = StatusLabel, MainTimer = MainTimer }
+end
+
+local function destroyTimerGUI()
+    if _attributeConnection then _attributeConnection:Disconnect() _attributeConnection = nil end
+    if _attributeConnection2 then _attributeConnection2:Disconnect() _attributeConnection2 = nil end
+    CheckingGameTimer = false
+    if TimerGUI then TimerGUI.ScreenGui:Destroy() TimerGUI = nil end
+    TimerEnabled = false
+end
+local function ensureTimerGUI() if not TimerGUI then TimerGUI = createTimerGUI() end end
+local function SetTime(seconds)
+    if not TimerGUI then return end
+    if type(seconds) == "number" then
+        local m2 = math.floor(seconds/60); local s2 = math.floor(seconds%60)
+        TimerGUI.TimeDisplay.Text = string.format("%d:%02d", m2, s2)
+        local col = seconds <= 5 and Color3.fromRGB(215,100,100) or Color3.fromRGB(165,194,255)
+        TimerGUI.TimeDisplay.TextColor3 = col
+        TimerGUI.StatusLabel.TextColor3 = col
+    else TimerGUI.TimeDisplay.Text = tostring(seconds) end
+end
+local function SetStatus(text) if not TimerGUI then return end TimerGUI.StatusLabel.Text = text:upper() end
+local function CheckGameTimerVisibility()
+    if not TimerEnabled or not TimerGUI then if TimerGUI then TimerGUI.MainTimer.Visible = false end return end
+    local hud = localPlayer.PlayerGui:FindFirstChild("Shared")
+    if hud then hud = hud:FindFirstChild("HUD") end
+    if hud then hud = hud:FindFirstChild("Overlay") end
+    if hud then hud = hud:FindFirstChild("Default") end
+    if hud then hud = hud:FindFirstChild("RoundOverlay") end
+    if hud then hud = hud:FindFirstChild("Round") end
+    local roundTimer = hud and hud:FindFirstChild("RoundTimer")
+    if roundTimer and roundTimer.Visible then TimerGUI.MainTimer.Visible = false
+    else TimerGUI.MainTimer.Visible = OriginalTimerVisible end
+end
+local function StartGameTimerCheck()
+    if CheckingGameTimer then return end
+    CheckingGameTimer = true
+    spawn(function() while CheckingGameTimer do CheckGameTimerVisibility() wait(0.1) end end)
+end
+local function UpdateFromAttributes()
+    local statsFolder = workspace:FindFirstChild("Game")
+    if statsFolder then statsFolder = statsFolder:FindFirstChild("Stats") end
+    if not statsFolder then return end
+    local timerValue = statsFolder:GetAttribute("Timer")
+    local roundStarted = statsFolder:GetAttribute("RoundStarted")
+    if timerValue then SetTime(timerValue) end
+    if roundStarted ~= nil then SetStatus(roundStarted and "Round Active" or "Intermission") end
+end
+local function StartAttributeMonitor()
+    if _attributeConnection then _attributeConnection:Disconnect() _attributeConnection = nil end
+    if _attributeConnection2 then _attributeConnection2:Disconnect() _attributeConnection2 = nil end
+    local statsFolder = workspace:FindFirstChild("Game")
+    if statsFolder then statsFolder = statsFolder:FindFirstChild("Stats") end
+    if not statsFolder then return end
+    _attributeConnection = statsFolder:GetAttributeChangedSignal("Timer"):Connect(UpdateFromAttributes)
+    _attributeConnection2 = statsFolder:GetAttributeChangedSignal("RoundStarted"):Connect(UpdateFromAttributes)
+    UpdateFromAttributes()
+end
+local function SetTimerVisible(visible)
+    TimerEnabled = visible
+    OriginalTimerVisible = visible
+    if CheckingGameTimer then CheckGameTimerVisibility()
+    elseif TimerGUI then TimerGUI.MainTimer.Visible = visible end
+end
+local function handleTimerToggles()
+    if not TimerEnabled then destroyTimerGUI()
+    else ensureTimerGUI() SetTimerVisible(true) StartAttributeMonitor() StartGameTimerCheck() end
+end
+
+-- ==============================================================================
+-- 6. COLA LOGIC
+-- ==============================================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ToolAction = ReplicatedStorage.Events.Character.ToolAction
+local SpeedBoostEvent = ReplicatedStorage.Events.Character.SpeedBoost
+local firstFired = false
+local ColaCheat = { UnlimitedCola = false, CustomSpeed = 1.4, CustomDuration = 3.5, isBlocked = false }
+local mt = getrawmetatable(ToolAction)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = { ... }
+    if method == "FireServer" and self == ToolAction then
+        if args[1] == 0 then
+            firstFired = true
+            task.delay(0.5, function()
+                if ColaCheat.CustomSpeed and ColaCheat.CustomDuration then
+                    firesignal(SpeedBoostEvent.OnClientEvent, "Drink", ColaCheat.CustomSpeed, ColaCheat.CustomDuration, Color3.new(1,1,1))
+                end
+            end)
+        elseif firstFired and args[1] == 2 then
+            firstFired = false
+            if ColaCheat.UnlimitedCola then
+                ColaCheat.isBlocked = true
+                task.delay(5, function() ColaCheat.isBlocked = false end)
+            end
+        end
+        if ColaCheat.UnlimitedCola and ColaCheat.isBlocked and args[1] == 2 then return nil end
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- ==============================================================================
+-- 7. WINDUI TABS & MENUS
+-- ==============================================================================
+Tabs.Main:Section({ Title = "Movement Options", TextSize = 20 })
+Tabs.Main:Divider()
+
+Tabs.Main:Toggle({
+    Title = "Bhop",
+    Value = false,
+    Callback = function(state)
+        featureStates.Bhop = state
+        getgenv().autoJumpEnabled = state
+        FloatingBhopToggle:SetVisible(state)
+        if not state then
+            FloatingBhopToggle:Set(false)
+        end
+        checkBhopState()
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Bhop Hold (Tahan Tombol Jump)",
+    Value = false,
+    Callback = function(state)
+        featureStates.BhopHold = state
+        if not state then
+            getgenv().bhopHoldActive = false
+            checkBhopState()
+        end
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Bhop Button GUI",
+    Value = false,
+    Callback = function(state)
+        if state then
+            if not bhopButtonScreenGui then
+                bhopButtonScreenGui = Instance.new("ScreenGui")
+                bhopButtonScreenGui.Name = "BhopButtonGUI"
+                bhopButtonScreenGui.ResetOnSpawn = false
+                bhopButtonScreenGui.Parent = game:GetService("CoreGui")
+            end
+            FloatingBhopToggle:SetVisible(true)
+        else
+            if bhopButtonScreenGui then
+                bhopButtonScreenGui:Destroy()
+                bhopButtonScreenGui = nil
+            end
+            FloatingBhopToggle:SetVisible(false)
+        end
+    end
+})
+
+Tabs.Main:Dropdown({
+    Title = "Bhop Mode",
+    Values = {"Acceleration", "No Acceleration"},
+    Value = "Acceleration",
+    Callback = function(value)
+        getgenv().bhopMode = value
+        checkBhopState()
+    end
+})
+
+Tabs.Main:Dropdown({
+    Title = "Auto Jump Type",
+    Values = {"Bounce", "Realistic"},
+    Value = "Bounce",
+    Callback = function(value)
+        getgenv().autoJumpType = value
+    end
+})
+
+Tabs.Main:Input({
+    Title = "Bhop Acceleration (Negative Only)",
+    Placeholder = "-0.5",
+    Numeric = true,
+    Value = "-0.5",
+    Callback = function(value)
+        if tostring(value):sub(1, 1) == "-" then
+            getgenv().bhopAccelValue = tonumber(value)
+        end
+    end
+})
+
+Tabs.Main:Space()
+Tabs.Main:Section({ Title = "Movement Stats", TextSize = 20 })
+Tabs.Main:Divider()
+
+Tabs.Main:Input({
+    Title = "Air Strafe Acceleration",
+    Placeholder = "182", Numeric = true,
+    Value = tostring(savedMovementStats.AirStrafeAcceleration),
+    Callback = function(value) savedMovementStats.AirStrafeAcceleration = value applySavedMovementStats() end
+})
+
+Tabs.Main:Input({
+    Title = "Jump Cap",
+    Placeholder = "1", Numeric = true,
+    Value = tostring(savedMovementStats.JumpCap),
+    Callback = function(value) savedMovementStats.JumpCap = value applySavedMovementStats() end
+})
+
+Tabs.Main:Toggle({
+    Title = "Infinite Slide",
+    Flag = "InfiniteSlideToggle",
+    Value = false,
+    Callback = function(v) infiniteSlide = v end
+})
+
+Tabs.Main:Input({
+    Title = "Slide Friction (Negative Only)",
+    Placeholder = "-8", Numeric = true, Value = "-8",
+    Callback = function(v) local n = tonumber(v) if n and n < 0 then slideFriction = n end end
+})
+
+Tabs.Main:Space()
+Tabs.Main:Section({ Title = "Cola Cheats", TextSize = 20 })
+Tabs.Main:Divider()
+
+Tabs.Main:Toggle({ Title = "Unlimited Cola", Value = false, Callback = function(state) ColaCheat.UnlimitedCola = state end })
+Tabs.Main:Input({ Title = "Cola Speed Multiplier", Placeholder = "1.4", Numeric = true, Value = "1.4", Callback = function(value) ColaCheat.CustomSpeed = tonumber(value) or 1.4 end })
+Tabs.Main:Input({ Title = "Cola Duration", Placeholder = "3.5", Numeric = true, Value = "3.5", Callback = function(value) ColaCheat.CustomDuration = tonumber(value) or 3.5 end })
+
+Tabs.Visuals:Section({ Title = "Visuals & Helpers", TextSize = 20 })
+Tabs.Visuals:Divider()
+
+Tabs.Visuals:Toggle({
+    Title = "Fullbright",
+    Desc = "Menerangkan seluruh map",
+    Value = false,
+    Callback = function(state) fullbrightEnabled = state end
+})
+
+Tabs.Visuals:Toggle({
+    Title = "Timer Display",
+    Flag = "TimerDisplayToggle",
+    Desc = "Tampilkan timer round seperti DaraHub",
+    Value = false,
+    Callback = function(state) TimerEnabled = state handleTimerToggles() end
+})
+
+Tabs.Visuals:Button({
+    Title = "Clear Invis Walls",
+    Callback = function()
+        pcall(function()
+            for _, obj in ipairs(workspace.Game.Map.InvisParts:GetDescendants()) do
+                if obj:IsA("BasePart") then obj.CanCollide = false end
+            end
+        end)
+    end
+})
+
+Tabs.Visuals:Button({
+    Title = "Visual Infinite Ammo",
+    Desc = "Ammo di HUD tampak tak terbatas (visual only)",
+    Callback = function()
+        pcall(function()
+            local toolInfoModule = ReplicatedStorage.Modules.Character.CharacterTable.CharacterController.Local.HUD.FrameModules.ToolInfo
+            local originalModule = require(toolInfoModule)
+            local originalUpdateAmounts = originalModule.UpdateAmounts
+            originalModule.UpdateAmounts = function(self, amounts)
+                if amounts then
+                    for _, amountInfo in pairs(amounts) do
+                        if amountInfo.Current then amountInfo.Current = math.huge end
+                        if amountInfo.Reserve then amountInfo.Reserve = math.huge end
+                        if amountInfo.MaxReserve then amountInfo.MaxReserve = math.huge end
+                    end
+                end
+                return originalUpdateAmounts(self, amounts)
+            end
+            local originalUpdateBullets = originalModule.UpdateBullets
+            originalModule.UpdateBullets = function(self, frame, oldAmount, newAmount)
+                return originalUpdateBullets(self, frame, 0, 6)
+            end
+            for _, tool in pairs(ReplicatedStorage.Tools:GetChildren()) do
+                local success, toolData = pcall(require, tool)
+                if success and toolData.Tasks then
+                    for _, taskData in ipairs(toolData.Tasks) do
+                        if taskData.ResourceInfo then
+                            if taskData.ResourceInfo.Type == "Clip" then
+                                taskData.ResourceInfo.Cap = 676967
+                                taskData.ResourceInfo.Reserve = 676967
+                            elseif taskData.ResourceInfo.Max then
+                                taskData.ResourceInfo.Max = 676967
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+Tabs.Visuals:Button({
+    Title = "Portal Bypass",
+    Desc = "Bypass cooldown & batasan portal",
+    Callback = function()
+        pcall(function()
+            local methodModule = getrenv().require(ReplicatedStorage.Modules.Character.Tools.Modules.Methods.Portal)
+            local OldIsPortalPossible = methodModule.IsPortalPossible
+            methodModule.IsPortalPossible = function(...)
+                return true
+            end
+        end)
+    end
+})
+
+Tabs.Visuals:Button({
+    Title = "Grapple Hook Bypass",
+    Desc = "Bypass cooldown & batasan grapple hook",
+    Callback = function()
+        pcall(function()
+            local grappleModule = getrenv().require(ReplicatedStorage.Modules.Character.Tools.Modules.Methods.GrappleHook)
+            if grappleModule then
+                if grappleModule.CanUse then
+                    grappleModule.CanUse = function(...) return true end
+                end
+                if grappleModule.IsGrapplePossible then
+                    grappleModule.IsGrapplePossible = function(...) return true end
+                end
+                if grappleModule.CheckCooldown then
+                    grappleModule.CheckCooldown = function(...) return false end
+                end
+            end
+        end)
+        pcall(function()
+            local tools = ReplicatedStorage.Modules.Character.Tools.Modules.Methods
+            for _, mod in pairs(tools:GetChildren()) do
+                if mod.Name:lower():find("grapple") or mod.Name:lower():find("hook") then
+                    local s, m2 = pcall(function() return getrenv().require(mod) end)
+                    if s and m2 then
+                        for k, v in pairs(m2) do
+                            if type(v) == "function" and (k:lower():find("can") or k:lower():find("possible") or k:lower():find("cooldown")) then
+                                m2[k] = function(...) return true end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+-- ==============================================================================
+-- AUTO SELF REVIVE
+-- ==============================================================================
+local AutoSelfRevive = false
+local SelfReviveMethod = "Spawnpoint"
+local lastSavedPosition = nil
+local respawnConnection = nil
+local AutoSelfReviveConnection = nil
+local hasRevived = false
+local isReviving = false
+
+local function setupSelfReviveForChar(character)
+    if AutoSelfReviveConnection then AutoSelfReviveConnection:Disconnect() AutoSelfReviveConnection = nil end
+    if not character then return end
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    AutoSelfReviveConnection = character:GetAttributeChangedSignal("Downed"):Connect(function()
+        local isDowned = character:GetAttribute("Downed")
+        if isDowned and not isReviving then
+            isReviving = true
+            if SelfReviveMethod == "Spawnpoint" then
+                if not hasRevived then
+                    hasRevived = true
+                    pcall(function()
+                        ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+                    end)
+                    task.delay(10, function() hasRevived = false end)
+                    task.delay(1, function() isReviving = false end)
+                else
+                    isReviving = false
+                end
+            elseif SelfReviveMethod == "Fake Revive" then
+                if hrp then lastSavedPosition = hrp.Position end
+                task.spawn(function()
+                    pcall(function()
+                        ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+                    end)
+                    local newChar
+                    repeat newChar = player.Character task.wait()
+                    until newChar and newChar:FindFirstChild("HumanoidRootPart") and newChar ~= character
+                    if newChar then
+                        local newHRP = newChar:FindFirstChild("HumanoidRootPart")
+                        if lastSavedPosition and newHRP then
+                            newHRP.CFrame = CFrame.new(lastSavedPosition)
+                            lastSavedPosition = nil
+                        end
+                    end
+                    isReviving = false
+                end)
+            end
+        end
+    end)
+end
+
+Tabs.Main:Space()
+Tabs.Main:Section({ Title = "Self Revive", TextSize = 20 })
+Tabs.Main:Divider()
+
+Tabs.Main:Toggle({
+    Title = "Auto Self Revive",
+    Flag = "AutoSelfReviveToggle",
+    Value = false,
+    Callback = function(state)
+        AutoSelfRevive = state
+        if state then
+            local char = player.Character
+            setupSelfReviveForChar(char)
+            if respawnConnection then respawnConnection:Disconnect() end
+            respawnConnection = player.CharacterAdded:Connect(function(newChar)
+                task.wait(0.5)
+                hasRevived = false
+                isReviving = false
+                lastSavedPosition = nil
+                setupSelfReviveForChar(newChar)
+            end)
+        else
+            if AutoSelfReviveConnection then AutoSelfReviveConnection:Disconnect() AutoSelfReviveConnection = nil end
+            if respawnConnection then respawnConnection:Disconnect() respawnConnection = nil end
+            hasRevived = false
+            isReviving = false
+            lastSavedPosition = nil
+        end
+    end
+})
+
+Tabs.Main:Dropdown({
+    Title = "Self Revive Method",
+    Flag = "SelfReviveMethodDropdown",
+    Values = { "Spawnpoint", "Fake Revive" },
+    Value = "Spawnpoint",
+    Callback = function(value) SelfReviveMethod = value end
+})
+
+Tabs.Main:Button({
+    Title = "Manual Self Revive",
+    Desc = "Revive sekali saat ini juga",
+    Callback = function()
+        local character = player.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local isDowned = character:GetAttribute("Downed")
+        if not isDowned then return end
+        if SelfReviveMethod == "Spawnpoint" then
+            if not hasRevived then
+                hasRevived = true
+                pcall(function() ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true) end)
+                task.delay(10, function() hasRevived = false end)
+            end
+        elseif SelfReviveMethod == "Fake Revive" then
+            if hrp then lastSavedPosition = hrp.Position end
+            task.spawn(function()
+                pcall(function() ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true) end)
+                local newChar
+                repeat newChar = player.Character task.wait()
+                until newChar and newChar:FindFirstChild("HumanoidRootPart") and newChar ~= character
+                if newChar then
+                    local newHRP = newChar:FindFirstChild("HumanoidRootPart")
+                    if lastSavedPosition and newHRP then
+                        newHRP.CFrame = CFrame.new(lastSavedPosition)
+                        lastSavedPosition = nil
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- ==============================================================================
+-- KEYBIND TO TOGGLE UI (Optional - Keyboard Shortcut)
+-- ==============================================================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    -- Tekan Right Control atau End untuk toggle UI
+    if input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.End then
+        local newState = not isUIVisible
+        setUIVisible(newState)
+        UIToggleButton:Set(newState)
+    end
+end)
+
+Window:SelectTab(1)
