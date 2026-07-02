@@ -129,9 +129,8 @@ function ButtonLib.Create:Toggle(config)
 end
 
 -- ==============================================================================
--- 2. INIT UI & SERVICES (WindUI dengan proper ButtonLib integration)
+-- 2. INIT UI & SERVICES (WindUI)
 -- ==============================================================================
--- Load library dulu (ini akan load ButtonLib global dari DaraHub)
 loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))()
 local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
@@ -177,7 +176,7 @@ local Tabs = {
 }
 
 -- ==============================================================================
--- UI OPEN BUTTON (Menggunakan ButtonLib dari LoadAll.lua seperti DaraHub)
+-- UI OPEN BUTTON (Draggable - menggunakan ButtonLib dari LoadAll)
 -- ==============================================================================
 local function mouseUnlock(enabled)
     game.Players.LocalPlayer.PlayerScripts.Camera.MouseEnableStats:SetAttribute("MouseLockEnabled", enabled)
@@ -185,10 +184,8 @@ end
 
 mouseUnlock(true)
 
--- Callbacks untuk Window - persis seperti DaraHub
 Window:OnOpen(function()
     mouseUnlock(true)
-    -- Sembunyikan open button saat window terbuka
     pcall(function()
         if ButtonLib and ButtonLib.OpenButton then
             ButtonLib:OpenButton(false)
@@ -198,7 +195,6 @@ end)
 
 Window:OnClose(function()
     mouseUnlock(false)
-    -- Tampilkan open button saat window tertutup
     pcall(function()
         if ButtonLib and ButtonLib.OpenButton then
             ButtonLib:OpenButton(true)
@@ -215,12 +211,20 @@ Window:OnDestroy(function()
     mouseUnlock(false)
 end)
 
--- Fallback: Jika ButtonLib dari LoadAll tidak bekerja, buat custom open button
+-- ==============================================================================
+-- FALLBACK DRAGGABLE OPEN BUTTON
+-- ==============================================================================
 local customOpenButtonCreated = false
+local fallbackDragDetector = nil
+local fallbackBtnFrame = nil
+local isDraggingFallback = false
+local fallbackDragStart = nil
+local fallbackBtnStartPos = nil
+
 local function createFallbackOpenButton()
     if customOpenButtonCreated then return end
     
-    -- Coba gunakan ButtonLib dari LoadAll dulu
+    -- Coba pakai ButtonLib dari LoadAll dulu
     pcall(function()
         if ButtonLib and ButtonLib.OpenButton then
             ButtonLib:OpenButton(true)
@@ -229,70 +233,129 @@ local function createFallbackOpenButton()
         end
     end)
     
-    -- Fallback: buat button sendiri
+    -- Buat ScreenGui
     local openBtnGui = Instance.new("ScreenGui")
     openBtnGui.Name = "PatpatOpenButton"
     openBtnGui.ResetOnSpawn = false
     openBtnGui.Parent = CoreGui
     openBtnGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local btn = Instance.new("TextButton")
-    btn.Name = "OpenButton"
-    btn.Size = UDim2.new(0, 120, 0, 45)
-    btn.Position = UDim2.new(0, 15, 0.5, -22)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Text = "Patpat"
-    btn.Font = Enum.Font.FredokaOne
-    btn.TextSize = 18
-    btn.AutoButtonColor = true
-    btn.Parent = openBtnGui
+    -- Frame container (bisa di-drag)
+    local container = Instance.new("Frame")
+    container.Name = "ButtonContainer"
+    container.Size = UDim2.new(0, 130, 0, 50)
+    container.Position = UDim2.new(0, 15, 0.5, -25)
+    container.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    container.BackgroundTransparency = 0.3
+    container.Active = true
+    container.Parent = openBtnGui
     
-    local uiScale = Instance.new("UIScale", btn)
+    local uiScale = Instance.new("UIScale", container)
     uiScale.Scale = getDPIScale()
     
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 12)
     
-    local stroke = Instance.new("UIStroke", btn)
+    local stroke = Instance.new("UIStroke", container)
     stroke.Thickness = 2
     stroke.Color = Color3.fromRGB(100, 150, 255)
     
-    local grad = Instance.new("UIGradient", btn)
+    local grad = Instance.new("UIGradient", container)
     grad.Rotation = 90
     grad.Color = ColorSequence.new(
         Color3.fromRGB(50, 50, 70),
         Color3.fromRGB(25, 25, 35)
     )
     
-    btn.MouseButton1Click:Connect(function()
-        pcall(function()
-            Window:Toggle()
-        end)
+    -- UIDragDetector untuk drag
+    local dragDetect = Instance.new("UIDragDetector", container)
+    dragDetect.DragMode = Enum.DragMode.Instant
+    
+    -- Actual clickable button di dalam container
+    local btn = Instance.new("TextButton")
+    btn.Name = "ClickArea"
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Position = UDim2.new(0, 0, 0, 0)
+    btn.BackgroundColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundTransparency = 1
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Text = "Patpat"
+    btn.Font = Enum.Font.FredokaOne
+    btn.TextSize = 18
+    btn.AutoButtonColor = false
+    btn.ZIndex = 5
+    btn.Parent = container
+    
+    fallbackBtnFrame = container
+    fallbackDragDetector = dragDetect
+    
+    -- Track drag vs click
+    dragDetect.DragStart:Connect(function()
+        isDraggingFallback = false
+        fallbackDragStart = tick()
+        fallbackBtnStartPos = container.Position
     end)
     
-    -- Sembunyikan saat window terbuka, tampilkan saat tertutup
-    local function updateVisibility()
-        local isOpen = false
-        pcall(function()
-            isOpen = Window:IsOpen()
-        end)
-        openBtnGui.Enabled = not isOpen
-    end
+    -- Update flag jika posisi berubah (berarti sedang drag)
+    local dragCheckConn
+    dragCheckConn = RunService.Heartbeat:Connect(function()
+        if fallbackDragStart and fallbackBtnStartPos then
+            local cp = container.Position
+            if cp.X.Offset ~= fallbackBtnStartPos.X.Offset or cp.Y.Offset ~= fallbackBtnStartPos.Y.Offset then
+                isDraggingFallback = true
+            end
+        end
+    end)
     
-    -- Override OnOpen/OnClose untuk update visibility fallback button
-    local originalOnOpen = Window.OnOpen
-    local originalOnClose = Window.OnClose
+    dragDetect.DragEnd:Connect(function()
+        if not isDraggingFallback then
+            -- Ini klik, bukan drag - toggle UI
+            pcall(function()
+                Window:Toggle()
+            end)
+        end
+        isDraggingFallback = false
+        fallbackDragStart = nil
+        fallbackBtnStartPos = nil
+    end)
     
+    -- Visual feedback saat hover
+    btn.MouseEnter:Connect(function()
+        if not isDraggingFallback then
+            stroke.Color = Color3.fromRGB(130, 180, 255)
+            container.BackgroundTransparency = 0.15
+        end
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        stroke.Color = Color3.fromRGB(100, 150, 255)
+        container.BackgroundTransparency = 0.3
+    end)
+    
+    -- Click animation
+    btn.MouseButton1Down:Connect(function()
+        container:TweenSize(UDim2.new(0, 125, 0, 47), "Out", "Quad", 0.08, true)
+    end)
+    
+    btn.MouseButton1Up:Connect(function()
+        container:TweenSize(UDim2.new(0, 130, 0, 50), "Out", "Quad", 0.08, true)
+    end)
+    
+    -- Update visibility berdasarkan state window
     spawn(function()
-        while wait(0.5) do
-            updateVisibility()
+        while task.wait(0.3) do
+            local isOpen = false
+            pcall(function()
+                isOpen = Window:IsOpen()
+            end)
+            -- Selalu visible supaya bisa di-drag kapanpun, tapi biarkan user toggle
+            -- Jika ingin hide saat open, uncomment baris bawah:
+            -- openBtnGui.Enabled = not isOpen
         end
     end)
     
     customOpenButtonCreated = true
 end
 
--- Buat fallback button setelah sedikit delay
 task.delay(2, createFallbackOpenButton)
 
 -- ==============================================================================
@@ -693,12 +756,11 @@ local function handleTimerToggles()
 end
 
 -- ==============================================================================
--- 6. COLA LOGIC (Fixed - Berdasarkan DaraHub style)
+-- 6. COLA LOGIC (Fixed)
 -- ==============================================================================
 local ToolAction = ReplicatedStorage.Events.Character.ToolAction
 local SpeedBoostEvent = ReplicatedStorage.Events.Character.SpeedBoost
 
--- Cola Settings
 local ColaCheat = {
     UnlimitedCola = false,
     CustomSpeed = 1.4,
@@ -706,14 +768,11 @@ local ColaCheat = {
     FixAnimation = false
 }
 
--- State tracking
 local colaState = {
     isDrinking = false,
-    lastDrinkTime = 0,
-    blockedActions = {}
+    lastDrinkTime = 0
 }
 
--- Hook ToolAction
 local mt = getrawmetatable(ToolAction)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -724,12 +783,10 @@ mt.__namecall = newcclosure(function(self, ...)
     if method == "FireServer" and self == ToolAction then
         local actionType = args[1]
         
-        -- Action 0 = Mulai minum cola
         if actionType == 0 then
             colaState.isDrinking = true
             colaState.lastDrinkTime = tick()
             
-            -- Fix Animation: Hentikan animasi minum lebih cepat
             if ColaCheat.FixAnimation then
                 task.spawn(function()
                     local char = player.Character
@@ -737,7 +794,6 @@ mt.__namecall = newcclosure(function(self, ...)
                         local humanoid = char:FindFirstChildOfClass("Humanoid")
                         if humanoid then
                             task.wait(0.15)
-                            -- Coba stop animasi dengan mengubah state
                             if humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
                                 humanoid:ChangeState(Enum.HumanoidStateType.Running)
                             end
@@ -746,7 +802,6 @@ mt.__namecall = newcclosure(function(self, ...)
                 end)
             end
             
-            -- Apply custom speed boost
             if ColaCheat.CustomSpeed and ColaCheat.CustomDuration then
                 local delayTime = ColaCheat.FixAnimation and 0.05 or 0.4
                 task.delay(delayTime, function()
@@ -757,19 +812,12 @@ mt.__namecall = newcclosure(function(self, ...)
             end
         end
         
-        -- Action 2 = Selesai minum (ini yang mengurangi ammo)
         if actionType == 2 then
             if ColaCheat.UnlimitedCola and colaState.isDrinking then
                 colaState.isDrinking = false
-                -- Block server call agar ammo tidak berkurang
                 return nil
             end
             colaState.isDrinking = false
-        end
-        
-        -- Action 1 atau lainnya saat unlimited cola aktif
-        if actionType ~= 0 and actionType ~= 2 and ColaCheat.UnlimitedCola then
-            -- Allow other actions to pass through
         end
     end
     
@@ -777,22 +825,7 @@ mt.__namecall = newcclosure(function(self, ...)
 end)
 setreadonly(mt, true)
 
--- Fix Animation: Hook Animator untuk stop cola animation
 local function setupAnimationFix()
-    local animator = nil
-    local char = player.Character
-    if char then
-        animator = char:FindFirstChildOfClass("Animator")
-    end
-    
-    if not animator then
-        player.CharacterAdded:Connect(function(c)
-            task.wait(0.5)
-            animator = c:FindFirstChildOfClass("Animator")
-        end)
-    end
-    
-    -- Monitor animation tracks dan stop cola animation jika fix aktif
     spawn(function()
         while task.wait(0.1) do
             if ColaCheat.FixAnimation and colaState.isDrinking then
@@ -802,9 +835,8 @@ local function setupAnimationFix()
                     if anim then
                         for _, track in ipairs(anim:GetPlayingAnimationTracks()) do
                             local animName = track.Animation and track.Animation.Name or ""
-                            -- Coba detect cola drinking animation
                             if animName:lower():find("drink") or animName:lower():find("cola") or animName:lower():find("consume") then
-                                track:AdjustSpeed(10) -- Percepat animasi
+                                track:AdjustSpeed(10)
                                 task.wait(0.1)
                                 track:Stop()
                             end
