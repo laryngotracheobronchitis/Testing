@@ -1,5 +1,5 @@
 -- ==============================================================================
--- 1. BUTTON LIBRARY
+-- 1. BUTTON LIBRARY (Local untuk floating buttons)
 -- ==============================================================================
 local ButtonLib = {}
 local CoreGui = game:GetService("CoreGui")
@@ -129,8 +129,9 @@ function ButtonLib.Create:Toggle(config)
 end
 
 -- ==============================================================================
--- 2. INIT UI & SERVICES (WindUI)
+-- 2. INIT UI & SERVICES (WindUI dengan proper ButtonLib integration)
 -- ==============================================================================
+-- Load library dulu (ini akan load ButtonLib global dari DaraHub)
 loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))()
 local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
@@ -176,86 +177,133 @@ local Tabs = {
 }
 
 -- ==============================================================================
--- UI TOGGLE BUTTON (Custom, bukan WindUI OpenButton)
+-- UI OPEN BUTTON (Menggunakan ButtonLib dari LoadAll.lua seperti DaraHub)
 -- ==============================================================================
 local function mouseUnlock(enabled)
     game.Players.LocalPlayer.PlayerScripts.Camera.MouseEnableStats:SetAttribute("MouseLockEnabled", enabled)
 end
 
-local isUIVisible = true
-local WindUIScreenGui = nil
+mouseUnlock(true)
 
--- Cari WindUI ScreenGui
-local function findWindUIGui()
-    local folder = CoreGui:FindFirstChild("Patpat")
-    if folder then
-        for _, child in ipairs(folder:GetChildren()) do
-            if child:IsA("ScreenGui") then
-                return child
-            end
+-- Callbacks untuk Window - persis seperti DaraHub
+Window:OnOpen(function()
+    mouseUnlock(true)
+    -- Sembunyikan open button saat window terbuka
+    pcall(function()
+        if ButtonLib and ButtonLib.OpenButton then
+            ButtonLib:OpenButton(false)
         end
-    end
-    -- Fallback: cari semua ScreenGui yang mungkin dari WindUI
-    for _, child in ipairs(CoreGui:GetChildren()) do
-        if child:IsA("ScreenGui") and child.Name ~= "Darahub" then
-            local hasWindow = child:FindFirstChildWhichIsA("Frame") or child:FindFirstChildWhichIsA("ViewportFrame")
-            if hasWindow then
-                return child
-            end
-        end
-    end
-    return nil
-end
-
--- Retry mencari WindUI GUI karena mungkin belum terbuat
-task.spawn(function()
-    for i = 1, 20 do
-        WindUIScreenGui = findWindUIGui()
-        if WindUIScreenGui then break end
-        task.wait(0.5)
-    end
+    end)
 end)
 
-local function setUIVisible(visible)
-    isUIVisible = visible
-    -- Cari ulang jika belum ketemu
-    if not WindUIScreenGui then
-        WindUIScreenGui = findWindUIGui()
+Window:OnClose(function()
+    mouseUnlock(false)
+    -- Tampilkan open button saat window tertutup
+    pcall(function()
+        if ButtonLib and ButtonLib.OpenButton then
+            ButtonLib:OpenButton(true)
+        end
+    end)
+end)
+
+Window:OnDestroy(function()
+    pcall(function()
+        if ButtonLib and ButtonLib.DestroyScreengui then
+            ButtonLib:DestroyScreengui()
+        end
+    end)
+    mouseUnlock(false)
+end)
+
+-- Fallback: Jika ButtonLib dari LoadAll tidak bekerja, buat custom open button
+local customOpenButtonCreated = false
+local function createFallbackOpenButton()
+    if customOpenButtonCreated then return end
+    
+    -- Coba gunakan ButtonLib dari LoadAll dulu
+    pcall(function()
+        if ButtonLib and ButtonLib.OpenButton then
+            ButtonLib:OpenButton(true)
+            customOpenButtonCreated = true
+            return
+        end
+    end)
+    
+    -- Fallback: buat button sendiri
+    local openBtnGui = Instance.new("ScreenGui")
+    openBtnGui.Name = "PatpatOpenButton"
+    openBtnGui.ResetOnSpawn = false
+    openBtnGui.Parent = CoreGui
+    openBtnGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = "OpenButton"
+    btn.Size = UDim2.new(0, 120, 0, 45)
+    btn.Position = UDim2.new(0, 15, 0.5, -22)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Text = "Patpat"
+    btn.Font = Enum.Font.FredokaOne
+    btn.TextSize = 18
+    btn.AutoButtonColor = true
+    btn.Parent = openBtnGui
+    
+    local uiScale = Instance.new("UIScale", btn)
+    uiScale.Scale = getDPIScale()
+    
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(100, 150, 255)
+    
+    local grad = Instance.new("UIGradient", btn)
+    grad.Rotation = 90
+    grad.Color = ColorSequence.new(
+        Color3.fromRGB(50, 50, 70),
+        Color3.fromRGB(25, 25, 35)
+    )
+    
+    btn.MouseButton1Click:Connect(function()
+        pcall(function()
+            Window:Toggle()
+        end)
+    end)
+    
+    -- Sembunyikan saat window terbuka, tampilkan saat tertutup
+    local function updateVisibility()
+        local isOpen = false
+        pcall(function()
+            isOpen = Window:IsOpen()
+        end)
+        openBtnGui.Enabled = not isOpen
     end
     
-    if WindUIScreenGui then
-        WindUIScreenGui.Enabled = visible
-    else
-        -- Fallback: toggle semua ScreenGui kecuali Darahub
-        local folder = CoreGui:FindFirstChild("Patpat")
-        if folder then
-            for _, child in ipairs(folder:GetChildren()) do
-                if child:IsA("ScreenGui") then
-                    child.Enabled = visible
-                end
-            end
+    -- Override OnOpen/OnClose untuk update visibility fallback button
+    local originalOnOpen = Window.OnOpen
+    local originalOnClose = Window.OnClose
+    
+    spawn(function()
+        while wait(0.5) do
+            updateVisibility()
         end
-    end
-    mouseUnlock(visible)
+    end)
+    
+    customOpenButtonCreated = true
 end
 
--- Buat UI Toggle Button
-local UIToggleButton = ButtonLib.Create:Toggle({
-    Text = "UI",
-    Flag = "UIToggleButton",
-    Default = true,
-    Visible = true,
-    SizeX = 90,
-    SizeY = 50,
-    Position = UDim2.new(0, 15, 0.5, -25),
-    Callback = function(state)
-        setUIVisible(state)
-    end
-})
+-- Buat fallback button setelah sedikit delay
+task.delay(2, createFallbackOpenButton)
 
 -- ==============================================================================
 -- 3. MOVEMENT MODIFICATIONS & BHOP LOGIC
 -- ==============================================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+local localPlayer = player
+
 local m = require(game.ReplicatedStorage.Modules.Character.CharacterTable.CharacterController.Local.Movement.returnValues)
 local originalReturnTable = m.returnTable
 local movementInstances = {}
@@ -290,10 +338,6 @@ local function applySavedMovementStats()
         end
     end)
 end
-
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local localPlayer = player
 
 player.CharacterAdded:Connect(function(character)
     applySavedMovementStats()
@@ -490,7 +534,6 @@ end)
 -- ==============================================================================
 -- 4. VISUALS (Fullbright)
 -- ==============================================================================
-local Lighting = game:GetService("Lighting")
 local fullbrightEnabled = false
 RunService.RenderStepped:Connect(function()
     if fullbrightEnabled then
@@ -650,39 +693,130 @@ local function handleTimerToggles()
 end
 
 -- ==============================================================================
--- 6. COLA LOGIC
+-- 6. COLA LOGIC (Fixed - Berdasarkan DaraHub style)
 -- ==============================================================================
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ToolAction = ReplicatedStorage.Events.Character.ToolAction
 local SpeedBoostEvent = ReplicatedStorage.Events.Character.SpeedBoost
-local firstFired = false
-local ColaCheat = { UnlimitedCola = false, CustomSpeed = 1.4, CustomDuration = 3.5, isBlocked = false }
+
+-- Cola Settings
+local ColaCheat = {
+    UnlimitedCola = false,
+    CustomSpeed = 1.4,
+    CustomDuration = 3.5,
+    FixAnimation = false
+}
+
+-- State tracking
+local colaState = {
+    isDrinking = false,
+    lastDrinkTime = 0,
+    blockedActions = {}
+}
+
+-- Hook ToolAction
 local mt = getrawmetatable(ToolAction)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     local args = { ... }
+    
     if method == "FireServer" and self == ToolAction then
-        if args[1] == 0 then
-            firstFired = true
-            task.delay(0.5, function()
-                if ColaCheat.CustomSpeed and ColaCheat.CustomDuration then
-                    firesignal(SpeedBoostEvent.OnClientEvent, "Drink", ColaCheat.CustomSpeed, ColaCheat.CustomDuration, Color3.new(1,1,1))
-                end
-            end)
-        elseif firstFired and args[1] == 2 then
-            firstFired = false
-            if ColaCheat.UnlimitedCola then
-                ColaCheat.isBlocked = true
-                task.delay(5, function() ColaCheat.isBlocked = false end)
+        local actionType = args[1]
+        
+        -- Action 0 = Mulai minum cola
+        if actionType == 0 then
+            colaState.isDrinking = true
+            colaState.lastDrinkTime = tick()
+            
+            -- Fix Animation: Hentikan animasi minum lebih cepat
+            if ColaCheat.FixAnimation then
+                task.spawn(function()
+                    local char = player.Character
+                    if char then
+                        local humanoid = char:FindFirstChildOfClass("Humanoid")
+                        if humanoid then
+                            task.wait(0.15)
+                            -- Coba stop animasi dengan mengubah state
+                            if humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+                                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                            end
+                        end
+                    end
+                end)
+            end
+            
+            -- Apply custom speed boost
+            if ColaCheat.CustomSpeed and ColaCheat.CustomDuration then
+                local delayTime = ColaCheat.FixAnimation and 0.05 or 0.4
+                task.delay(delayTime, function()
+                    pcall(function()
+                        firesignal(SpeedBoostEvent.OnClientEvent, "Drink", ColaCheat.CustomSpeed, ColaCheat.CustomDuration, Color3.new(1, 1, 1))
+                    end)
+                end)
             end
         end
-        if ColaCheat.UnlimitedCola and ColaCheat.isBlocked and args[1] == 2 then return nil end
+        
+        -- Action 2 = Selesai minum (ini yang mengurangi ammo)
+        if actionType == 2 then
+            if ColaCheat.UnlimitedCola and colaState.isDrinking then
+                colaState.isDrinking = false
+                -- Block server call agar ammo tidak berkurang
+                return nil
+            end
+            colaState.isDrinking = false
+        end
+        
+        -- Action 1 atau lainnya saat unlimited cola aktif
+        if actionType ~= 0 and actionType ~= 2 and ColaCheat.UnlimitedCola then
+            -- Allow other actions to pass through
+        end
     end
+    
     return oldNamecall(self, ...)
 end)
 setreadonly(mt, true)
+
+-- Fix Animation: Hook Animator untuk stop cola animation
+local function setupAnimationFix()
+    local animator = nil
+    local char = player.Character
+    if char then
+        animator = char:FindFirstChildOfClass("Animator")
+    end
+    
+    if not animator then
+        player.CharacterAdded:Connect(function(c)
+            task.wait(0.5)
+            animator = c:FindFirstChildOfClass("Animator")
+        end)
+    end
+    
+    -- Monitor animation tracks dan stop cola animation jika fix aktif
+    spawn(function()
+        while task.wait(0.1) do
+            if ColaCheat.FixAnimation and colaState.isDrinking then
+                local char = player.Character
+                if char then
+                    local anim = char:FindFirstChildOfClass("Animator")
+                    if anim then
+                        for _, track in ipairs(anim:GetPlayingAnimationTracks()) do
+                            local animName = track.Animation and track.Animation.Name or ""
+                            -- Coba detect cola drinking animation
+                            if animName:lower():find("drink") or animName:lower():find("cola") or animName:lower():find("consume") then
+                                track:AdjustSpeed(10) -- Percepat animasi
+                                task.wait(0.1)
+                                track:Stop()
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+setupAnimationFix()
 
 -- ==============================================================================
 -- 7. WINDUI TABS & MENUS
@@ -725,7 +859,7 @@ Tabs.Main:Toggle({
                 bhopButtonScreenGui = Instance.new("ScreenGui")
                 bhopButtonScreenGui.Name = "BhopButtonGUI"
                 bhopButtonScreenGui.ResetOnSpawn = false
-                bhopButtonScreenGui.Parent = game:GetService("CoreGui")
+                bhopButtonScreenGui.Parent = CoreGui
             end
             FloatingBhopToggle:SetVisible(true)
         else
@@ -804,9 +938,35 @@ Tabs.Main:Space()
 Tabs.Main:Section({ Title = "Cola Cheats", TextSize = 20 })
 Tabs.Main:Divider()
 
-Tabs.Main:Toggle({ Title = "Unlimited Cola", Value = false, Callback = function(state) ColaCheat.UnlimitedCola = state end })
-Tabs.Main:Input({ Title = "Cola Speed Multiplier", Placeholder = "1.4", Numeric = true, Value = "1.4", Callback = function(value) ColaCheat.CustomSpeed = tonumber(value) or 1.4 end })
-Tabs.Main:Input({ Title = "Cola Duration", Placeholder = "3.5", Numeric = true, Value = "3.5", Callback = function(value) ColaCheat.CustomDuration = tonumber(value) or 3.5 end })
+Tabs.Main:Toggle({ 
+    Title = "Unlimited Cola", 
+    Desc = "Cola tidak akan habis",
+    Value = false, 
+    Callback = function(state) ColaCheat.UnlimitedCola = state end 
+})
+
+Tabs.Main:Toggle({ 
+    Title = "Fix Cola Animation", 
+    Desc = "Percepat/hentikan animasi minum cola",
+    Value = false, 
+    Callback = function(state) ColaCheat.FixAnimation = state end 
+})
+
+Tabs.Main:Input({ 
+    Title = "Cola Speed Multiplier", 
+    Placeholder = "1.4", 
+    Numeric = true, 
+    Value = "1.4", 
+    Callback = function(value) ColaCheat.CustomSpeed = tonumber(value) or 1.4 end 
+})
+
+Tabs.Main:Input({ 
+    Title = "Cola Duration (seconds)", 
+    Placeholder = "3.5", 
+    Numeric = true, 
+    Value = "3.5", 
+    Callback = function(value) ColaCheat.CustomDuration = tonumber(value) or 3.5 end 
+})
 
 Tabs.Visuals:Section({ Title = "Visuals & Helpers", TextSize = 20 })
 Tabs.Visuals:Divider()
@@ -1053,18 +1213,5 @@ Tabs.Main:Button({
         end
     end
 })
-
--- ==============================================================================
--- KEYBIND TO TOGGLE UI (Optional - Keyboard Shortcut)
--- ==============================================================================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    -- Tekan Right Control atau End untuk toggle UI
-    if input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.End then
-        local newState = not isUIVisible
-        setUIVisible(newState)
-        UIToggleButton:Set(newState)
-    end
-end)
 
 Window:SelectTab(1)
