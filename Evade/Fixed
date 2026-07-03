@@ -176,7 +176,7 @@ local Tabs = {
 }
 
 -- ==============================================================================
--- UI OPEN BUTTON (Draggable - menggunakan ButtonLib dari LoadAll)
+-- UI OPEN BUTTON (Draggable + Clickable - Manual Drag Method)
 -- ==============================================================================
 local function mouseUnlock(enabled)
     game.Players.LocalPlayer.PlayerScripts.Camera.MouseEnableStats:SetAttribute("MouseLockEnabled", enabled)
@@ -212,14 +212,9 @@ Window:OnDestroy(function()
 end)
 
 -- ==============================================================================
--- FALLBACK DRAGGABLE OPEN BUTTON
+-- FALLBACK DRAGGABLE + CLICKABLE OPEN BUTTON (Manual Input Method)
 -- ==============================================================================
 local customOpenButtonCreated = false
-local fallbackDragDetector = nil
-local fallbackBtnFrame = nil
-local isDraggingFallback = false
-local fallbackDragStart = nil
-local fallbackBtnStartPos = nil
 
 local function createFallbackOpenButton()
     if customOpenButtonCreated then return end
@@ -240,7 +235,7 @@ local function createFallbackOpenButton()
     openBtnGui.Parent = CoreGui
     openBtnGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Frame container (bisa di-drag)
+    -- Frame container (TIDAK pakai UIDragDetector - pakai manual drag)
     local container = Instance.new("Frame")
     container.Name = "ButtonContainer"
     container.Size = UDim2.new(0, 130, 0, 50)
@@ -266,91 +261,102 @@ local function createFallbackOpenButton()
         Color3.fromRGB(25, 25, 35)
     )
     
-    -- UIDragDetector untuk drag
-    local dragDetect = Instance.new("UIDragDetector", container)
-    dragDetect.DragMode = Enum.DragMode.Instant
+    -- Label teks
+    local label = Instance.new("TextLabel")
+    label.Name = "Title"
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = "Patpat"
+    label.Font = Enum.Font.FredokaOne
+    label.TextSize = 18
+    label.ZIndex = 5
+    label.Parent = container
     
-    -- Actual clickable button di dalam container
-    local btn = Instance.new("TextButton")
-    btn.Name = "ClickArea"
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.Position = UDim2.new(0, 0, 0, 0)
-    btn.BackgroundColor3 = Color3.new(1, 1, 1)
-    btn.BackgroundTransparency = 1
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Text = "Patpat"
-    btn.Font = Enum.Font.FredokaOne
-    btn.TextSize = 18
-    btn.AutoButtonColor = false
-    btn.ZIndex = 5
-    btn.Parent = container
+    -- ========================================
+    -- MANUAL DRAG + CLICK DETECTION
+    -- ========================================
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+    local isDragging = false
+    local CLICK_THRESHOLD = 8 -- Jika digeser kurang dari 8 pixel = click
     
-    fallbackBtnFrame = container
-    fallbackDragDetector = dragDetect
-    
-    -- Track drag vs click
-    dragDetect.DragStart:Connect(function()
-        isDraggingFallback = false
-        fallbackDragStart = tick()
-        fallbackBtnStartPos = container.Position
+    container.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = false
+            dragStart = input.Position
+            startPos = container.Position
+            
+            -- Visual feedback
+            container:TweenSize(UDim2.new(0, 125, 0, 47), "Out", "Quad", 0.08, true)
+            stroke.Color = Color3.fromRGB(130, 180, 255)
+            
+            -- Connect drag tracking
+            dragInput = input
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragInput = nil
+                end
+            end)
+        end
     end)
     
-    -- Update flag jika posisi berubah (berarti sedang drag)
-    local dragCheckConn
-    dragCheckConn = RunService.Heartbeat:Connect(function()
-        if fallbackDragStart and fallbackBtnStartPos then
-            local cp = container.Position
-            if cp.X.Offset ~= fallbackBtnStartPos.X.Offset or cp.Y.Offset ~= fallbackBtnStartPos.Y.Offset then
-                isDraggingFallback = true
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            
+            -- Cek apakah sudah melebihi threshold drag
+            local distance = math.sqrt(delta.X^2 + delta.Y^2)
+            if distance > CLICK_THRESHOLD then
+                isDragging = true
+            end
+            
+            if isDragging then
+                -- Update posisi
+                local newPosition = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+                container.Position = newPosition
             end
         end
     end)
     
-    dragDetect.DragEnd:Connect(function()
-        if not isDraggingFallback then
-            -- Ini klik, bukan drag - toggle UI
-            pcall(function()
-                Window:Toggle()
-            end)
+    container.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            -- Reset visual
+            container:TweenSize(UDim2.new(0, 130, 0, 50), "Out", "Quad", 0.08, true)
+            stroke.Color = Color3.fromRGB(100, 150, 255)
+            
+            if not isDragging then
+                -- Ini CLICK - toggle UI
+                pcall(function()
+                    Window:Toggle()
+                end)
+            else
+                -- Ini DRAG selesai - update startPos agar drag berikutnya mulai dari posisi baru
+                startPos = container.Position
+            end
+            
+            isDragging = false
+            dragInput = nil
+            dragStart = nil
         end
-        isDraggingFallback = false
-        fallbackDragStart = nil
-        fallbackBtnStartPos = nil
     end)
     
-    -- Visual feedback saat hover
-    btn.MouseEnter:Connect(function()
-        if not isDraggingFallback then
+    -- Hover effect
+    container.MouseEnter:Connect(function()
+        if not isDragging then
             stroke.Color = Color3.fromRGB(130, 180, 255)
             container.BackgroundTransparency = 0.15
         end
     end)
     
-    btn.MouseLeave:Connect(function()
+    container.MouseLeave:Connect(function()
         stroke.Color = Color3.fromRGB(100, 150, 255)
         container.BackgroundTransparency = 0.3
-    end)
-    
-    -- Click animation
-    btn.MouseButton1Down:Connect(function()
-        container:TweenSize(UDim2.new(0, 125, 0, 47), "Out", "Quad", 0.08, true)
-    end)
-    
-    btn.MouseButton1Up:Connect(function()
-        container:TweenSize(UDim2.new(0, 130, 0, 50), "Out", "Quad", 0.08, true)
-    end)
-    
-    -- Update visibility berdasarkan state window
-    spawn(function()
-        while task.wait(0.3) do
-            local isOpen = false
-            pcall(function()
-                isOpen = Window:IsOpen()
-            end)
-            -- Selalu visible supaya bisa di-drag kapanpun, tapi biarkan user toggle
-            -- Jika ingin hide saat open, uncomment baris bawah:
-            -- openBtnGui.Enabled = not isOpen
-        end
     end)
     
     customOpenButtonCreated = true
