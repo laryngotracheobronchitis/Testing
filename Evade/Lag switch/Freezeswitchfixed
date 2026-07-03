@@ -15,8 +15,15 @@ local SettingsOpen = false
 local fflagEnabled = false
 local dragEnabled = true
 
+-- ============ DEMON MODE SETTINGS ============
+local demonModeEnabled = false
+local demonMSDelay = 200
+
 local originalMainText = "CYBER FREEZE"
 local originalStatusText = "SYSTEM READY"
+
+local CachedRayParams = RaycastParams.new()
+CachedRayParams.FilterType = Enum.RaycastFilterType.Exclude
 
 local function SetFFlag(val)
     pcall(function() 
@@ -315,7 +322,7 @@ ClickDetector.Parent = IceButton
 
 local SettingsPanel = Instance.new("Frame")
 SettingsPanel.Name = "SettingsPanel"
-SettingsPanel.Size = UDim2.new(0, 160, 0, 130)
+SettingsPanel.Size = UDim2.new(0, 160, 0, 175)
 SettingsPanel.Position = UDim2.new(0, 125, 0, 0)
 SettingsPanel.BackgroundColor3 = Color3.fromRGB(0, 20, 40)
 SettingsPanel.BackgroundTransparency = 0.2
@@ -457,11 +464,86 @@ SizeBoxBorder.Color = Color3.fromRGB(0, 150, 200)
 SizeBoxBorder.Thickness = 1
 SizeBoxBorder.Parent = SizeTextBox
 
+-- DEMON MODE TOGGLE
+local DemonSection = Instance.new("Frame")
+DemonSection.Name = "DemonSection"
+DemonSection.Size = UDim2.new(1, -16, 0, 20)
+DemonSection.Position = UDim2.new(0, 8, 0, 76)
+DemonSection.BackgroundTransparency = 1
+DemonSection.ZIndex = 21
+DemonSection.Parent = SettingsContent
+
+local DemonToggleButton = Instance.new("TextButton")
+DemonToggleButton.Name = "DemonToggleButton"
+DemonToggleButton.Size = UDim2.new(1, 0, 1, 0)
+DemonToggleButton.Position = UDim2.new(0, 0, 0, 0)
+DemonToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+DemonToggleButton.BackgroundTransparency = 0.2
+DemonToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+DemonToggleButton.Text = "DEMON OFF"
+DemonToggleButton.TextSize = 9
+DemonToggleButton.Font = Enum.Font.SciFi
+DemonToggleButton.ZIndex = 22
+DemonToggleButton.Parent = DemonSection
+
+local DemonButtonCorner = Instance.new("UICorner")
+DemonButtonCorner.CornerRadius = UDim.new(0, 3)
+DemonButtonCorner.Parent = DemonToggleButton
+
+local DemonButtonBorder = Instance.new("UIStroke")
+DemonButtonBorder.Color = Color3.fromRGB(100, 100, 100)
+DemonButtonBorder.Thickness = 1
+DemonButtonBorder.Parent = DemonToggleButton
+
+-- DEMON MS DELAY SETTING
+local DemonDelaySection = Instance.new("Frame")
+DemonDelaySection.Name = "DemonDelaySection"
+DemonDelaySection.Size = UDim2.new(1, -16, 0, 32)
+DemonDelaySection.Position = UDim2.new(0, 8, 0, 100)
+DemonDelaySection.BackgroundTransparency = 1
+DemonDelaySection.ZIndex = 21
+DemonDelaySection.Parent = SettingsContent
+
+local DemonDelayLabel = Instance.new("TextLabel")
+DemonDelayLabel.Size = UDim2.new(1, 0, 0, 12)
+DemonDelayLabel.Position = UDim2.new(0, 0, 0, 0)
+DemonDelayLabel.Text = "Demon Delay (50-500):"
+DemonDelayLabel.Font = Enum.Font.Code
+DemonDelayLabel.TextSize = 8
+DemonDelayLabel.TextColor3 = Color3.fromRGB(200, 255, 255)
+DemonDelayLabel.BackgroundTransparency = 1
+DemonDelayLabel.TextXAlignment = Enum.TextXAlignment.Left
+DemonDelayLabel.ZIndex = 22
+DemonDelayLabel.Parent = DemonDelaySection
+
+local DemonDelayTextBox = Instance.new("TextBox")
+DemonDelayTextBox.Size = UDim2.new(1, 0, 0, 18)
+DemonDelayTextBox.Position = UDim2.new(0, 0, 0, 14)
+DemonDelayTextBox.BackgroundColor3 = Color3.fromRGB(0, 50, 100)
+DemonDelayTextBox.BackgroundTransparency = 0.2
+DemonDelayTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+DemonDelayTextBox.Text = tostring(demonMSDelay)
+DemonDelayTextBox.Font = Enum.Font.Code
+DemonDelayTextBox.TextSize = 10
+DemonDelayTextBox.PlaceholderText = "ms"
+DemonDelayTextBox.ZIndex = 22
+DemonDelayTextBox.ClearTextOnFocus = false
+DemonDelayTextBox.Parent = DemonDelaySection
+
+local DemonDelayBoxCorner = Instance.new("UICorner")
+DemonDelayBoxCorner.CornerRadius = UDim.new(0, 3)
+DemonDelayBoxCorner.Parent = DemonDelayTextBox
+
+local DemonDelayBoxBorder = Instance.new("UIStroke")
+DemonDelayBoxBorder.Color = Color3.fromRGB(0, 150, 200)
+DemonDelayBoxBorder.Thickness = 1
+DemonDelayBoxBorder.Parent = DemonDelayTextBox
+
 -- DRAG TOGGLE
 local DragSection = Instance.new("Frame")
 DragSection.Name = "DragSection"
 DragSection.Size = UDim2.new(1, -16, 0, 20)
-DragSection.Position = UDim2.new(0, 8, 0, 76)
+DragSection.Position = UDim2.new(0, 8, 0, 136)
 DragSection.BackgroundTransparency = 1
 DragSection.ZIndex = 21
 DragSection.Parent = SettingsContent
@@ -492,7 +574,7 @@ DragButtonBorder.Parent = DragToggleButton
 local FflagSection = Instance.new("Frame")
 FflagSection.Name = "FflagSection"
 FflagSection.Size = UDim2.new(1, -16, 0, 20)
-FflagSection.Position = UDim2.new(0, 8, 0, 100)
+FflagSection.Position = UDim2.new(0, 8, 0, 160)
 FflagSection.BackgroundTransparency = 1
 FflagSection.ZIndex = 21
 FflagSection.Parent = SettingsContent
@@ -522,7 +604,7 @@ FflagButtonBorder.Parent = FflagToggleButton
 -- APPLY BUTTON
 local ApplyButton = Instance.new("TextButton")
 ApplyButton.Size = UDim2.new(1, -16, 0, 22)
-ApplyButton.Position = UDim2.new(0, 8, 0, 124)
+ApplyButton.Position = UDim2.new(0, 8, 0, 184)
 ApplyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 ApplyButton.BorderSizePixel = 0
 ApplyButton.Text = "APPLY"
@@ -541,7 +623,180 @@ ApplyButtonBorder.Color = Color3.fromRGB(0, 255, 255)
 ApplyButtonBorder.Thickness = 1
 ApplyButtonBorder.Parent = ApplyButton
 
--- ============ FUNGSI PERFORM FREEZE (TANPA DEMON MODE) ============
+-- ============ DEMON MODE LOGIC (DARI LEGACY.LUA) ============
+local function PerformDemonLag()
+    local ms = demonMSDelay
+    local LagTime = ms * 0.002
+    local character = Player.Character
+    if not character then return false end
+
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    local storedVelocity = hrp.AssemblyLinearVelocity
+    if storedVelocity.Magnitude < 1 then return false end
+
+    local start = tick()
+    while tick() - start < LagTime do end
+    
+    setfflag("MaxMissedWorldStepsRemembered", "9999")
+    
+    CachedRayParams.FilterDescendantsInstances = {character}
+
+    local multiplier = math.random(2, 4)
+    local horizontalVelocity = Vector3.new(storedVelocity.X, 0, storedVelocity.Z)
+    local direction = horizontalVelocity.Magnitude > 0 and horizontalVelocity.Unit or hrp.CFrame.LookVector
+    local distance = math.min(horizontalVelocity.Magnitude * LagTime * multiplier, 30)
+    local forwardPos = hrp.Position + direction * distance
+    local targetPos = forwardPos
+
+    local forwardResult = workspace:Raycast(hrp.Position, forwardPos - hrp.Position, CachedRayParams)
+    if forwardResult then
+        targetPos = forwardResult.Position - direction * 2
+    end
+
+    local function detectSlope(dir, dist)
+        return workspace:Raycast(hrp.Position + dir * dist, Vector3.new(0, -60, 0), CachedRayParams)
+    end
+
+    local longSlopeCheck = detectSlope(direction, 50)
+    local shortSlopeCheck = nil
+
+    for i = 2, 20, 2 do
+        local result = detectSlope(direction, i)
+        if result then
+            shortSlopeCheck = result
+            break
+        end
+    end
+
+    local slopeLengthBoost, shortSlopeBoost = 1, 1
+    local slopeDirBoost = 1
+    local hoverBuffer = 0
+    local slopeAngle = 0
+    local earlyBounce = false
+
+    if longSlopeCheck then
+        local normal = longSlopeCheck.Normal
+        slopeAngle = math.deg(math.acos(normal:Dot(Vector3.new(0, 1, 0))))
+        if slopeAngle >= 20 and slopeAngle <= 80 then
+            slopeLengthBoost = math.clamp(slopeAngle / 25, 1, 2.2)
+            slopeDirBoost = math.clamp(slopeAngle / 40, 1, 2)
+            hoverBuffer = math.clamp((slopeAngle - 20) * 0.06, 0, 3)
+            if slopeAngle < 35 then
+                targetPos = targetPos + Vector3.new(0, 3, 0) + direction * (2 * slopeDirBoost)
+            else
+                targetPos = targetPos + Vector3.new(0, slopeAngle * 0.3 + hoverBuffer, 0)
+            end
+        end
+    end
+
+    if shortSlopeCheck then
+        local normal = shortSlopeCheck.Normal
+        slopeAngle = math.deg(math.acos(normal:Dot(Vector3.new(0, 1, 0))))
+        if slopeAngle >= 20 and slopeAngle <= 80 then
+            shortSlopeBoost = math.clamp(slopeAngle / 22, 1, 2.5)
+            slopeDirBoost = slopeDirBoost + math.clamp(slopeAngle / 50, 0, 1.6)
+            hoverBuffer = hoverBuffer + math.clamp((slopeAngle - 20) * 0.05, 0, 3)
+            local verticalDist = hrp.Position.Y - shortSlopeCheck.Position.Y
+            local minForward = 4
+            local minUp = 4
+            if slopeAngle >= 50 and verticalDist < 3 then
+                earlyBounce = true
+                targetPos = targetPos + direction * minForward + Vector3.new(0, minUp, 0)
+            else
+                if slopeAngle < 35 then
+                    targetPos = targetPos + Vector3.new(0, 3, 0) + direction * (2 * slopeDirBoost)
+                else
+                    targetPos = targetPos + Vector3.new(0, slopeAngle * 0.4 + hoverBuffer, 0)
+                end
+            end
+        end
+    end
+
+    if slopeAngle >= 35 then
+        targetPos = targetPos + direction * (5 * slopeDirBoost)
+    end
+
+    local safetyCheck = workspace:Raycast(hrp.Position, targetPos - hrp.Position, CachedRayParams)
+    if safetyCheck then
+        targetPos = safetyCheck.Position + Vector3.new(0, 2, 0) - direction * 2
+    end
+
+    if shortSlopeCheck or longSlopeCheck then
+        local hitPos = (shortSlopeCheck or longSlopeCheck).Position
+        local verticalDist = hrp.Position.Y - hitPos.Y
+        if verticalDist < 2 then
+            targetPos = hrp.Position + direction * 2 + Vector3.new(0, 2, 0)
+        end
+    end
+
+    hrp.CFrame = CFrame.new(targetPos, targetPos + hrp.CFrame.LookVector)
+
+    local delta = targetPos - hrp.Position
+    local speed = storedVelocity.Magnitude
+    local forwardBoost = math.clamp(speed * 0.4, 4, 20)
+    local safeDir = delta.Magnitude > 0 and delta.Unit or direction
+    local safeCheck = workspace:Raycast(hrp.Position, safeDir * forwardBoost, CachedRayParams)
+
+    if not safeCheck then
+        hrp.AssemblyLinearVelocity += safeDir * forwardBoost
+    else
+        local safeDist = (safeCheck.Position - hrp.Position).Magnitude
+        if safeDist > 3 then
+            hrp.AssemblyLinearVelocity += safeDir * (safeDist * 0.6)
+        end
+    end
+
+    local bounceMultiplier = 1.2
+    if slopeAngle >= 45 then
+        local angleBoost = math.clamp((slopeAngle - 45) / 20, 0, 1.0)
+        bounceMultiplier = 1.2 + angleBoost
+    end
+
+    if storedVelocity.Y < -60 then
+        bounceMultiplier *= 0.9 * slopeLengthBoost * shortSlopeBoost
+    elseif storedVelocity.Y < -30 then
+        bounceMultiplier *= 1.0 * slopeLengthBoost * shortSlopeBoost
+    end
+
+    if storedVelocity.Y < -10 then
+        local angleFactor = math.clamp((slopeAngle - 20) / 40, 0, 1)
+        local bounceY = math.abs(storedVelocity.Y) * (1.1 + angleFactor * 0.9)
+        bounceY = bounceY + storedVelocity.Magnitude * (0.3 + angleFactor * 0.5)
+        bounceY = math.clamp(bounceY * bounceMultiplier * 1.0, 0, 60 + storedVelocity.Magnitude * 0.4)
+
+        hrp.AssemblyLinearVelocity = Vector3.new(
+            storedVelocity.X * slopeDirBoost,
+            bounceY,
+            storedVelocity.Z * slopeDirBoost
+        )
+
+        if earlyBounce then
+            local forwardBoost = math.clamp(5 + storedVelocity.Magnitude * 0.1, 6, 20)
+            local forwardCheck = workspace:Raycast(hrp.Position, direction * forwardBoost, CachedRayParams)
+            if not forwardCheck then
+                hrp.CFrame = hrp.CFrame + direction * forwardBoost
+            else
+                local safeDist = (forwardCheck.Position - hrp.Position).Magnitude
+                if safeDist > 3 then
+                    hrp.CFrame = hrp.CFrame + direction * (safeDist * 0.5)
+                end
+            end
+        end
+    end
+    
+    hrp.Size = Vector3.new(3, 20, 3)
+    task.delay(0.1, function()
+        if hrp then
+            hrp.Size = Vector3.new(2, 4, 2)
+        end
+    end)
+    
+    return true
+end
+
+-- ============ FUNGSI PERFORM FREEZE ============
 local function PerformFreeze()
     if IsFreezing then return end
     if tick() - LastFreezeTime < Cooldown then return end
@@ -549,25 +804,46 @@ local function PerformFreeze()
     IsFreezing = true
     LastFreezeTime = tick()
     
-    ButtonText.Text = "FREEZING"
-    StatusText.Text = "BUSY"
-    StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
-    
-    CyberBorder.Color = Color3.fromRGB(255, 0, 0)
-    
-    if fflagEnabled then
-        SetFFlag(1000)
-    end
-    
-    task.wait(0.05)
-    
-    local startTime = os.clock()
-    while os.clock() - startTime < FreezeDuration do
+    if demonModeEnabled then
+        ButtonText.Text = "DEMON"
+        StatusText.Text = "SLOPE..."
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
+        CyberBorder.Color = Color3.fromRGB(255, 0, 100)
+        
+        local success = PerformDemonLag()
+        
+        if success then
+            StatusText.Text = "BOOST!"
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 100)
+        else
+            StatusText.Text = "NO VEL"
+            StatusText.TextColor3 = Color3.fromRGB(255, 150, 0)
+        end
+    else
+        ButtonText.Text = "FREEZING"
+        StatusText.Text = "BUSY"
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+        CyberBorder.Color = Color3.fromRGB(255, 0, 0)
+        
+        if fflagEnabled then
+            SetFFlag(1000)
+        end
+        
+        task.wait(0.05)
+        
+        local startTime = os.clock()
+        while os.clock() - startTime < FreezeDuration do
+        end
     end
     
     ButtonText.Text = originalMainText
-    StatusText.Text = originalStatusText
-    StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+    if demonModeEnabled then
+        StatusText.Text = "DEMON READY"
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
+    else
+        StatusText.Text = originalStatusText
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+    end
     CyberBorder.Color = Color3.fromRGB(0, 255, 255)
     
     if fflagEnabled then
@@ -673,6 +949,28 @@ SettingsButton.Activated:Connect(function()
     if SettingsOpen then
         DurationTextBox.Text = tostring(FreezeDuration)
         SizeTextBox.Text = tostring(IceButton.Size.X.Offset)
+        DemonDelayTextBox.Text = tostring(demonMSDelay)
+    end
+end)
+
+-- DEMON TOGGLE EVENT
+DemonToggleButton.Activated:Connect(function()
+    demonModeEnabled = not demonModeEnabled
+    
+    if demonModeEnabled then
+        DemonToggleButton.Text = "DEMON ON"
+        DemonToggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 50)
+        DemonButtonBorder.Color = Color3.fromRGB(255, 0, 100)
+        StatusText.Text = "DEMON READY"
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
+    else
+        DemonToggleButton.Text = "DEMON OFF"
+        DemonToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        DemonButtonBorder.Color = Color3.fromRGB(100, 100, 100)
+        if not IsFreezing then
+            StatusText.Text = originalStatusText
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+        end
     end
 end)
 
@@ -719,9 +1017,12 @@ ApplyButton.Activated:Connect(function()
         StatusText.Text = "BAD DUR"
         StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
         task.wait(2)
-        if not IsFreezing then
+        if not IsFreezing and not demonModeEnabled then
             StatusText.Text = originalStatusText
             StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+        elseif demonModeEnabled and not IsFreezing then
+            StatusText.Text = "DEMON READY"
+            StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
         end
         return
     end
@@ -736,11 +1037,20 @@ ApplyButton.Activated:Connect(function()
         StatusText.Text = "BAD SIZE"
         StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
         task.wait(2)
-        if not IsFreezing then
+        if not IsFreezing and not demonModeEnabled then
             StatusText.Text = originalStatusText
             StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+        elseif demonModeEnabled and not IsFreezing then
+            StatusText.Text = "DEMON READY"
+            StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
         end
         return
+    end
+    
+    local newDelay = tonumber(DemonDelayTextBox.Text)
+    if newDelay and newDelay >= 50 and newDelay <= 500 then
+        demonMSDelay = newDelay
+        hasChanges = true
     end
     
     if hasChanges then
@@ -752,9 +1062,12 @@ ApplyButton.Activated:Connect(function()
         ApplyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
         
         task.wait(1.5)
-        if not IsFreezing then
+        if not IsFreezing and not demonModeEnabled then
             StatusText.Text = originalStatusText
             StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+        elseif demonModeEnabled and not IsFreezing then
+            StatusText.Text = "DEMON READY"
+            StatusText.TextColor3 = Color3.fromRGB(255, 50, 100)
         end
     end
     
