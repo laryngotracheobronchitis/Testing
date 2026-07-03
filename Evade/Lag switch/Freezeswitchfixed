@@ -623,7 +623,7 @@ ApplyButtonBorder.Color = Color3.fromRGB(0, 255, 255)
 ApplyButtonBorder.Thickness = 1
 ApplyButtonBorder.Parent = ApplyButton
 
--- ============ DEMON MODE LOGIC (DARI LEGACY.LUA) ============
+-- ============ DEMON MODE - 100% COPY DARI LEGACY.LUA ============
 local function PerformDemonLag()
     local ms = demonMSDelay
     local LagTime = ms * 0.002
@@ -636,10 +636,13 @@ local function PerformDemonLag()
     local storedVelocity = hrp.AssemblyLinearVelocity
     if storedVelocity.Magnitude < 1 then return false end
 
+    -- === INI SAMA PERSIS DENGAN LEGACY.LUA ===
     local start = tick()
     while tick() - start < LagTime do end
     
-    setfflag("MaxMissedWorldStepsRemembered", "9999")
+    -- TIDAK ADA setfflag DI SINI (SAMA KAYAK LEGACY.LUA)
+    -- if mode == "FastFlag" atau mode ~= "Demon" tidak perlu karena
+    -- di UI ini kalau demon ON, ya pasti demon mode
     
     CachedRayParams.FilterDescendantsInstances = {character}
 
@@ -786,12 +789,10 @@ local function PerformDemonLag()
         end
     end
     
+    -- === INI JUGA SAMA PERSIS: wait(0.1) BUKAN task.delay ===
     hrp.Size = Vector3.new(3, 20, 3)
-    task.delay(0.1, function()
-        if hrp then
-            hrp.Size = Vector3.new(2, 4, 2)
-        end
-    end)
+    wait(0.1)
+    hrp.Size = Vector3.new(2, 4, 2)
     
     return true
 end
