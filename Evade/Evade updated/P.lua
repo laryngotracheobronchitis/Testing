@@ -535,7 +535,7 @@ loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lu
 local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "Hub Evade | Hybrid",
+    Title = "Hub Evade",
     Icon = "rbxassetid://137330250139083",
     Author = "DaraHub Modded",
     Folder = "DaraHub/Games/Evade",
