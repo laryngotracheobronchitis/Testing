@@ -142,7 +142,6 @@ local currentFriction = -0.2
 
 local originalMovementUpdate = nil
 
--- Fungsi DaraHub untuk mengirim sinyal resmi ke game
 local function MovementValueSet(MovementType, value)
     local char = LocalPlayer.Character
     if not char then return end
@@ -174,7 +173,6 @@ local function updateBhopState()
     end
 end
 
--- Mengambil modul Movement bawaan Evade
 local Movement = require(ReplicatedStorage:WaitForChild("Objects"):WaitForChild("Game"):WaitForChild("Character"):WaitForChild("Client"):WaitForChild("Movement"))
 originalMovementUpdate = Movement.Update
 
@@ -264,7 +262,7 @@ local function applyFullBright()
     Lighting.ColorShift_Top = Color3.new(1, 1, 1)
 end
 
--- Timer Display Logic
+-- Timer Display Logic (UI DaraHub Original)
 local TimerGUI = nil
 local TimerEnabled = false
 local SpecialRoundEnabled = false
@@ -350,21 +348,31 @@ end
 
 local function createTimerGUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "TimerGUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.Parent = PlayerGui
-    local Timer = Instance.new("Frame"); Timer.BackgroundTransparency = 1; Timer.Size = UDim2.new(1, 0, 1, 0); Timer.Parent = ScreenGui
-    local Top = Instance.new("Frame"); Top.BackgroundTransparency = 1; Top.Position = UDim2.new(0.5, 0, 0, 0); Top.Size = UDim2.new(1, 0, 1, 0); Top.Parent = Timer
+    ScreenGui.Name = "TimerGUI"; ScreenGui.ResetOnSpawn = false; ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.Parent = PlayerGui
     
-    local MainTimer = Instance.new("Frame"); MainTimer.AnchorPoint = Vector2.new(0.5, 0); MainTimer.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MainTimer.BackgroundTransparency = 0.6; MainTimer.Position = UDim2.new(0.5, 0, 0.04, 0); MainTimer.Size = UDim2.new(0.25, 0, 0.1, 0); MainTimer.Visible = false; MainTimer.Parent = Top
+    local Timer = Instance.new("Frame"); Timer.Name = "Timer"; Timer.BackgroundTransparency = 1; Timer.Size = UDim2.new(1, 0, 1, 0); Timer.Parent = ScreenGui
+    
+    local Top = Instance.new("Frame"); Top.Name = "Top"; Top.AnchorPoint = Vector2.new(0.5, 0); Top.BackgroundTransparency = 1; Top.Position = UDim2.new(0.5, 0, 0, 0); Top.Size = UDim2.new(1, 0, 1, 0); Top.Parent = Timer
+    Instance.new("UIAspectRatioConstraint", Top)
+    local SizeConstraint = Instance.new("UISizeConstraint", Top); SizeConstraint.MaxSize = Vector2.new(900, 900)
+    
+    local MainTimer = Instance.new("Frame"); MainTimer.Name = "MainTimer"; MainTimer.AnchorPoint = Vector2.new(0.5, 0); MainTimer.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MainTimer.BackgroundTransparency = 0.6; MainTimer.BorderSizePixel = 0; MainTimer.Position = UDim2.new(0.5, 0, 0.04, 0); MainTimer.Size = UDim2.new(0.25, 0, 0.1, 0); MainTimer.Visible = false; MainTimer.Parent = Top
     Instance.new("UICorner", MainTimer).CornerRadius = UDim.new(0, 4)
-    local MainTimerImage = Instance.new("ImageLabel"); MainTimerImage.Image = "rbxassetid://196969716"; MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21); MainTimerImage.ImageTransparency = 0.7; MainTimerImage.AnchorPoint = Vector2.new(0.5, 0.5); MainTimerImage.BackgroundTransparency = 1; MainTimerImage.Position = UDim2.new(0.5, 0, 0.5, 0); MainTimerImage.Size = UDim2.new(1, 0, 1, 0); MainTimerImage.Parent = MainTimer
+    
+    local MainTimerImage = Instance.new("ImageLabel"); MainTimerImage.Image = "rbxassetid://196969716"; MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21); MainTimerImage.ImageTransparency = 0.7; MainTimerImage.AnchorPoint = Vector2.new(0.5, 0.5); MainTimerImage.BackgroundTransparency = 1; MainTimerImage.Position = UDim2.new(0.5, 0, 0.5, 0); MainTimerImage.Size = UDim2.new(1, 0, 1, 0); MainTimerImage.ZIndex = 0; MainTimerImage.Parent = MainTimer
     Instance.new("UICorner", MainTimerImage).CornerRadius = UDim.new(0, 4)
     
-    local StatusLabel = Instance.new("TextLabel"); StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); StatusLabel.Text = "ROUND ACTIVE"; StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255); StatusLabel.TextScaled = true; StatusLabel.TextStrokeTransparency = 0.95; StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5); StatusLabel.BackgroundTransparency = 1; StatusLabel.Position = UDim2.new(0.5, 0, 0.25, 0); StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0); StatusLabel.Parent = MainTimer
-    local TimeDisplay = Instance.new("TextLabel"); TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); TimeDisplay.Text = "0:00"; TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255); TimeDisplay.TextScaled = true; TimeDisplay.TextStrokeTransparency = 0.95; TimeDisplay.AnchorPoint = Vector2.new(0.5, 0.5); TimeDisplay.BackgroundTransparency = 1; TimeDisplay.Position = UDim2.new(0.5, 0, 0.65, 0); TimeDisplay.Size = UDim2.new(0.5, 0, 0.5, 0); TimeDisplay.Parent = MainTimer
+    local StatusLabel = Instance.new("TextLabel"); StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); StatusLabel.Text = "ROUND ACTIVE"; StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255); StatusLabel.TextScaled = true; StatusLabel.TextStrokeTransparency = 0.95; StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5); StatusLabel.BackgroundTransparency = 1; StatusLabel.Position = UDim2.new(0.5, 0, 0.25, 0); StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0); StatusLabel.ZIndex = 3; StatusLabel.Parent = MainTimer
+    Instance.new("UIStroke", StatusLabel).Thickness = 2
     
-    local SpecialRound = Instance.new("Frame"); SpecialRound.AnchorPoint = Vector2.new(0.5, 0); SpecialRound.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SpecialRound.BackgroundTransparency = 0.6; SpecialRound.Position = UDim2.new(0.5, 0, 0.15, 0); SpecialRound.Size = UDim2.new(0.23, 0, 0.05, 0); SpecialRound.Visible = false; SpecialRound.Parent = Top
+    local TimeDisplay = Instance.new("TextLabel"); TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); TimeDisplay.Text = "0:00"; TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255); TimeDisplay.TextScaled = true; TimeDisplay.TextStrokeTransparency = 0.95; TimeDisplay.AnchorPoint = Vector2.new(0.5, 0.5); TimeDisplay.BackgroundTransparency = 1; TimeDisplay.Position = UDim2.new(0.5, 0, 0.65, 0); TimeDisplay.Size = UDim2.new(0.5, 0, 0.5, 0); TimeDisplay.ZIndex = 3; TimeDisplay.Parent = MainTimer
+    Instance.new("UIStroke", TimeDisplay).Thickness = 3
+    
+    local SpecialRound = Instance.new("Frame"); SpecialRound.Name = "SpecialRound"; SpecialRound.AnchorPoint = Vector2.new(0.5, 0); SpecialRound.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SpecialRound.BackgroundTransparency = 0.6; SpecialRound.BorderSizePixel = 0; SpecialRound.Position = UDim2.new(0.5, 0, 0.15, 0); SpecialRound.Size = UDim2.new(0.23, 0, 0.05, 0); SpecialRound.Visible = false; SpecialRound.Parent = Top
     Instance.new("UICorner", SpecialRound).CornerRadius = UDim.new(0, 4)
-    local SpecialRoundLabel = Instance.new("TextLabel"); SpecialRoundLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); SpecialRoundLabel.Text = "No Data"; SpecialRoundLabel.TextColor3 = Color3.fromRGB(255, 208, 115); SpecialRoundLabel.TextScaled = true; SpecialRoundLabel.TextStrokeTransparency = 0.95; SpecialRoundLabel.AnchorPoint = Vector2.new(0.5, 0.5); SpecialRoundLabel.BackgroundTransparency = 1; SpecialRoundLabel.Position = UDim2.new(0.5, 0, 0.5, 0); SpecialRoundLabel.Size = UDim2.new(0.9, 0, 0.6, 0); SpecialRoundLabel.Parent = SpecialRound
+    
+    local SpecialRoundLabel = Instance.new("TextLabel"); SpecialRoundLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold); SpecialRoundLabel.Text = "No Data"; SpecialRoundLabel.TextColor3 = Color3.fromRGB(255, 208, 115); SpecialRoundLabel.TextScaled = true; SpecialRoundLabel.TextStrokeTransparency = 0.95; SpecialRoundLabel.AnchorPoint = Vector2.new(0.5, 0.5); SpecialRoundLabel.BackgroundTransparency = 1; SpecialRoundLabel.Position = UDim2.new(0.5, 0, 0.5, 0); SpecialRoundLabel.Size = UDim2.new(0.9, 0, 0.6, 0); SpecialRoundLabel.ZIndex = 3; SpecialRoundLabel.Parent = SpecialRound
+    Instance.new("UIStroke", SpecialRoundLabel).Thickness = 2
     
     TimerGUI = { ScreenGui = ScreenGui, TimeDisplay = TimeDisplay, SpecialRoundLabel = SpecialRoundLabel, StatusLabel = StatusLabel, MainTimer = MainTimer, SpecialRound = SpecialRound }
     
@@ -535,7 +543,9 @@ Tabs.Movement:Dropdown({ Title = "Auto Jump Mode", Values = {"Simulation", "Real
 Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
 
 Tabs.Movement:Divider()
-Tabs.Movement:Section({ Title = "Floating Buttons (ButtonLib)", TextSize = 18 })
+Tabs.Movement:Section({ Title = "Auto Jump Toggles", TextSize = 18 })
+
+-- Auto Jump (Menggunakan ButtonLib)
 Tabs.Movement:Toggle({ Title = "Show Auto Jump Button", Value = false, Callback = function(state)
     if state then
         if not ButtonLib.AutoJumpBtn then
@@ -546,15 +556,11 @@ Tabs.Movement:Toggle({ Title = "Show Auto Jump Button", Value = false, Callback 
         if ButtonLib.AutoJumpBtn then ButtonLib.AutoJumpBtn:Set(false); ButtonLib.AutoJumpBtn:SetVisible(false) end
     end
 end})
-Tabs.Movement:Toggle({ Title = "Show Hold Jump Button", Value = false, Callback = function(state)
-    if state then
-        if not ButtonLib.HoldJumpBtn then
-            ButtonLib.HoldJumpBtn = ButtonLib.Create:Toggle({ Text = "Hold Jump", Flag = "HoldJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -45), Callback = function(s) bhopHoldEnabled = s; updateBhopState() end })
-            ButtonLib.HoldJumpBtn:SetVisible(true)
-        end
-    else
-        if ButtonLib.HoldJumpBtn then ButtonLib.HoldJumpBtn:Set(false); ButtonLib.HoldJumpBtn:SetVisible(false) end
-    end
+
+-- Hold Jump (Toggle WindUI Biasa)
+Tabs.Movement:Toggle({ Title = "Bhop Hold Jump", Value = false, Callback = function(state)
+    bhopHoldEnabled = state
+    updateBhopState()
 end})
 
 -- TAB VISUALS
