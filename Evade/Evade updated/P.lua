@@ -134,8 +134,11 @@ local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local autoJumpEnabled = false
-local bhopHoldEnabled = false
+-- Variabel State
+local autoJumpDaraHub = false
+local bhopHoldDaraHub = false
+local autoJumpHybrid = false
+
 local autoJumpType = "Simulation"
 local bhopMode = "Acceleration"
 local currentFriction = -0.2
@@ -153,7 +156,7 @@ local function MovementValueSet(MovementType, value)
 end
 
 local function updateBhopState()
-    local shouldEnable = autoJumpEnabled or bhopHoldEnabled
+    local shouldEnable = autoJumpDaraHub or bhopHoldDaraHub or autoJumpHybrid
     MovementValueSet("BhopEnabled", shouldEnable)
     if shouldEnable then
         if bhopMode == "Acceleration" then
@@ -185,15 +188,37 @@ Movement.Update = function(self, ...)
     if not humanoid or not hrp then return end
 
     local grounded = self.DataRegistry:Get("Grounded")
-    local isBhopActive = autoJumpEnabled or bhopHoldEnabled
+    
+    -- CEK MODE YANG SEDANG AKTIF
+    local isDaraHubActive = autoJumpDaraHub or (bhopHoldDaraHub and humanoid.Jump == true)
+    local isHybridActive = autoJumpHybrid
 
-    if isBhopActive then
+    -- LOGIKA MODE 1: DARAHUB ASLI
+    if isDaraHubActive and not isHybridActive then
+        if grounded then
+            if autoJumpDaraHub then
+                if autoJumpType == "Realistic" then
+                    pcall(function() self:AttemptJump() end)
+                else
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            elseif bhopHoldDaraHub and humanoid.Jump == true then
+                pcall(function() self:AttemptJump() end)
+            end
+        end
+    end
+
+    -- LOGIKA MODE 2: HYBRID (PHANTOMWRYM)
+    if isHybridActive then
         if bhopMode == "Acceleration" then
+            -- HipHeight Bypass
             local targetHipHeight = -1.10
             if char:FindFirstChild("R15Visual") then targetHipHeight = 0.9 end
             if humanoid.HipHeight ~= targetHipHeight then
                 humanoid.HipHeight = targetHipHeight
             end
+
+            -- Velocity Stacking (Pengganti getgc Friction)
             local currentVel = hrp.AssemblyLinearVelocity
             local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
             if horizontalVel.Magnitude > 1 then
@@ -203,16 +228,10 @@ Movement.Update = function(self, ...)
         end
         
         if grounded then
-            -- Logika Asli DaraHub
-            if autoJumpEnabled then
-                if autoJumpType == "Realistic" then
-                    pcall(function() self:AttemptJump() end)
-                else
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            elseif bhopHoldEnabled and humanoid.Jump == true then
-                -- Hold Jump hanya akan lompat jika player menahan tombol Jump di keyboard/layar
+            if autoJumpType == "Realistic" then
                 pcall(function() self:AttemptJump() end)
+            else
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
@@ -250,7 +269,7 @@ local function stopNoFog()
     end
 end
 
-local fullBrightConnection, fullBrightCharConnection
+local fullBrightConnection
 local originalBrightness = Lighting.Brightness
 local originalAmbient = Lighting.Ambient
 local originalOutdoorAmbient = Lighting.OutdoorAmbient
@@ -531,40 +550,74 @@ local Window = WindUI:CreateWindow({
 Window:ToggleTransparency(true)
 local Tabs = {
     Movement = Window:Tab({ Title = "Movement", Icon = "user" }),
+    Hybrid = Window:Tab({ Title = "Hybrid (Ramp)", Icon = "zap" }),
     Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
 }
 
--- TAB MOVEMENT
+-- ==============================================================================
+-- TAB 1: MOVEMENT (DARAHUB ASLI)
+-- ==============================================================================
 Tabs.Movement:Section({ Title = "Movement Stats (DaraHub)", TextSize = 18 })
 Tabs.Movement:Input({ Title = "Jump Cap", Placeholder = "1", NumbersOnly = true, Value = "1", Callback = function(v) local n=tonumber(v) if n then MovementValueSet("JumpCap", n) end end })
 Tabs.Movement:Input({ Title = "Air Strafe Acceleration", Placeholder = "182", NumbersOnly = true, Value = "182", Callback = function(v) local n=tonumber(v) if n then MovementValueSet("AirStrafeAcceleration", n) end end })
 
 Tabs.Movement:Divider()
-Tabs.Movement:Section({ Title = "Hybrid Auto Jump (Ramp Bhop)", TextSize = 18 })
-Tabs.Movement:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
+Tabs.Movement:Section({ Title = "DaraHub Auto Jump Settings", TextSize = 18 })
+Tabs.Movement:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 if autoJumpDaraHub or bhopHoldDaraHub then updateBhopState() end end })
 Tabs.Movement:Dropdown({ Title = "Auto Jump Mode", Values = {"Simulation", "Realistic"}, Value = "Simulation", Callback = function(v) autoJumpType = v end })
-Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
+Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpDaraHub or bhopHoldDaraHub then updateBhopState() end end })
 
 Tabs.Movement:Divider()
-Tabs.Movement:Section({ Title = "Auto Jump Toggles", TextSize = 18 })
+Tabs.Movement:Section({ Title = "DaraHub Toggles", TextSize = 18 })
 
 Tabs.Movement:Toggle({ Title = "Show Auto Jump Button", Value = false, Callback = function(state)
     if state then
-        if not ButtonLib.AutoJumpBtn then
-            ButtonLib.AutoJumpBtn = ButtonLib.Create:Toggle({ Text = "Auto Jump", Flag = "AutoJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -145), Callback = function(s) autoJumpEnabled = s; updateBhopState() end })
-            ButtonLib.AutoJumpBtn:SetVisible(true)
+        -- Matikan Hybrid jika menyala
+        if ButtonLib.HybridAutoJumpBtn then ButtonLib.HybridAutoJumpBtn:Set(false) end
+        if not ButtonLib.DaraHubAutoJumpBtn then
+            ButtonLib.DaraHubAutoJumpBtn = ButtonLib.Create:Toggle({ Text = "Auto Jump", Flag = "DaraHubAutoJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -145), Callback = function(s) 
+                autoJumpDaraHub = s
+                if s then autoJumpHybrid = false end
+                updateBhopState()
+            end })
         end
+        ButtonLib.DaraHubAutoJumpBtn:SetVisible(true)
     else
-        if ButtonLib.AutoJumpBtn then ButtonLib.AutoJumpBtn:Set(false); ButtonLib.AutoJumpBtn:SetVisible(false) end
+        if ButtonLib.DaraHubAutoJumpBtn then ButtonLib.DaraHubAutoJumpBtn:Set(false); ButtonLib.DaraHubAutoJumpBtn:SetVisible(false) end
     end
 end})
 
 Tabs.Movement:Toggle({ Title = "Bhop Hold Jump", Value = false, Callback = function(state)
-    bhopHoldEnabled = state
+    bhopHoldDaraHub = state
     updateBhopState()
 end})
 
--- TAB VISUALS
+-- ==============================================================================
+-- TAB 2: HYBRID (PHANTOMWRYM)
+-- ==============================================================================
+Tabs.Hybrid:Section({ Title = "Hybrid Auto Jump (Phantomwrym)", TextSize = 18 })
+Tabs.Hybrid:Paragraph({ Title = "Info", Content = "Mode ini menggunakan exploit fisika untuk menumpuk speed ekstrem di ramp. Hold Jump tidak tersedia di mode ini karena menyebabkan glitch." })
+
+Tabs.Hybrid:Toggle({ Title = "Show Hybrid Auto Jump Button", Value = false, Callback = function(state)
+    if state then
+        -- Matikan DaraHub Auto Jump jika menyala
+        if ButtonLib.DaraHubAutoJumpBtn then ButtonLib.DaraHubAutoJumpBtn:Set(false) end
+        if not ButtonLib.HybridAutoJumpBtn then
+            ButtonLib.HybridAutoJumpBtn = ButtonLib.Create:Toggle({ Text = "Hybrid Bhop", Flag = "HybridAutoJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -145), Callback = function(s) 
+                autoJumpHybrid = s
+                if s then autoJumpDaraHub = false end
+                updateBhopState()
+            end })
+        end
+        ButtonLib.HybridAutoJumpBtn:SetVisible(true)
+    else
+        if ButtonLib.HybridAutoJumpBtn then ButtonLib.HybridAutoJumpBtn:Set(false); ButtonLib.HybridAutoJumpBtn:SetVisible(false) end
+    end
+end})
+
+-- ==============================================================================
+-- TAB 3: VISUALS
+-- ==============================================================================
 Tabs.Visuals:Section({ Title = "World Visuals", TextSize = 18 })
 Tabs.Visuals:Toggle({ Title = "Full Bright", Value = false, Callback = function(state)
     if state then
