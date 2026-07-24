@@ -139,6 +139,7 @@ local bhopHoldEnabled = false
 local autoJumpType = "Simulation"
 local bhopMode = "Acceleration"
 local currentFriction = -0.2
+local lastFriction = nil
 
 local originalMovementUpdate = nil
 
@@ -155,14 +156,9 @@ end
 local function updateBhopState()
     local shouldEnable = autoJumpEnabled or bhopHoldEnabled
     MovementValueSet("BhopEnabled", shouldEnable)
-    if shouldEnable then
-        if bhopMode == "Acceleration" then
-            MovementValueSet("Friction", currentFriction)
-        else
-            MovementValueSet("Friction", 5)
-        end
-    else
+    if not shouldEnable then
         MovementValueSet("Friction", 5)
+        lastFriction = 5
         local char = LocalPlayer.Character
         if char then
             local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -185,8 +181,26 @@ Movement.Update = function(self, ...)
     if not humanoid or not hrp then return end
 
     local grounded = self.DataRegistry:Get("Grounded")
-    local isBhopActive = autoJumpEnabled or bhopHoldEnabled
+    
+    -- Logika DaraHub: Bhop hanya dianggap aktif jika Auto Jump aktif, ATAU Hold Jump aktif DAN tombol lompat ditekan
+    local isBhopActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
 
+    -- 1. LOGIKA FRICTION DARAHUB ASLI
+    local desiredFriction = nil
+    if isBhopActive and not grounded and bhopMode == "Acceleration" then
+        desiredFriction = currentFriction
+    end
+    
+    if desiredFriction ~= lastFriction then
+        if desiredFriction ~= nil then
+            MovementValueSet("Friction", desiredFriction)
+        else
+            MovementValueSet("Friction", 5)
+        end
+        lastFriction = desiredFriction
+    end
+
+    -- 2. PHANTOMWRYM PHYSICS EXPLOIT (Hanya berjalan saat isBhopActive true)
     if isBhopActive then
         if bhopMode == "Acceleration" then
             local targetHipHeight = -1.10
@@ -201,17 +215,17 @@ Movement.Update = function(self, ...)
                 hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X + boost.X, currentVel.Y, currentVel.Z + boost.Z)
             end
         end
-        
+
+        -- 3. EKSEKUSI LOMPAT (Logika DaraHub Asli)
         if grounded then
-            -- Logika Asli DaraHub
             if autoJumpEnabled then
                 if autoJumpType == "Realistic" then
                     pcall(function() self:AttemptJump() end)
                 else
                     humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
-            elseif bhopHoldEnabled and humanoid.Jump == true then
-                -- Hold Jump hanya akan lompat jika player menahan tombol Jump di keyboard/layar
+            elseif bhopHoldEnabled then
+                -- Ini akan memicu lompatan selama menahan tombol jump
                 pcall(function() self:AttemptJump() end)
             end
         end
@@ -250,7 +264,7 @@ local function stopNoFog()
     end
 end
 
-local fullBrightConnection, fullBrightCharConnection
+local fullBrightConnection
 local originalBrightness = Lighting.Brightness
 local originalAmbient = Lighting.Ambient
 local originalOutdoorAmbient = Lighting.OutdoorAmbient
@@ -541,9 +555,9 @@ Tabs.Movement:Input({ Title = "Air Strafe Acceleration", Placeholder = "182", Nu
 
 Tabs.Movement:Divider()
 Tabs.Movement:Section({ Title = "Hybrid Auto Jump (Ramp Bhop)", TextSize = 18 })
-Tabs.Movement:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
+Tabs.Movement:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 end })
 Tabs.Movement:Dropdown({ Title = "Auto Jump Mode", Values = {"Simulation", "Realistic"}, Value = "Simulation", Callback = function(v) autoJumpType = v end })
-Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
+Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v end })
 
 Tabs.Movement:Divider()
 Tabs.Movement:Section({ Title = "Auto Jump Toggles", TextSize = 18 })
