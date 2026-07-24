@@ -1,0 +1,211 @@
+if getgenv().DaraHubMovementExecuted then return end
+getgenv().DaraHubMovementExecuted = true
+
+-- Load WindUI Library
+loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))()
+local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Variabel State
+local autoJumpEnabled = false
+local autoJumpType = "Simulation" -- "Simulation" atau "Realistic"
+local bhopMode = "Acceleration"   -- "Acceleration" atau "No Acceleration"
+local currentFriction = -0.2
+
+local originalMovementUpdate = nil
+
+-- Fungsi DaraHub untuk mengirim sinyal resmi ke game
+local function MovementValueSet(MovementType, value)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local CharacterTag = char:GetAttribute("Tag")
+    if not CharacterTag then return end
+    
+    firesignal(ReplicatedStorage.Events.CharacterTask.OnClientEvent, 
+        CharacterTag, "ModifyMovement", { MovementType, value }
+    )
+end
+
+-- Mengambil modul Movement bawaan Evade (Metode DaraHub)
+local Movement = require(ReplicatedStorage:WaitForChild("Objects"):WaitForChild("Game"):WaitForChild("Character"):WaitForChild("Client"):WaitForChild("Movement"))
+originalMovementUpdate = Movement.Update
+
+-- Melakukan hook pada Movement.Update (Gabungan DaraHub + Phantomwrym)
+Movement.Update = function(self, ...)
+    -- 1. Jalankan fungsi bawaan game terlebih dahulu
+    originalMovementUpdate(self, ...)
+    
+    if not autoJumpEnabled then return end
+
+    local char = self.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
+
+    -- Cek apakah karakter menyentuh tanah (DaraHub Method)
+    local grounded = self.DataRegistry:Get("Grounded")
+
+    -- 2. PHANTOMWRYM EXPLOIT: Hanya berlaku jika Bhop Mode = "Acceleration"
+    if bhopMode == "Acceleration" then
+        -- HipHeight Bypass
+        local targetHipHeight = -1.10
+        if char:FindFirstChild("R15Visual") then targetHipHeight = 0.9 end
+        if humanoid.HipHeight ~= targetHipHeight then
+            humanoid.HipHeight = targetHipHeight
+        end
+
+        -- Velocity Stacking (Mengubah gravitasi ramp menjadi dorongan horizontal)
+        local currentVel = hrp.AssemblyLinearVelocity
+        local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+        
+        if horizontalVel.Magnitude > 1 then
+            local boost = horizontalVel.Unit * 2.5 -- Kekuatan dorongan di ramp
+            hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X + boost.X, currentVel.Y, currentVel.Z + boost.Z)
+        end
+    end
+
+    -- 3. DaraHub Auto Jump Execution (Dengan Mode)
+    if grounded then
+        if autoJumpType == "Realistic" then
+            pcall(function()
+                self:AttemptJump()
+            end)
+        else
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end
+
+-- ==============================================================================
+-- UI WINDUI DARAHUB
+-- ==============================================================================
+
+local Window = WindUI:CreateWindow({
+    Title = "Movement Hub | Evade",
+    Icon = "rbxassetid://137330250139083",
+    Author = "Hybrid Script",
+    Folder = "DaraHub/Games/Evade",
+    Size = UDim2.fromOffset(580, 460),
+    Theme = "Dark",
+    Acrylic = false,
+    HideSearchBar = true,
+    SideBarWidth = 180,
+    OpenButton = { Enabled = true, Scale = 0.8 } -- TOMBOL SHOW/HIDE UI (Bisa di-drag)
+})
+
+Window:ToggleTransparency(true)
+
+local Tabs = {
+    Main = Window:Tab({ Title = "Movement", Icon = "user" }),
+}
+
+Tabs.Main:Section({ Title = "Movement Stats (DaraHub)", TextSize = 18 })
+
+-- Input Jump Cap
+Tabs.Main:Input({
+    Title = "Jump Cap",
+    Placeholder = "1",
+    NumbersOnly = true,
+    Value = "1",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then MovementValueSet("JumpCap", num) end
+    end
+})
+
+-- Input Strafe Acceleration
+Tabs.Main:Input({
+    Title = "Air Strafe Acceleration",
+    Placeholder = "182",
+    NumbersOnly = true,
+    Value = "182",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then MovementValueSet("AirStrafeAcceleration", num) end
+    end
+})
+
+Tabs.Main:Divider()
+Tabs.Main:Section({ Title = "Hybrid Auto Jump (Ramp Bhop)", TextSize = 18 })
+
+-- Input Friction (Untuk Mode Acceleration)
+Tabs.Main:Input({
+    Title = "Friction Value (Acceleration Mode)",
+    Placeholder = "-0.2",
+    NumbersOnly = true,
+    Value = "-0.2",
+    Callback = function(value)
+        currentFriction = tonumber(value) or -0.2
+        -- Jika bhop sedang menyala, update langsung frictionnya
+        if autoJumpEnabled and bhopMode == "Acceleration" then
+            MovementValueSet("Friction", currentFriction)
+        end
+    end
+})
+
+-- Dropdown Mode Lompatan
+Tabs.Main:Dropdown({
+    Title = "Auto Jump Mode",
+    Values = {"Simulation", "Realistic"},
+    Value = "Simulation",
+    Callback = function(value)
+        autoJumpType = value
+    end
+})
+
+-- Dropdown Bhop Mode
+Tabs.Main:Dropdown({
+    Title = "Bhop Mode",
+    Values = {"Acceleration", "No Acceleration"},
+    Value = "Acceleration",
+    Callback = function(value)
+        bhopMode = value
+        -- Saat mode diubah, update friction langsung jika bhop aktif
+        if autoJumpEnabled then
+            if bhopMode == "Acceleration" then
+                MovementValueSet("Friction", currentFriction)
+            else
+                MovementValueSet("Friction", 5) -- Kembali normal
+            end
+        end
+    end
+})
+
+-- Toggle Auto Jump
+Tabs.Main:Toggle({
+    Title = "Enable Auto Jump (Ramp Bhop)",
+    Value = false,
+    Callback = function(state)
+        autoJumpEnabled = state
+        if state then
+            -- Aktifkan Bhop
+            MovementValueSet("BhopEnabled", true)
+            if bhopMode == "Acceleration" then
+                MovementValueSet("Friction", currentFriction)
+            else
+                MovementValueSet("Friction", 5)
+            end
+        else
+            -- Matikan Bhop & Reset semuanya
+            MovementValueSet("BhopEnabled", false)
+            MovementValueSet("Friction", 5)
+            
+            -- Reset HipHeight ke normal
+            local char = LocalPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.HipHeight = char:FindFirstChild("R15Visual") and 0.75 or -1.25
+                end
+            end
+        end
+    end
+})
+
+Window:SelectTab(1)
