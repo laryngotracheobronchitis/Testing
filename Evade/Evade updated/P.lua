@@ -535,7 +535,7 @@ loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lu
 local WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "Hub Evade",
+    Title = "Hub Evade | Hybrid",
     Icon = "rbxassetid://137330250139083",
     Author = "DaraHub Modded",
     Folder = "DaraHub/Games/Evade",
@@ -595,6 +595,12 @@ end})
 -- ==============================================================================
 -- TAB 2: HYBRID (PHANTOMWRYM)
 -- ==============================================================================
+Tabs.Hybrid:Section({ Title = "Hybrid Auto Jump Settings", TextSize = 18 })
+Tabs.Hybrid:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 if autoJumpDaraHub or bhopHoldDaraHub or autoJumpHybrid then updateBhopState() end end })
+Tabs.Hybrid:Dropdown({ Title = "Auto Jump Mode", Values = {"Simulation", "Realistic"}, Value = "Simulation", Callback = function(v) autoJumpType = v end })
+Tabs.Hybrid:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpDaraHub or bhopHoldDaraHub or autoJumpHybrid then updateBhopState() end end })
+
+Tabs.Hybrid:Divider()
 Tabs.Hybrid:Section({ Title = "Hybrid Auto Jump (Phantomwrym)", TextSize = 18 })
 Tabs.Hybrid:Paragraph({ Title = "Info", Content = "Mode ini menggunakan exploit fisika untuk menumpuk speed ekstrem di ramp. Hold Jump tidak tersedia di mode ini karena menyebabkan glitch." })
 
