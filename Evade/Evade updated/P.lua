@@ -137,9 +137,8 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local autoJumpEnabled = false
 local bhopHoldEnabled = false
 local autoJumpType = "Simulation"
-local autoJumpMode = "DaraHub" -- "DaraHub" atau "Hybrid (Phantomwrym)"
+local bhopMode = "Acceleration"
 local currentFriction = -0.2
-local lastFriction = nil
 
 local originalMovementUpdate = nil
 
@@ -156,9 +155,14 @@ end
 local function updateBhopState()
     local shouldEnable = autoJumpEnabled or bhopHoldEnabled
     MovementValueSet("BhopEnabled", shouldEnable)
-    if not shouldEnable then
+    if shouldEnable then
+        if bhopMode == "Acceleration" then
+            MovementValueSet("Friction", currentFriction)
+        else
+            MovementValueSet("Friction", 5)
+        end
+    else
         MovementValueSet("Friction", 5)
-        lastFriction = 5
         local char = LocalPlayer.Character
         if char then
             local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -181,27 +185,25 @@ Movement.Update = function(self, ...)
     if not humanoid or not hrp then return end
 
     local grounded = self.DataRegistry:Get("Grounded")
-    local isFrictionActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
+    local isBhopActive = autoJumpEnabled or bhopHoldEnabled
 
-    -- ==============================================================================
-    -- MODE 1: DARAHUB ASLI
-    -- ==============================================================================
-    if autoJumpMode == "DaraHub" then
-        local desiredFriction = nil
-        if isFrictionActive and not grounded then
-            desiredFriction = currentFriction
+    if isBhopActive then
+        if bhopMode == "Acceleration" then
+            local targetHipHeight = -1.10
+            if char:FindFirstChild("R15Visual") then targetHipHeight = 0.9 end
+            if humanoid.HipHeight ~= targetHipHeight then
+                humanoid.HipHeight = targetHipHeight
+            end
+            local currentVel = hrp.AssemblyLinearVelocity
+            local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+            if horizontalVel.Magnitude > 1 then
+                local boost = horizontalVel.Unit * 2.5
+                hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X + boost.X, currentVel.Y, currentVel.Z + boost.Z)
+            end
         end
         
-        if desiredFriction ~= lastFriction then
-            if desiredFriction ~= nil then
-                MovementValueSet("Friction", desiredFriction)
-            else
-                MovementValueSet("Friction", 5)
-            end
-            lastFriction = desiredFriction
-        end
-
         if grounded then
+            -- Logika Asli DaraHub
             if autoJumpEnabled then
                 if autoJumpType == "Realistic" then
                     pcall(function() self:AttemptJump() end)
@@ -209,65 +211,8 @@ Movement.Update = function(self, ...)
                     humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
             elseif bhopHoldEnabled and humanoid.Jump == true then
+                -- Hold Jump hanya akan lompat jika player menahan tombol Jump di keyboard/layar
                 pcall(function() self:AttemptJump() end)
-            end
-        end
-
-    -- ==============================================================================
-    -- MODE 2: HYBRID (PHANTOMWRYM)
-    -- ==============================================================================
-    elseif autoJumpMode == "Hybrid (Phantomwrym)" then
-        -- 1. FRICTION LOGIC
-        local desiredFriction = nil
-        if isFrictionActive then
-            -- Di mode Hybrid, friction negatif dipaksa terus menerus saat Bhop aktif (Phantomwrym Behavior)
-            desiredFriction = currentFriction
-        else
-            desiredFriction = 5
-        end
-        
-        if desiredFriction ~= lastFriction then
-            MovementValueSet("Friction", desiredFriction)
-            lastFriction = desiredFriction
-        end
-
-        -- 2. PHYSICS EXPLOIT (Hanya berlaku untuk Auto Jump)
-        if autoJumpEnabled then
-            -- HIPHEIGHT BYPASS
-            local targetHipHeight = -1.10
-            if char:FindFirstChild("R15Visual") then targetHipHeight = 0.9 end
-            if humanoid.HipHeight ~= targetHipHeight then
-                humanoid.HipHeight = targetHipHeight
-            end
-
-            -- VELOCITY STACKING (Selalu berjalan, tidak ada syarat grounded)
-            local currentVel = hrp.AssemblyLinearVelocity
-            local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
-            if horizontalVel.Magnitude > 1 then
-                local boost = horizontalVel.Unit * 2.5
-                hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X + boost.X, currentVel.Y, currentVel.Z + boost.Z)
-            end
-
-            -- AUTO JUMP EXECUTION (Menggunakan FloorMaterial agar deteksi ramp lebih akurat)
-            if humanoid.FloorMaterial ~= Enum.Material.Air then
-                if autoJumpType == "Realistic" then
-                    pcall(function() self:AttemptJump() end)
-                else
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            end
-        else
-            -- Reset HipHeight jika Auto Jump tidak aktif
-            local targetHipHeight = char:FindFirstChild("R15Visual") and 0.75 or -1.25
-            if humanoid.HipHeight ~= targetHipHeight then
-                humanoid.HipHeight = targetHipHeight
-            end
-
-            -- Hold Jump Logic (Murni DaraHub Asli, tanpa Physics Exploit)
-            if bhopHoldEnabled and humanoid.Jump == true then
-                if humanoid.FloorMaterial ~= Enum.Material.Air then
-                    pcall(function() self:AttemptJump() end)
-                end
             end
         end
     end
@@ -305,7 +250,7 @@ local function stopNoFog()
     end
 end
 
-local fullBrightConnection
+local fullBrightConnection, fullBrightCharConnection
 local originalBrightness = Lighting.Brightness
 local originalAmbient = Lighting.Ambient
 local originalOutdoorAmbient = Lighting.OutdoorAmbient
@@ -595,24 +540,10 @@ Tabs.Movement:Input({ Title = "Jump Cap", Placeholder = "1", NumbersOnly = true,
 Tabs.Movement:Input({ Title = "Air Strafe Acceleration", Placeholder = "182", NumbersOnly = true, Value = "182", Callback = function(v) local n=tonumber(v) if n then MovementValueSet("AirStrafeAcceleration", n) end end })
 
 Tabs.Movement:Divider()
-Tabs.Movement:Section({ Title = "Auto Jump Settings", TextSize = 18 })
-Tabs.Movement:Input({ Title = "Friction Value", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 end })
+Tabs.Movement:Section({ Title = "Hybrid Auto Jump (Ramp Bhop)", TextSize = 18 })
+Tabs.Movement:Input({ Title = "Friction Value (Accel Mode)", Placeholder = "-0.2", NumbersOnly = true, Value = "-0.2", Callback = function(v) currentFriction = tonumber(v) or -0.2 if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
 Tabs.Movement:Dropdown({ Title = "Auto Jump Mode", Values = {"Simulation", "Realistic"}, Value = "Simulation", Callback = function(v) autoJumpType = v end })
-Tabs.Movement:Dropdown({ Title = "Bhop Version", Values = {"DaraHub", "Hybrid (Phantomwrym)"}, Value = "DaraHub", Callback = function(v) 
-    autoJumpMode = v 
-    -- Saat ganti mode, reset state terlebih dahulu
-    if autoJumpEnabled or bhopHoldEnabled then
-        MovementValueSet("Friction", 5)
-        lastFriction = 5
-        local char = LocalPlayer.Character
-        if char then
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.HipHeight = char:FindFirstChild("R15Visual") and 0.75 or -1.25
-            end
-        end
-    end
-end})
+Tabs.Movement:Dropdown({ Title = "Bhop Mode", Values = {"Acceleration", "No Acceleration"}, Value = "Acceleration", Callback = function(v) bhopMode = v if autoJumpEnabled or bhopHoldEnabled then updateBhopState() end end })
 
 Tabs.Movement:Divider()
 Tabs.Movement:Section({ Title = "Auto Jump Toggles", TextSize = 18 })
@@ -620,17 +551,11 @@ Tabs.Movement:Section({ Title = "Auto Jump Toggles", TextSize = 18 })
 Tabs.Movement:Toggle({ Title = "Show Auto Jump Button", Value = false, Callback = function(state)
     if state then
         if not ButtonLib.AutoJumpBtn then
-            ButtonLib.AutoJumpBtn = ButtonLib.Create:Toggle({ Text = "Auto Jump", Flag = "AutoJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -145), Callback = function(s) 
-                autoJumpEnabled = s 
-                updateBhopState()
-            end })
+            ButtonLib.AutoJumpBtn = ButtonLib.Create:Toggle({ Text = "Auto Jump", Flag = "AutoJumpBtn", Default = false, Position = UDim2.new(0.5, -125, 0.5, -145), Callback = function(s) autoJumpEnabled = s; updateBhopState() end })
+            ButtonLib.AutoJumpBtn:SetVisible(true)
         end
-        ButtonLib.AutoJumpBtn:SetVisible(true)
     else
-        if ButtonLib.AutoJumpBtn then
-            ButtonLib.AutoJumpBtn:Set(false)
-            ButtonLib.AutoJumpBtn:SetVisible(false)
-        end
+        if ButtonLib.AutoJumpBtn then ButtonLib.AutoJumpBtn:Set(false); ButtonLib.AutoJumpBtn:SetVisible(false) end
     end
 end})
 
