@@ -202,14 +202,17 @@ Movement.Update = function(self, ...)
             end
         end
         
-        -- PERBAIKAN HOLD JUMP: Jika grounded dan salah satu toggle menyala, langsung lompat
         if grounded then
-            if autoJumpEnabled or bhopHoldEnabled then
+            -- Logika Asli DaraHub
+            if autoJumpEnabled then
                 if autoJumpType == "Realistic" then
                     pcall(function() self:AttemptJump() end)
                 else
                     humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
+            elseif bhopHoldEnabled and humanoid.Jump == true then
+                -- Hold Jump hanya akan lompat jika player menahan tombol Jump di keyboard/layar
+                pcall(function() self:AttemptJump() end)
             end
         end
     end
