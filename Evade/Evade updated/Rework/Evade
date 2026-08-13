@@ -65,7 +65,7 @@ Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
 }
 socialsModule = loadstring(game:HttpGet("https://darahub.pages.dev/Module/info.lua"))()
 
-socialsModule(Tabs)
+pcall(socialsModule, Tabs)
 local function mouseUnlock(enabled)
 local success, err = pcall(function()
 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -607,16 +607,20 @@ SetAccelerationMethod(value)
 end
 })
 
--- FIX: removed "Negative Only" restriction. Now any value (positive or negative) is accepted.
+-- Negative Only: Bhop acceleration only accepts negative values (important for proper Bhop behavior).
 AccelerationInput = Tabs.Auto:Input({
-Title = "Bhop Acceleration (Any Value)",
+Title = "Bhop Acceleration (Negative Only)",
 Flag = "AccelerationInput",
 Placeholder = "-0.2",
 Value = "-0.2",
 Callback = function(value)
 local n = tonumber(value)
 if n then
+if n > 0 then
+n = -n -- Force negative if positive value is entered
+end
 accelerationValue = n
+end
 end
 end
 })
@@ -694,7 +698,7 @@ Flag = "MaxAccelerationInput",
 Placeholder = "3",
 Value = "3",
 Callback = function(value)
-n = tonumber(value)
+local n = tonumber(value)
 if n then
 maxAcceleration = n
 end
@@ -707,7 +711,7 @@ Flag = "MinAccelerationInput",
 Placeholder = "-1",
 Value = "-1",
 Callback = function(value)
-n = tonumber(value)
+local n = tonumber(value)
 if n then
 minAcceleration = n
 end
@@ -720,7 +724,7 @@ Flag = "MaxSpeedInput",
 Placeholder = "70",
 Value = "70",
 Callback = function(value)
-n = tonumber(value)
+local n = tonumber(value)
 if n and n > 0 then
 maxAutoAccelSpeed = n
 end
@@ -773,18 +777,18 @@ local hrp = char:FindFirstChild("HumanoidRootPart")
 
 if SelfRevive.Method == "Spawnpoint" then
 if not SelfRevive.HasRevived then
-self.HasRevived = true
+SelfRevive.HasRevived = true
 pcall(function()
 changePlayerMode:FireServer(true)
 end)
 SelfRevive.IsProcessing = false
 task.delay(10, function()
-self.HasRevived = false
+SelfRevive.HasRevived = false
 end)
 else
 SelfRevive.IsProcessing = false
 end
-elseif self.Method == "Fake Revive" then
+elseif SelfRevive.Method == "Fake Revive" then
 local savedPos = nil
 if hrp then
 savedPos = hrp.CFrame.Position
@@ -829,7 +833,7 @@ if not char then return end
 
 local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
 if charData and charData.DataRegistry:Get("Downed") then
-self:Respawn()
+SelfRevive:Respawn()
 end
 end)
 
