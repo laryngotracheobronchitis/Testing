@@ -63,9 +63,14 @@ Auto = Window:Tab({ Title = "Auto", Icon = "repeat-2" }),
 Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
 Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
 }
-socialsModule = loadstring(game:HttpGet("https://darahub.pages.dev/Module/info.lua"))()
+local socialsSuccess, socialsResult = pcall(function()
+    return loadstring(game:HttpGet("https://darahub.pages.dev/Module/info.lua"))()
+end)
+local socialsModule = socialsSuccess and socialsResult or nil
 
-pcall(socialsModule, Tabs)
+if socialsModule and type(socialsModule) == "function" then
+    pcall(socialsModule, Tabs)
+end
 local function mouseUnlock(enabled)
 local success, err = pcall(function()
 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -620,7 +625,6 @@ if n > 0 then
 n = -n -- Force negative if positive value is entered
 end
 accelerationValue = n
-end
 end
 end
 })
