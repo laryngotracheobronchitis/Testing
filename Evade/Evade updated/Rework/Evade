@@ -531,7 +531,52 @@ Tabs.Player:Section({ Title = "Player", TextSize = 40 })
 Tabs.Player:Divider()
 Tabs.Player:Section({Title="Movement Values", TextSize = 20})
 
--- Jump Cap: NO value limit (NumbersOnly removed so any value is accepted)
+-- Saved player movement values (persist across respawns)
+local savedJumpCap = defaultMovementValues.JumpCap
+local savedAirStrafeAccel = defaultMovementValues.AirStrafeAcceleration
+
+-- Retry queue: stores pending MovementValueSet calls to retry when CharacterTag becomes available
+local pendingMovementSets = {}
+
+-- Safe MovementValueSet with retry + notification
+local function SafeMovementValueSet(MovementType, value)
+    local success, err = pcall(function()
+        MovementValueSet(MovementType, value)
+    end)
+    if not success then
+        -- CharacterTag probably nil, queue it for retry
+        pendingMovementSets[MovementType] = value
+        WindUI:Notify({
+            Title = "Movement Pending",
+            Content = MovementType .. " will apply when you join a round",
+            Duration = 2
+        })
+    else
+        pendingMovementSets[MovementType] = nil
+    end
+end
+
+-- Apply all saved movement values (called on character setup and round join)
+local function ApplySavedMovementValues()
+    SafeMovementValueSet("JumpCap", savedJumpCap)
+    SafeMovementValueSet("AirStrafeAcceleration", savedAirStrafeAccel)
+    -- Also retry any pending values
+    for mType, mValue in pairs(pendingMovementSets) do
+        SafeMovementValueSet(mType, mValue)
+    end
+end
+
+-- Hook into character setup to re-apply values on respawn
+local originalSetupCharacter = setupCharacter
+setupCharacter = function(character)
+    originalSetupCharacter(character)
+    -- Small delay to let the server assign the Tag attribute
+    task.delay(0.5, function()
+        ApplySavedMovementValues()
+    end)
+end
+
+-- Jump Cap Input
 JumpCapInput = Tabs.Player:Input({
 Title="Jump Cap",
 Placeholder="1",
@@ -539,12 +584,13 @@ Value="1",
 Callback = function(value)
 local n = tonumber(value)
 if n then
-MovementValueSet("JumpCap", n)
+    savedJumpCap = n
+    SafeMovementValueSet("JumpCap", n)
 end
 end
 })
 
--- Air Strafe Acceleration: NO value limit
+-- Air Strafe Acceleration Input
 AirStrafeAccelerationInput = Tabs.Player:Input({
 Title="Air Strafe Acceleration",
 Placeholder="182",
@@ -552,7 +598,8 @@ Value="182",
 Callback = function(value)
 local n = tonumber(value)
 if n then
-MovementValueSet("AirStrafeAcceleration", n)
+    savedAirStrafeAccel = n
+    SafeMovementValueSet("AirStrafeAcceleration", n)
 end
 end
 })
@@ -564,8 +611,10 @@ Desc = "Reset JumpCap and AirStrafeAcceleration to defaults",
 Icon = "refresh-cw",
 Color = Color3.fromHex("#FF3030"),
 Callback = function()
-MovementValueSet("JumpCap", defaultMovementValues.JumpCap)
-MovementValueSet("AirStrafeAcceleration", defaultMovementValues.AirStrafeAcceleration)
+savedJumpCap = defaultMovementValues.JumpCap
+savedAirStrafeAccel = defaultMovementValues.AirStrafeAcceleration
+SafeMovementValueSet("JumpCap", defaultMovementValues.JumpCap)
+SafeMovementValueSet("AirStrafeAcceleration", defaultMovementValues.AirStrafeAcceleration)
 if JumpCapInput then JumpCapInput:Set(tostring(defaultMovementValues.JumpCap)) end
 if AirStrafeAccelerationInput then AirStrafeAccelerationInput:Set(tostring(defaultMovementValues.AirStrafeAcceleration)) end
 WindUI:Notify({
