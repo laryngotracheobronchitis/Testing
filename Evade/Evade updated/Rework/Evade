@@ -1,0 +1,3090 @@
+-- DaraHub | Evade 2.1 | Movement Edition
+-- Generated from DaraHubUpdated_the_second.txt
+-- Kept features: Strafe Accel, Jump Cap, Bhop (with ramp boost fix),
+--                Display Time, Special Round Display, full Visuals tab,
+--                Respawn features (Auto Respawn / Force Respawn / Instant Respawn).
+-- Removed tabs: Main, Combat, ESP, Misc, Utility, Teleport, Shop, info, Others.
+
+if getgenv().DaraHubExecuted then
+firesignal(game:GetService("ReplicatedStorage").Events.SharedUISetType
+.OnClientEvent,
+"Notification",
+"Message",
+"Script Is Already Loaded, rejoin of you want to re-execute",
+"Error"
+)
+return
+end
+getgenv().DaraHubExecuted = true
+loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
+WindUI = loadstring(game:HttpGet("https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"))()
+-- Create WindUI window
+Window = WindUI:CreateWindow({
+NewElements = true,
+Title = "Dara Hub | Evade 2.1 | Movement Edition",
+Icon = "rbxassetid://137330250139083",
+Author = "Made by: Pnsdg And Yomka (Movement Edition)",
+Folder = "DaraHub/Games/Evade",
+Size = UDim2.fromOffset(580, 490),
+Theme = "Dark",
+HidePanelBackground = false,
+Acrylic = false,
+HideSearchBar = false,
+SideBarWidth = 200,
+OpenButton = {
+Enabled = false,
+Scale = 0
+},
+})
+WindUI.TransparencyValue = 0.7
+Window:ToggleTransparency(true)
+Window:DisableTopbarButtons({ "Fullscreen" })
+Window:SetIconSize(48)
+executor = identifyexecutor()
+if type(executor) == "table" then
+for key, value in pairs(executor) do
+print(key .. ": " .. tostring(value))
+end
+elseif type(executor) == "string" then
+Window:Tag({
+Title = "" .. executor
+})
+else
+print("The injector does not support identifyexecutor()")
+end
+Window:Tag({
+Title = "v1.1-Move",
+Color = Color3.fromHex("#30ff6a")
+})
+-- Movement Edition: only Player, Auto, Visuals, Settings tabs
+Tabs = {
+Player = Window:Tab({ Title = "Player", Icon = "user" }),
+Auto = Window:Tab({ Title = "Auto", Icon = "repeat-2" }),
+Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
+Settings = Window:Tab({ Title = "Settings", Icon = "settings" }),
+}
+socialsModule = loadstring(game:HttpGet("https://darahub.pages.dev/Module/info.lua"))()
+
+socialsModule(Tabs)
+local function mouseUnlock(enabled)
+local success, err = pcall(function()
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local uiService = replicatedStorage:FindFirstChild("Services"):FindFirstChild("UI"):FindFirstChild("SharedUIService")
+uiService.SetMouseActive:Fire("WindUI", enabled)
+end)
+
+if not success then
+warn("Failed to set mouse active state: " .. tostring(err))
+end
+end
+mouseUnlock(true)
+Window:OnOpen(function()
+mouseUnlock(true)
+ButtonLib:OpenButton(false)
+end)
+Window:OnClose(function()
+mouseUnlock(false)
+ButtonLib:OpenButton(true)
+end)
+Window:OnDestroy(function()
+ButtonLib:DestroyScreengui()
+mouseUnlock(false)
+end)
+-- Services & Variable
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStateRegistryService = require(ReplicatedStorage:WaitForChild("Services"):WaitForChild("Data"):WaitForChild("ServerStateRegistryService"))
+local workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local PathfindingService = game:GetService("PathfindingService")
+local CharacterService = require(ReplicatedStorage:WaitForChild("Services"):WaitForChild("Asset"):WaitForChild("CharacterService"))
+
+local Character
+local Humanoid
+local HumanoidRootPart
+local CharacterTag
+
+function GetCharacterTag(Character)
+if not Character then return nil end
+return Character:GetAttribute("Tag")
+end
+
+function setupCharacter(character)
+Character = character
+Humanoid = character:FindFirstChildOfClass("Humanoid")
+HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+CharacterTag = GetCharacterTag(character)
+end
+
+if LocalPlayer.Character then
+setupCharacter(LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+setupCharacter(character)
+end)
+
+
+local ToolAction = ReplicatedStorage.Events.ToolAction
+
+-- Top bar buttons (mobile)
+if game:GetService("UserInputService").TouchEnabled then local isButtonLocked, currentMouseHold, activeKeybinds, createdButtons = {}, {}, {}, {} function UpdateAllButtons() for key, _ in pairs(currentMouseHold) do if currentMouseHold[key] then ReplicatedStorage:WaitForChild("Services"):WaitForChild("Client"):WaitForChild("KeybindService"):WaitForChild("SendKeybindEvent"):Fire({ Key = key, Down = false }) end currentMouseHold[key] = nil end for key, buttonData in pairs(createdButtons) do if buttonData and buttonData.updateVisualState then pcall(buttonData.updateVisualState) end end end local LocalPlayer, starterGui, PlayerGui = game.Players.LocalPlayer, game:GetService("StarterGui"), game.Players.LocalPlayer:WaitForChild("PlayerGui") local topbarStandard, targetParent = PlayerGui:FindFirstChild("TopbarStandard"), nil if topbarStandard then local main = topbarStandard:FindFirstChild("Main") if main then local holders = main:FindFirstChild("Holders") if holders then targetParent = holders:FindFirstChild("Left") if targetParent then for _, child in ipairs(targetParent:GetChildren()) do if child.Name == "TopbarStandard" then child:Destroy() end end end end end end if not targetParent then if PlayerGui:FindFirstChild("TopbarStandard") then PlayerGui:FindFirstChild("TopbarStandard"):Destroy() end starterGui:SetCore("TopbarEnabled", false) local screenGui = Instance.new("ScreenGui") screenGui.Name, screenGui.IgnoreGuiInset, screenGui.ScreenInsets, screenGui.DisplayOrder, screenGui.ResetOnSpawn, screenGui.Parent = "TopbarStandard", false, Enum.ScreenInsets.TopbarSafeInsets, 100, false, PlayerGui local holders = Instance.new("Frame") holders.Name, holders.BackgroundTransparency, holders.BorderSizePixel, holders.Position, holders.Size, holders.Parent = "Holders", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, -2), screenGui local frame = Instance.new("Frame") frame.Name, frame.BackgroundTransparency, frame.BorderSizePixel, frame.Position, frame.Size, frame.Parent = "Main", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0), holders local scrollingFrame = Instance.new("ScrollingFrame") scrollingFrame.Name, scrollingFrame.Parent, scrollingFrame.BackgroundTransparency, scrollingFrame.BorderSizePixel, scrollingFrame.Position, scrollingFrame.Size, scrollingFrame.CanvasSize, scrollingFrame.AutomaticCanvasSize, scrollingFrame.ScrollBarThickness, scrollingFrame.ScrollingDirection, scrollingFrame.ScrollingEnabled = "Right", frame, 1, 0, UDim2.new(0, 12, 0, 0), UDim2.new(1, -24, 1, 0), UDim2.new(0, 0, 0, 0), Enum.AutomaticSize.X, 0, Enum.ScrollingDirection.X, false local uiListLayout = Instance.new("UIListLayout") uiListLayout.Parent, uiListLayout.Padding, uiListLayout.SortOrder, uiListLayout.FillDirection, uiListLayout.HorizontalAlignment, uiListLayout.VerticalAlignment = scrollingFrame, UDim.new(0, 12), Enum.SortOrder.LayoutOrder, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Bottom targetParent = scrollingFrame else starterGui:SetCore("TopbarEnabled", true) end local keybindButtonsConfig = { { name = "SecondaryButton", layoutOrder = 999, icon = "rbxassetid://126943351764139", label = "Zoom", key = "Secondary", enablesLockValue = false }, { name = "ReloadButton", layoutOrder = 997, icon = "rbxassetid://78648212535999", label = "Front View/Reload", key = "Reload", enablesLockValue = false }, { name = "LeaderboardButton", layoutOrder = 998, icon = "rbxassetid://5107166345", label = "Leaderboard", key = "Leaderboard", enablesLockValue = false } } function createKeybindButton(config, parent) local Button = Instance.new("Frame") Button.Name, Button.Parent, Button.BackgroundTransparency, Button.ClipsDescendants, Button.LayoutOrder, Button.Size, Button.ZIndex = config.name, parent, 1, true, config.layoutOrder, UDim2.new(0, 44, 0, 44), 20 local IconButton = Instance.new("Frame") IconButton.Name, IconButton.Parent, IconButton.BackgroundColor3, IconButton.BackgroundTransparency, IconButton.BorderSizePixel, IconButton.ClipsDescendants, IconButton.Size, IconButton.ZIndex = "IconButton", Button, Color3.fromRGB(0, 0, 0), 0.3, 0, true, UDim2.new(1, 0, 1, 0), 2 local UICorner = Instance.new("UICorner") UICorner.CornerRadius, UICorner.Parent = UDim.new(1, 0), IconButton local IconImage = Instance.new("ImageLabel") IconImage.Parent, IconImage.AnchorPoint, IconImage.BackgroundTransparency, IconImage.Position, IconImage.Size, IconImage.ZIndex, IconImage.Image = IconButton, Vector2.new(0.5, 0.5), 1, UDim2.new(0.5, 0, 0.5, 0), UDim2.new(0.5, 0, 0.5, 0), 15, config.icon local IconImageRatio = Instance.new("UIAspectRatioConstraint") IconImageRatio.Parent, IconImageRatio.DominantAxis = IconImage, Enum.DominantAxis.Height local ClickRegion = Instance.new("TextButton") ClickRegion.Parent, ClickRegion.BackgroundTransparency, ClickRegion.Size, ClickRegion.ZIndex, ClickRegion.Text = IconButton, 1, UDim2.new(1, 0, 1, 0), 20, "" local IconOverlay = Instance.new("Frame") IconOverlay.Parent, IconOverlay.BackgroundColor3, IconOverlay.BackgroundTransparency, IconOverlay.Size, IconOverlay.Visible, IconOverlay.ZIndex = IconButton, Color3.fromRGB(255, 255, 255), 0.925, UDim2.new(1, 0, 1, 0), false, 6 local UICorner_Overlay = Instance.new("UICorner") UICorner_Overlay.CornerRadius, UICorner_Overlay.Parent = UDim.new(1, 0), IconOverlay function getIsActive() return currentMouseHold[config.key] or false end function updateVisualState() IconOverlay.Visible = getIsActive() end ClickRegion.MouseButton1Down:Connect(function() currentMouseHold[config.key] = true ReplicatedStorage:WaitForChild("Services"):WaitForChild("Client"):WaitForChild("KeybindService"):WaitForChild("SendKeybindEvent"):Fire({ Key = config.key, Down = true }) updateVisualState() end) ClickRegion.MouseButton1Up:Connect(function() if currentMouseHold[config.key] then currentMouseHold[config.key] = false ReplicatedStorage:WaitForChild("Services"):WaitForChild("Client"):WaitForChild("KeybindService"):WaitForChild("SendKeybindEvent"):Fire({ Key = config.key, Down = false }) updateVisualState() end end) createdButtons[config.key] = { Button = Button, updateVisualState = updateVisualState } end for _, config in ipairs(keybindButtonsConfig) do createKeybindButton(config, targetParent) end end
+
+--Force Enable Lookback mobile
+require(ReplicatedStorage.Objects.Game.Actions.ActionTypes.LookBack).Requirements.Mobile = true
+
+local camera = workspace.CurrentCamera
+AutoWhistle = false
+TPWALK = false
+AutoCarry = false
+NoFog = false
+AutoVote = false
+AutoSelfRevive = false
+AutoRevive = false
+TpwalkValue = 1
+SelectedMap = 1
+TimerDisplay = false
+SelectedGameMode = "Pro"
+AutoGameModeEnabled = false
+
+local Character, humanoid, rootPart
+local bodyVelocity, bodyGyro
+local ToggleTpwalk = false
+local TpwalkConnection
+if not AntiNextbotDistance then
+AntiNextbotDistance = 50
+end
+local AntiAFKConnection
+local originalBrightness = Lighting.Brightness
+local originalFogEnd = Lighting.FogEnd
+local originalOutdoorAmbient = Lighting.OutdoorAmbient
+local originalAmbient = Lighting.Ambient
+local originalAtmospheres = {}
+
+for _, v in pairs(Lighting:GetDescendants()) do
+if v:IsA("Atmosphere") then
+table.insert(originalAtmospheres, v)
+end
+end
+function startNoFog()
+originalFogEnd = Lighting.FogEnd
+Lighting.FogEnd = 1000000
+for _, v in pairs(Lighting:GetDescendants()) do
+if v:IsA("Atmosphere") then
+v:Destroy()
+end
+end
+end
+function isPlayerGrounded()
+if not Character or not humanoid or not rootPart then
+return false
+end
+local rayOrigin = rootPart.Position
+local rayDirection = Vector3.new(0, -3, 0)
+local raycastParams = RaycastParams.new()
+raycastParams.FilterDescendantsInstances = {Character}
+raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+return raycastResult ~= nil
+end
+
+-----------------------------------------Modification Stuffs (Movement Edition)-----------------------------------------------------
+local defaultMovementValues = {
+SprintAcceleration = 1,
+SprintCap = 2,
+RunAccel = 1,
+Friction = 5,
+RunDeaccel = 700,
+AirStrafeAcceleration = 182,
+AirAcceleration = 1,
+Speed = 1500,
+JumpHeight = 3,
+JumpCap = 1,
+WalkSpeedMultiplier = 1,
+JumpSpeedMultiplier = 1.45,
+BhopEnabled = false,
+GroundedDistCheck = 2.9
+}
+local infiniteSlide = false
+local slideFriction = -8
+local AutowallHop = false
+local autoJumpEnabled = false
+local autoJumpType = "Simulation"
+local bhopHoldEnabled = false
+local accelerationMethod = "Acceleration"
+local accelerationValue = -0.2
+local autoAccelerationEnabled = false
+local maxAcceleration = 3
+local minAcceleration = -1
+local maxAutoAccelSpeed = 70
+-- NEW: when true, bhop acceleration also applies while grounded (allows ramp boost)
+local bhopGroundedBoost = true
+
+local function getCurrentSpeed(character)
+if not character then return 0 end
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not hrp then return 0 end
+for _, child in ipairs(hrp:GetChildren()) do
+if child:IsA("LinearVelocity") and child.Name:find("LinearVelocity") then
+local pv = child.PlaneVelocity
+return (pv.X * pv.X + pv.Y * pv.Y) ^ 0.5
+end
+end
+local velocity = hrp.AssemblyLinearVelocity
+return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
+end
+function MovementValueSet(MovementType, value)
+if not CharacterTag then
+CharacterTag = GetCharacterTag(LocalPlayer.Character)
+end
+if not CharacterTag then return end
+firesignal(ReplicatedStorage.Events.CharacterTask.OnClientEvent,
+CharacterTag,
+"ModifyMovement",
+{
+MovementType,
+value
+}
+)
+end
+local Movement = require(ReplicatedStorage.Objects.Game.Character.Client.Movement)
+local originalRegistry = Movement.RegistryTermUpdated
+Movement.RegistryTermUpdated = function(self, term)
+originalRegistry(self, term)
+end
+local originalMovementUpdate = Movement.Update
+local lastFriction = nil
+Movement.Update = function(self, ...)
+originalMovementUpdate(self, ...)
+local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
+if not humanoid then return end
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local LocalPlayerData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local movementData = LocalPlayerData and LocalPlayerData.Movement
+local state = movementData and movementData.State
+if not state then
+state = self.State
+end
+local grounded = self.DataRegistry:Get("Grounded")
+local desiredFriction = nil
+
+-- ============================================================
+-- BHOP BOOST FIX:
+-- Original code only applied acceleration when `not grounded`.
+-- This meant that on ramps (where player is technically grounded)
+-- the bhop boost never kicked in. We now apply the acceleration
+-- value whenever bhop is active and either:
+--   * the player is airborne, OR
+--   * bhopGroundedBoost is enabled (so ramp boosts work).
+-- ============================================================
+if accelerationMethod == "Acceleration" then
+local isBhopActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
+local allowGroundedBoost = bhopGroundedBoost  -- when true, apply even when grounded (ramp boost)
+if isBhopActive and (not grounded or allowGroundedBoost) then
+local currentSpeed = getCurrentSpeed(self.Character)
+if autoAccelerationEnabled then
+if currentSpeed > maxAutoAccelSpeed then
+desiredFriction = maxAcceleration
+elseif currentSpeed < maxAutoAccelSpeed then
+desiredFriction = minAcceleration
+else
+desiredFriction = accelerationValue
+end
+else
+desiredFriction = accelerationValue
+end
+end
+end
+
+if desiredFriction ~= lastFriction then
+if desiredFriction ~= nil then
+MovementValueSet("Friction", desiredFriction)
+else
+MovementValueSet("Friction", defaultMovementValues.Friction)
+end
+lastFriction = desiredFriction
+end
+if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then
+self:AttemptJump()
+end
+if autoJumpEnabled and grounded then
+if autoJumpType == "Realistic" then
+self:AttemptJump()
+else
+humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+end
+end
+if bhopHoldEnabled and grounded and humanoid.Jump == true then
+self:AttemptJump()
+end
+end
+local function updateBhopEnabled()
+local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and accelerationMethod == "Acceleration"
+MovementValueSet("BhopEnabled", shouldEnable)
+end
+function ToggleBhop(state)
+autoJumpEnabled = state
+updateBhopEnabled()
+end
+function ToggleBhopHold(state)
+bhopHoldEnabled = state
+updateBhopEnabled()
+end
+function SetAccelerationMethod(method)
+accelerationMethod = method
+updateBhopEnabled()
+if not (autoJumpEnabled or bhopHoldEnabled) then
+MovementValueSet("Friction", defaultMovementValues.Friction)
+lastFriction = nil
+end
+end
+---------------------------------------------------------------------------------------------------------------------------
+
+
+function getDistanceFromPlayer(targetPosition)
+if not Character or not rootPart then return 0 end
+return (targetPosition - rootPart.Position).Magnitude
+end
+
+local function GetStatus(player)
+local character = player.Character
+if not character then
+return "DEAD"
+end
+
+local charData = CharacterService:GetCharacterFromPlayer(player)
+if charData and charData.DataRegistry:Get("Downed") then
+return "DOWNED"
+end
+
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+if humanoid and humanoid.Health > 0 then
+return "ALIVE"
+end
+
+return "DEAD"
+end
+
+local function isPlayerDowned(player)
+return GetStatus(player) == "DOWNED"
+end
+
+function startAntiAFK()
+AntiAFKConnection = LocalPlayer.Idled:Connect(function()
+VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+task.wait(1)
+VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+end
+
+function stopAntiAFK()
+if AntiAFKConnection then
+AntiAFKConnection:Disconnect()
+AntiAFKConnection = nil
+end
+end
+function stopNoFog()
+Lighting.FogEnd = originalFogEnd
+for _, atmosphere in pairs(originalAtmospheres) do
+if not atmosphere.Parent then
+local newAtmosphere = Instance.new("Atmosphere")
+for _, prop in pairs({"Density", "Offset", "Color", "Decay", "Glare", "Haze"}) do
+if atmosphere[prop] then
+newAtmosphere[prop] = atmosphere[prop]
+end
+end
+newAtmosphere.Parent = Lighting
+end
+end
+end
+
+
+if not workspace:FindFirstChild("SecurityPart") then
+SecurityPart = Instance.new("Part")
+SecurityPart.Name = "SecurityPart"
+SecurityPart.Size = Vector3.new(10, 1, 10)
+SecurityPart.Position = Vector3.new(50000, 50000, 50000)
+SecurityPart.Anchored = true
+SecurityPart.CanCollide = true
+SecurityPart.Parent = workspace
+end
+
+-- Auto Tab prep
+local changePlayerMode = ReplicatedStorage.Events.SetPlayerMode
+
+-- ======================= AUTO RESPAWN SYSTEM ============================
+-- New respawn features:
+--   * Auto Respawn on Death (toggle)
+--   * Respawn Delay (seconds, 0 = instant)
+--   * Instant Respawn (manual button)
+--   * Force Respawn (manual button, fires SetPlayerMode)
+-- ======================================================================
+local AutoRespawn = {
+Enabled = false,
+Delay = 0,
+LastFireTime = 0,
+DeathConn = nil,
+CharConn = nil,
+IsDead = false,
+}
+
+function AutoRespawn:IsDeadNow()
+local char = LocalPlayer.Character
+if not char then return true end
+local hum = char:FindFirstChildOfClass("Humanoid")
+if not hum then return true end
+if hum.Health <= 0 then return true end
+
+-- also check the death GUI (game-side death)
+local shared = PlayerGui:FindFirstChild("Shared")
+if shared then
+local respawn = shared:FindFirstChild("Respawn")
+if respawn then
+local types = respawn:FindFirstChild("Types")
+if types then
+local death = types:FindFirstChild("Death")
+if death and death.Visible then
+return true
+end
+end
+end
+end
+local menu = PlayerGui:FindFirstChild("Menu")
+if menu then return true end
+
+-- check downed state via charData
+local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+if charData and charData.DataRegistry:Get("Downed") then
+return false -- downed, not dead
+end
+
+return false
+end
+
+function AutoRespawn:FireRespawn()
+local now = tick()
+if now - self.LastFireTime < 0.5 then return end
+self.LastFireTime = now
+pcall(function()
+changePlayerMode:FireServer(true)
+end)
+end
+
+function AutoRespawn:Start()
+if self.Enabled then return end
+self.Enabled = true
+
+-- Watch death via Humanoid.Died
+self.DeathConn = RunService.Heartbeat:Connect(function()
+if not self.Enabled then return end
+local dead = self:IsDeadNow()
+if dead and not self.IsDead then
+self.IsDead = true
+task.delay(self.Delay, function()
+if not self.Enabled then return end
+if self:IsDeadNow() then
+self:FireRespawn()
+end
+end)
+elseif not dead and self.IsDead then
+self.IsDead = false
+end
+end)
+
+-- Reset state on new character
+self.CharConn = LocalPlayer.CharacterAdded:Connect(function()
+self.IsDead = false
+self.LastFireTime = 0
+end)
+end
+
+function AutoRespawn:Stop()
+self.Enabled = false
+self.IsDead = false
+if self.DeathConn then
+self.DeathConn:Disconnect()
+self.DeathConn = nil
+end
+if self.CharConn then
+self.CharConn:Disconnect()
+self.CharConn = nil
+end
+end
+
+-- ===================== PLAYER TAB (Movement Edition) =====================
+Tabs.Player:Section({ Title = "Player", TextSize = 40 })
+Tabs.Player:Divider()
+Tabs.Player:Section({Title="Movement Values", TextSize = 20})
+
+-- Jump Cap: NO value limit (NumbersOnly removed so any value is accepted)
+JumpCapInput = Tabs.Player:Input({
+Title="Jump Cap",
+Placeholder="1",
+Value="1",
+Callback = function(value)
+local n = tonumber(value)
+if n then
+MovementValueSet("JumpCap", n)
+end
+end
+})
+
+-- Air Strafe Acceleration: NO value limit
+AirStrafeAccelerationInput = Tabs.Player:Input({
+Title="Air Strafe Acceleration",
+Placeholder="182",
+Value="182",
+Callback = function(value)
+local n = tonumber(value)
+if n then
+MovementValueSet("AirStrafeAcceleration", n)
+end
+end
+})
+
+Tabs.Player:Space()
+Tabs.Player:Button({
+Title = "Reset Movement Values",
+Desc = "Reset JumpCap and AirStrafeAcceleration to defaults",
+Icon = "refresh-cw",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+MovementValueSet("JumpCap", defaultMovementValues.JumpCap)
+MovementValueSet("AirStrafeAcceleration", defaultMovementValues.AirStrafeAcceleration)
+if JumpCapInput then JumpCapInput:Set(tostring(defaultMovementValues.JumpCap)) end
+if AirStrafeAccelerationInput then AirStrafeAccelerationInput:Set(tostring(defaultMovementValues.AirStrafeAcceleration)) end
+WindUI:Notify({
+Title = "Movement Reset",
+Content = "Movement values reset to defaults",
+Duration = 3
+})
+end
+})
+
+-- =========================== AUTO TAB ===========================
+Tabs.Auto:Section({ Title = "Auto", TextSize = 40 })
+Tabs.Auto:Divider()
+
+-- =========================== BHOP SECTION ===========================
+Tabs.Auto:Section({Title="Bhop"})
+Tabs.Auto:Divider()
+
+BhopToggle = Tabs.Auto:Toggle({
+Title = "Bhop",
+Flag = "BhopToggle",
+Value = false,
+Callback = function(state)
+ToggleBhop(state)
+end
+})
+
+BhopHoldToggle = Tabs.Auto:Toggle({
+Title = "Bhop Hold Jump",
+Flag = "BhopHoldToggle",
+Value = false,
+Callback = function(state)
+ToggleBhopHold(state)
+end
+})
+
+AccelerationDropdown = Tabs.Auto:Dropdown({
+Title = "Bhop Mode",
+Flag = "AccelerationDropdown",
+Values = {"No Acceleration", "Acceleration"},
+Value = "Acceleration",
+Callback = function(value)
+SetAccelerationMethod(value)
+end
+})
+
+-- FIX: removed "Negative Only" restriction. Now any value (positive or negative) is accepted.
+AccelerationInput = Tabs.Auto:Input({
+Title = "Bhop Acceleration (Any Value)",
+Flag = "AccelerationInput",
+Placeholder = "-0.2",
+Value = "-0.2",
+Callback = function(value)
+local n = tonumber(value)
+if n then
+accelerationValue = n
+end
+end
+})
+
+AutoJumpTypeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Jump Mode",
+Flag = "AutoJumpTypeDropdown",
+Values = {"Simulation", "Realistic"},
+Value = "Simulation",
+Callback = function(value)
+autoJumpType = value
+end
+})
+
+AutoWallHop = Tabs.Auto:Toggle({
+Title = "Auto Wall Hop",
+Flag = "AutoWallHop",
+Value = false,
+Type = "Checkbox",
+Callback = function(state)
+AutowallHop = state
+end
+})
+
+-- Grounded Boost toggle: lets bhop acceleration apply even when grounded (ramp boost)
+BhopGroundedBoostToggle = Tabs.Auto:Toggle({
+Title = "Bhop Boost on Ground/Ramp",
+Flag = "BhopGroundedBoost",
+Desc = "Apply bhop acceleration even when grounded - enables boost on ramps",
+Value = true,
+Callback = function(state)
+bhopGroundedBoost = state
+end
+})
+
+ShowBunnyHopButtonToggle = Tabs.Auto:Toggle({
+Title = "Show Bhop Button",
+Flag = "ShowBunnyHopButton",
+Value = false,
+Callback = function(state)
+if ButtonLib and ButtonLib.BunnyHopToggle then
+ButtonLib.BunnyHopToggle:SetVisible(state)
+end
+end
+})
+
+ButtonLib.Create:Toggle({
+Text = "Bunny Hop",
+Flag = "BunnyHopToggle",
+Default = false,
+Visible = false,
+Callback = function(s)
+if BhopToggle then
+BhopToggle:Set(s)
+end
+end
+}).Position = UDim2.new(0.5, -125, 0.4, 0)
+
+-- =========================== AUTO ACCELERATION (Legit) ===========================
+Tabs.Auto:Section({Title="Auto Acceleration"})
+Tabs.Auto:Divider()
+
+AutoAccelerationToggle = Tabs.Auto:Toggle({
+Title = "Auto Acceleration (Legit)",
+Flag = "AutoAccelerationToggle",
+Value = false,
+Callback = function(state)
+autoAccelerationEnabled = state
+end
+})
+
+MaxAccelerationInput = Tabs.Auto:Input({
+Title = "Max Acceleration",
+Flag = "MaxAccelerationInput",
+Placeholder = "3",
+Value = "3",
+Callback = function(value)
+n = tonumber(value)
+if n then
+maxAcceleration = n
+end
+end
+})
+
+MinAccelerationInput = Tabs.Auto:Input({
+Title = "Min Acceleration",
+Flag = "MinAccelerationInput",
+Placeholder = "-1",
+Value = "-1",
+Callback = function(value)
+n = tonumber(value)
+if n then
+minAcceleration = n
+end
+end
+})
+
+MaxSpeedInput = Tabs.Auto:Input({
+Title = "Max Speed",
+Flag = "MaxSpeedInput",
+Placeholder = "70",
+Value = "70",
+Callback = function(value)
+n = tonumber(value)
+if n and n > 0 then
+maxAutoAccelSpeed = n
+end
+end
+})
+
+-- =========================== SELF REVIVE / RESPAWN SECTION ===========================
+Tabs.Auto:Space()
+Tabs.Auto:Section({Title="Self Revive & Respawn", TextSize = 20})
+Tabs.Auto:Divider()
+
+SelfRevive = {
+Method = "Spawnpoint",
+Enabled = false,
+HasRevived = false,
+LastSavedPosition = nil,
+IsProcessing = false,
+LastRespawnTime = 0,
+Connections = {
+Heartbeat = nil,
+Character = nil,
+}
+}
+
+function SelfRevive:Respawn()
+local now = tick()
+if now - SelfRevive.LastRespawnTime < 0.5 then
+return
+end
+SelfRevive.LastRespawnTime = now
+
+if SelfRevive.IsProcessing then
+return
+end
+
+local char = LocalPlayer.Character
+if not char then
+return
+end
+
+local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local isDowned = charData and charData.DataRegistry:Get("Downed")
+if not isDowned then
+return
+end
+
+SelfRevive.IsProcessing = true
+
+local hrp = char:FindFirstChild("HumanoidRootPart")
+
+if SelfRevive.Method == "Spawnpoint" then
+if not SelfRevive.HasRevived then
+self.HasRevived = true
+pcall(function()
+changePlayerMode:FireServer(true)
+end)
+SelfRevive.IsProcessing = false
+task.delay(10, function()
+self.HasRevived = false
+end)
+else
+SelfRevive.IsProcessing = false
+end
+elseif self.Method == "Fake Revive" then
+local savedPos = nil
+if hrp then
+savedPos = hrp.CFrame.Position
+end
+
+task.spawn(function()
+pcall(function()
+changePlayerMode:FireServer(true)
+end)
+
+local newCharacter
+repeat
+newCharacter = LocalPlayer.Character
+task.wait()
+until newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") and newCharacter ~= char
+
+if newCharacter then
+local newHRP = newCharacter:FindFirstChild("HumanoidRootPart")
+if savedPos and newHRP then
+task.wait(0.1)
+newHRP.CFrame = CFrame.new(savedPos + Vector3.new(0, 0, 0))
+end
+end
+
+SelfRevive.IsProcessing = false
+end)
+else
+SelfRevive.IsProcessing = false
+end
+end
+
+function SelfRevive:Start()
+if SelfRevive.Connections.Heartbeat then
+return
+end
+SelfRevive.Enabled = true
+
+SelfRevive.Connections.Heartbeat = RunService.Heartbeat:Connect(function()
+if not SelfRevive.Enabled then return end
+local char = LocalPlayer.Character
+if not char then return end
+
+local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+if charData and charData.DataRegistry:Get("Downed") then
+self:Respawn()
+end
+end)
+
+SelfRevive.Connections.Character = LocalPlayer.CharacterAdded:Connect(function(newChar)
+SelfRevive.HasRevived = false
+SelfRevive.IsProcessing = false
+SelfRevive.LastSavedPosition = nil
+end)
+end
+
+function SelfRevive:Stop()
+SelfRevive.Enabled = false
+SelfRevive.HasRevived = false
+SelfRevive.IsProcessing = false
+SelfRevive.LastSavedPosition = nil
+
+for name, conn in pairs(SelfRevive.Connections) do
+if conn then
+conn:Disconnect()
+SelfRevive.Connections[name] = nil
+end
+end
+end
+
+AutoSelfReviveToggle = Tabs.Auto:Toggle({
+Title = "Auto Self Revive",
+Flag = "AutoSelfReviveToggle",
+Value = false,
+Callback = function(state)
+if state then
+SelfRevive:Start()
+else
+SelfRevive:Stop()
+end
+end
+})
+
+SelfReviveMethodDropdown = Tabs.Auto:Dropdown({
+Title = "Self Revive Method",
+Flag = "SelfReviveMethodDropdown",
+Values = {"Spawnpoint", "Fake Revive"},
+Value = "Spawnpoint",
+Callback = function(value)
+SelfRevive.Method = value
+end
+})
+
+Tabs.Auto:Button({
+Title = "Manual Revive",
+Desc = "Manually revive yourself (when downed)",
+Icon = "heart",
+Callback = function()
+SelfRevive:Respawn()
+end
+})
+
+Tabs.Auto:Button({
+Title = "Force Respawn",
+Desc = "Force-fire SetPlayerMode to respawn immediately",
+Icon = "heart",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+changePlayerMode:FireServer(true)
+end
+})
+
+Tabs.Auto:Space()
+Tabs.Auto:Section({Title="Auto Respawn on Death", TextSize = 20})
+Tabs.Auto:Divider()
+
+AutoRespawnToggle = Tabs.Auto:Toggle({
+Title = "Auto Respawn on Death",
+Flag = "AutoRespawnToggle",
+Desc = "Automatically respawn when you die",
+Value = false,
+Callback = function(state)
+if state then
+AutoRespawn:Start()
+else
+AutoRespawn:Stop()
+end
+end
+})
+
+AutoRespawnDelayInput = Tabs.Auto:Input({
+Title = "Respawn Delay (seconds)",
+Flag = "AutoRespawnDelay",
+Placeholder = "0",
+Value = "0",
+Callback = function(value)
+local n = tonumber(value)
+if n and n >= 0 then
+AutoRespawn.Delay = n
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Instant Respawn",
+Desc = "Force respawn right now",
+Icon = "refresh-cw",
+Color = Color3.fromHex("#30FF6A"),
+Callback = function()
+AutoRespawn:FireRespawn()
+end
+})
+
+Tabs.Auto:Space()
+
+-- keep AntiAFK accessible in Auto tab
+AutoAFKToggle = Tabs.Auto:Toggle({
+Title = "Anti AFK",
+Flag = "AntiAFKToggle",
+Value = false,
+Callback = function(state)
+if state then
+startAntiAFK()
+else
+stopAntiAFK()
+end
+end
+})
+
+-- Visuals Tab
+Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
+Tabs.Visuals:Divider()
+local cameraStretchConnection
+function setupCameraStretch()
+cameraStretchConnection = nil
+local stretchHorizontal = 0.80
+local stretchVertical = 0.80
+CameraStretchToggle = Tabs.Visuals:Toggle({
+Title = "Camera Stretch",
+Flag = "CameraStretchToggle",
+Value = false,
+Callback = function(state)
+if state then
+if cameraStretchConnection then cameraStretchConnection:Disconnect() end
+cameraStretchConnection = game:GetService("RunService").RenderStepped:Connect(function()
+local Camera = workspace.CurrentCamera
+Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, stretchHorizontal, 0, 0, 0, stretchVertical, 0, 0, 0, 1)
+end)
+else
+if cameraStretchConnection then
+cameraStretchConnection:Disconnect()
+cameraStretchConnection = nil
+end
+end
+end
+})
+
+CameraStretchHorizontalInput = Tabs.Visuals:Input({
+Title = "Camera Stretch Horizontal",
+Flag = "CameraStretchHorizontalInput",
+Placeholder = "0.80",
+Numeric = true,
+Value = tostring(stretchHorizontal),
+Callback = function(value)
+local num = tonumber(value)
+if num then
+stretchHorizontal = num
+if cameraStretchConnection then
+cameraStretchConnection:Disconnect()
+cameraStretchConnection = game:GetService("RunService").RenderStepped:Connect(function()
+local Camera = workspace.CurrentCamera
+Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, stretchHorizontal, 0, 0, 0, stretchVertical, 0, 0, 0, 1)
+end)
+end
+end
+end
+})
+
+CameraStretchVerticalInput = Tabs.Visuals:Input({
+Title = "Camera Stretch Vertical",
+Flag = "CameraStretchVerticalInput",
+Placeholder = "0.80",
+Numeric = true,
+Value = tostring(stretchVertical),
+Callback = function(value)
+local num = tonumber(value)
+if num then
+stretchVertical = num
+if cameraStretchConnection then
+cameraStretchConnection:Disconnect()
+cameraStretchConnection = game:GetService("RunService").RenderStepped:Connect(function()
+local Camera = workspace.CurrentCamera
+Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, stretchHorizontal, 0, 0, 0, stretchVertical, 0, 0, 0, 1)
+end)
+end
+end
+end
+})
+end
+
+setupCameraStretch()
+Tabs.Visuals:Space()
+local fadeConnection = nil
+local fadeEnabled = false
+
+DisableFadeeffectToggle = Tabs.Visuals:Toggle({
+Title = "Disable Fade effect",
+Flag = "DisableFadeeffectToggle",
+Value = false,
+Callback = function(state)
+fadeEnabled = state
+
+if fadeConnection then
+fadeConnection:Disconnect()
+fadeConnection = nil
+end
+
+local coverScreen = PlayerGui:FindFirstChild("Shared")
+if coverScreen then
+coverScreen = coverScreen:FindFirstChild("Popups")
+if coverScreen then
+coverScreen = coverScreen:FindFirstChild("CoverScreen")
+end
+end
+
+if not coverScreen then return end
+
+if state then
+coverScreen.Visible = false
+fadeConnection = coverScreen:GetPropertyChangedSignal("Visible"):Connect(function()
+if fadeEnabled and coverScreen.Visible == true then
+coverScreen.Visible = false
+end
+end)
+else
+coverScreen.Visible = true
+end
+end
+})
+Tabs.Visuals:Space()
+FullBrightToggle = Tabs.Visuals:Toggle({
+Title = "Full Bright",
+Flag = "FullBrightToggle",
+Desc = "Ya Like drinking Night Vision while mining in da cave and sceard of creeper blow you up dawg?",
+Value = false,
+Callback = function(state)
+FullBright = state
+if state then originalBrightness = Lighting.Brightness
+originalAmbient = Lighting.Ambient
+originalOutdoorAmbient = Lighting.OutdoorAmbient
+originalColorShiftBottom = Lighting.ColorShift_Bottom
+originalColorShiftTop = Lighting.ColorShift_Top function applyFullBright()
+if Lighting.Brightness ~= 1 then
+Lighting.Brightness = 1
+end
+if Lighting.Ambient ~= Color3.new(1, 1, 1) then
+Lighting.Ambient = Color3.new(1, 1, 1)
+end
+if Lighting.OutdoorAmbient ~= Color3.new(1, 1, 1) then
+Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+end
+if Lighting.ColorShift_Bottom ~= Color3.new(1, 1, 1) then
+Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
+end
+if Lighting.ColorShift_Top ~= Color3.new(1, 1, 1) then
+Lighting.ColorShift_Top = Color3.new(1, 1, 1)
+end
+end applyFullBright() if fullBrightConnection then
+fullBrightConnection:Disconnect()
+end fullBrightConnection = RunService.Heartbeat:Connect(function()
+if FullBright then
+applyFullBright()
+end
+end) fullBrightCharConnection = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+task.wait(1)
+if FullBright then
+applyFullBright()
+end
+end) else
+if fullBrightConnection then
+fullBrightConnection:Disconnect()
+fullBrightConnection = nil
+end if fullBrightCharConnection then
+fullBrightCharConnection:Disconnect()
+fullBrightCharConnection = nil
+end if originalBrightness then
+Lighting.Brightness = originalBrightness
+Lighting.Ambient = originalAmbient
+Lighting.OutdoorAmbient = originalOutdoorAmbient
+Lighting.ColorShift_Bottom = originalColorShiftBottom
+Lighting.ColorShift_Top = originalColorShiftTop
+end
+end
+end
+})
+Tabs.Visuals:Space()
+
+NoFogToggle = Tabs.Visuals:Toggle({
+Title = "Remove Fog",
+Flag = "NoFogToggle",
+Value = false,
+Callback = function(state)
+NoFog = state
+if state then
+startNoFog()
+else
+stopNoFog()
+end
+end
+})
+local TimerGUI = nil
+local TimerEnabled = false
+local SpecialRoundEnabled = false
+local CurrentSpecialRoundName = ""
+local OriginalTimerVisible = false
+local CheckingGameTimer = false
+local _attributeConnection = nil
+local _attributeConnection2 = nil
+local _attributeConnection3 = nil
+
+function createTimerGUI()
+local RoundTimerTemplate = ReplicatedStorage.Assets.UI.Game.HUD.Overlay.RoundOverlay.RoundTimer.RoundTimer
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TimerGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+local Timer = Instance.new("Frame")
+Timer.Name = "Timer"
+Timer.BackgroundTransparency = 1
+Timer.Size = UDim2.new(1, 0, 1, 0)
+Timer.Parent = ScreenGui
+
+local Top = Instance.new("Frame")
+Top.Name = "Top"
+Top.AnchorPoint = Vector2.new(0.5, 0)
+Top.BackgroundTransparency = 1
+Top.Position = UDim2.new(0.5, 0, 0, 0)
+Top.Size = UDim2.new(1, 0, 1, 0)
+Top.Parent = Timer
+
+local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+AspectRatioConstraint.Parent = Top
+
+local SizeConstraint = Instance.new("UISizeConstraint")
+SizeConstraint.MaxSize = Vector2.new(900, 900)
+SizeConstraint.Parent = Top
+
+local MainTimer = RoundTimerTemplate:Clone()
+MainTimer.Name = "MainTimer"
+MainTimer.AnchorPoint = Vector2.new(0.5, 0)
+MainTimer.Position = UDim2.new(0.5, 0, 0.04, 0)
+MainTimer.Size = UDim2.new(0.25, 0, 0.1, 0)
+MainTimer.Parent = Top
+MainTimer.Visible = false
+
+local TimeDisplay = MainTimer:FindFirstChild("Timer")
+if not TimeDisplay then
+TimeDisplay = Instance.new("TextLabel")
+TimeDisplay.Name = "Timer"
+TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+TimeDisplay.Text = "0:00"
+TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255)
+TimeDisplay.TextScaled = true
+TimeDisplay.TextSize = 14
+TimeDisplay.TextStrokeTransparency = 0.95
+TimeDisplay.TextWrapped = true
+TimeDisplay.AnchorPoint = Vector2.new(0.5, 0.5)
+TimeDisplay.BackgroundTransparency = 1
+TimeDisplay.Position = UDim2.new(0.5, 0, 0.65, 0)
+TimeDisplay.Size = UDim2.new(0.5, 0, 0.5, 0)
+TimeDisplay.ZIndex = 3
+TimeDisplay.Parent = MainTimer
+local TimeStroke = Instance.new("UIStroke")
+TimeStroke.Thickness = 3
+TimeStroke.Transparency = 0.7
+TimeStroke.Parent = TimeDisplay
+local TimeGradient = Instance.new("UIGradient")
+TimeGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 194, 194))
+})
+TimeGradient.Rotation = 90
+TimeGradient.Parent = TimeDisplay
+end
+
+local StatusLabel = MainTimer:FindFirstChild("About")
+if not StatusLabel then
+StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "About"
+StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+StatusLabel.Text = "ROUND ACTIVE"
+StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255)
+StatusLabel.TextScaled = true
+StatusLabel.TextSize = 14
+StatusLabel.TextStrokeTransparency = 0.95
+StatusLabel.TextWrapped = true
+StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0.5, 0, 0.25, 0)
+StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0)
+StatusLabel.ZIndex = 3
+StatusLabel.Parent = MainTimer
+local StatusStroke = Instance.new("UIStroke")
+StatusStroke.Thickness = 2
+StatusStroke.Transparency = 0.7
+StatusStroke.Parent = StatusLabel
+local StatusGradient = Instance.new("UIGradient")
+StatusGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 194, 194))
+})
+StatusGradient.Rotation = 90
+StatusGradient.Parent = StatusLabel
+end
+
+local MainTimerStroke = MainTimer:FindFirstChildOfClass("UIStroke")
+if not MainTimerStroke then
+MainTimerStroke = Instance.new("UIStroke")
+MainTimerStroke.Transparency = 0.8
+MainTimerStroke.Parent = MainTimer
+end
+
+local MainTimerImage = MainTimer:FindFirstChildOfClass("ImageLabel")
+if not MainTimerImage then
+MainTimerImage = Instance.new("ImageLabel")
+MainTimerImage.Name = "Background"
+MainTimerImage.Image = "rbxassetid://196969716"
+MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21)
+MainTimerImage.ImageTransparency = 0.7
+MainTimerImage.AnchorPoint = Vector2.new(0.5, 0.5)
+MainTimerImage.BackgroundTransparency = 1
+MainTimerImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainTimerImage.Size = UDim2.new(1, 0, 1, 0)
+MainTimerImage.ZIndex = 0
+MainTimerImage.Parent = MainTimer
+local MainTimerImageCorner = Instance.new("UICorner")
+MainTimerImageCorner.CornerRadius = UDim.new(0, 4)
+MainTimerImageCorner.Parent = MainTimerImage
+end
+
+local SpecialRound = Instance.new("Frame")
+SpecialRound.Name = "SpecialRound"
+SpecialRound.AnchorPoint = Vector2.new(0.5, 0)
+SpecialRound.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+SpecialRound.BackgroundTransparency = 0.6
+SpecialRound.BorderSizePixel = 0
+SpecialRound.Position = UDim2.new(0.5, 0, 0.15, 0)
+SpecialRound.Size = UDim2.new(0.23, 0, 0.05, 0)
+SpecialRound.Parent = Top
+SpecialRound.Visible = false
+
+local SpecialRoundLabel = Instance.new("TextLabel")
+SpecialRoundLabel.Name = "Label"
+SpecialRoundLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+SpecialRoundLabel.Text = "No Data"
+SpecialRoundLabel.TextColor3 = Color3.fromRGB(255, 208, 115)
+SpecialRoundLabel.TextScaled = true
+SpecialRoundLabel.TextSize = 14
+SpecialRoundLabel.TextStrokeTransparency = 0.95
+SpecialRoundLabel.TextWrapped = true
+SpecialRoundLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+SpecialRoundLabel.BackgroundTransparency = 1
+SpecialRoundLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+SpecialRoundLabel.Size = UDim2.new(0.9, 0, 0.6, 0)
+SpecialRoundLabel.ZIndex = 3
+SpecialRoundLabel.Parent = SpecialRound
+
+local SpecialRoundStroke = Instance.new("UIStroke")
+SpecialRoundStroke.Thickness = 2
+SpecialRoundStroke.Transparency = 0.7
+SpecialRoundStroke.Parent = SpecialRoundLabel
+
+local SpecialRoundEmptyFrame = Instance.new("Frame")
+SpecialRoundEmptyFrame.AnchorPoint = Vector2.new(0, 0.5)
+SpecialRoundEmptyFrame.BackgroundTransparency = 1
+SpecialRoundEmptyFrame.Position = UDim2.new(0.775, 0, 0.6, 0)
+SpecialRoundEmptyFrame.Size = UDim2.new(0.225, 0, 0.45, 0)
+SpecialRoundEmptyFrame.Parent = SpecialRound
+
+local SpecialRoundListLayout = Instance.new("UIListLayout")
+SpecialRoundListLayout.FillDirection = Enum.FillDirection.Horizontal
+SpecialRoundListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+SpecialRoundListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SpecialRoundListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+SpecialRoundListLayout.Parent = SpecialRoundEmptyFrame
+
+local SpecialRoundCorner = Instance.new("UICorner")
+SpecialRoundCorner.CornerRadius = UDim.new(0, 4)
+SpecialRoundCorner.Parent = SpecialRound
+
+local SpecialRoundBackground = Instance.new("ImageLabel")
+SpecialRoundBackground.Name = "Background"
+SpecialRoundBackground.Image = "rbxassetid://196969716"
+SpecialRoundBackground.ImageColor3 = Color3.fromRGB(21, 21, 21)
+SpecialRoundBackground.ImageTransparency = 0.7
+SpecialRoundBackground.AnchorPoint = Vector2.new(0.5, 0.5)
+SpecialRoundBackground.BackgroundTransparency = 1
+SpecialRoundBackground.Position = UDim2.new(0.5, 0, 0.5, 0)
+SpecialRoundBackground.Size = UDim2.new(1, 0, 1, 0)
+SpecialRoundBackground.ZIndex = 0
+SpecialRoundBackground.Parent = SpecialRound
+
+local SpecialRoundBackgroundCorner = Instance.new("UICorner")
+SpecialRoundBackgroundCorner.CornerRadius = UDim.new(0, 4)
+SpecialRoundBackgroundCorner.Parent = SpecialRoundBackground
+
+local SpecialRoundUIStroke = Instance.new("UIStroke")
+SpecialRoundUIStroke.Transparency = 0.8
+SpecialRoundUIStroke.Parent = SpecialRound
+
+return {
+ScreenGui = ScreenGui,
+TimeDisplay = TimeDisplay,
+SpecialRoundLabel = SpecialRoundLabel,
+StatusLabel = StatusLabel,
+MainTimer = MainTimer,
+SpecialRound = SpecialRound,
+MainTimerStroke = MainTimerStroke,
+MainTimerImage = MainTimerImage
+}
+end
+
+function destroyTimerGUI()
+if TimerGUI then
+StopGameTimerCheck()
+StopAttributeMonitor()
+TimerGUI.ScreenGui:Destroy()
+TimerGUI = nil
+end
+TimerEnabled = false
+SpecialRoundEnabled = false
+end
+
+function ensureTimerGUI()
+if not TimerGUI then
+TimerGUI = createTimerGUI()
+end
+end
+
+function GetRoundTitle(roundName)
+if not roundName or roundName == "" then
+return ""
+end
+
+local specialRoundsFolder = ReplicatedStorage:FindFirstChild("Info")
+if not specialRoundsFolder then return roundName end
+
+specialRoundsFolder = specialRoundsFolder:FindFirstChild("SpecialRounds")
+if not specialRoundsFolder then return roundName end
+
+local roundModule = specialRoundsFolder:FindFirstChild(roundName)
+if not roundModule then return roundName end
+
+local success, moduleData = pcall(function()
+return require(roundModule)
+end)
+
+if success and moduleData and moduleData.Title then
+return moduleData.Title
+end
+
+return roundName
+end
+
+function SetTime(seconds)
+if not TimerGUI then return end
+if type(seconds) == "number" then
+local minutes = math.floor(seconds / 60)
+local remainingSeconds = math.floor(seconds % 60)
+TimerGUI.TimeDisplay.Text = string.format("%d:%02d", minutes, remainingSeconds)
+
+if seconds <= 5 then
+TimerGUI.TimeDisplay.TextColor3 = Color3.fromRGB(215, 100, 100)
+TimerGUI.StatusLabel.TextColor3 = Color3.fromRGB(215, 100, 100)
+if TimerGUI.MainTimerStroke then
+TimerGUI.MainTimerStroke.Color = Color3.fromRGB(255, 138, 138)
+end
+if TimerGUI.MainTimerImage then
+TimerGUI.MainTimerImage.ImageColor3 = Color3.fromRGB(255, 138, 138)
+end
+else
+TimerGUI.TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255)
+TimerGUI.StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255)
+if TimerGUI.MainTimerStroke then
+TimerGUI.MainTimerStroke.Color = Color3.fromRGB(165, 194, 255)
+end
+if TimerGUI.MainTimerImage then
+TimerGUI.MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21)
+end
+end
+else
+TimerGUI.TimeDisplay.Text = tostring(seconds)
+end
+end
+
+function SetSpecialRound(roundName)
+if not TimerGUI then return end
+if roundName and roundName ~= "" then
+CurrentSpecialRoundName = roundName
+local roundTitle = GetRoundTitle(roundName)
+TimerGUI.SpecialRoundLabel.Text = roundTitle
+TimerGUI.SpecialRound.Visible = SpecialRoundEnabled
+else
+CurrentSpecialRoundName = ""
+TimerGUI.SpecialRound.Visible = false
+end
+end
+
+function SetStatus(text)
+if not TimerGUI then return end
+TimerGUI.StatusLabel.Text = text:upper()
+end
+
+function SetTimerVisible(visible)
+TimerEnabled = visible
+OriginalTimerVisible = visible
+
+if CheckingGameTimer then
+CheckGameTimerVisibility()
+else
+if TimerGUI then
+TimerGUI.MainTimer.Visible = visible
+end
+end
+end
+
+function SetSpecialRoundVisible(visible)
+SpecialRoundEnabled = visible
+
+if TimerGUI and visible and CurrentSpecialRoundName ~= "" then
+TimerGUI.SpecialRound.Visible = true
+elseif TimerGUI then
+TimerGUI.SpecialRound.Visible = false
+end
+end
+
+function CheckGameTimerVisibility()
+if not TimerEnabled or not TimerGUI then
+if TimerGUI then TimerGUI.MainTimer.Visible = false end
+return
+end
+
+local hud = PlayerGui:FindFirstChild("Shared")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("HUD")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Overlay")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Default")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("RoundOverlay")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Round")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+local roundTimer = hud:FindFirstChild("RoundTimer")
+if not roundTimer then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+if roundTimer.Visible then
+TimerGUI.MainTimer.Visible = false
+else
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+end
+end
+
+function StartGameTimerCheck()
+if CheckingGameTimer then return end
+
+CheckingGameTimer = true
+
+spawn(function()
+while CheckingGameTimer do
+CheckGameTimerVisibility()
+wait(0.1)
+end
+end)
+end
+
+function StopGameTimerCheck()
+CheckingGameTimer = false
+if TimerGUI then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+end
+end
+
+function UpdateFromAttributes()
+local timerValue = ServerStateRegistryService.Registry.Time
+local specialRoundValue = ServerStateRegistryService.Registry.SpecialRound
+local roundStatus = ServerStateRegistryService.Registry.RoundStatus
+
+if timerValue and timerValue ~= -1 then
+SetTime(timerValue)
+end
+
+if roundStatus == 2 then
+SetStatus("Round Active")
+elseif roundStatus == 1 or 0 then
+SetStatus("Intermission")
+else
+SetStatus("nil")
+end
+
+if specialRoundValue and specialRoundValue ~= false then
+SetSpecialRound(tostring(specialRoundValue))
+else
+SetSpecialRound("")
+end
+end
+
+function StartAttributeMonitor()
+StopAttributeMonitor()
+
+local lastTimer = ServerStateRegistryService.Registry.Time
+local lastRoundStatus = ServerStateRegistryService.Registry.RoundStatus
+local lastSpecialRound = ServerStateRegistryService.Registry.SpecialRound
+
+_attributeConnection = RunService.Heartbeat:Connect(function()
+local currentTimer = ServerStateRegistryService.Registry.Time
+local currentRoundStatus = ServerStateRegistryService.Registry.RoundStatus
+local currentSpecialRound = ServerStateRegistryService.Registry.SpecialRound
+
+if currentTimer ~= lastTimer or currentRoundStatus ~= lastRoundStatus or currentSpecialRound ~= lastSpecialRound then
+lastTimer = currentTimer
+lastRoundStatus = currentRoundStatus
+lastSpecialRound = currentSpecialRound
+UpdateFromAttributes()
+end
+end)
+
+UpdateFromAttributes()
+end
+
+function StopAttributeMonitor()
+if _attributeConnection then
+_attributeConnection:Disconnect()
+_attributeConnection = nil
+end
+if _attributeConnection2 then
+_attributeConnection2:Disconnect()
+_attributeConnection2 = nil
+end
+if _attributeConnection3 then
+_attributeConnection3:Disconnect()
+_attributeConnection3 = nil
+end
+end
+
+function handleTimerToggles()
+local timerOn = TimerEnabled
+local specialOn = SpecialRoundEnabled
+
+if not timerOn and not specialOn then
+destroyTimerGUI()
+else
+ensureTimerGUI()
+if timerOn then
+SetTimerVisible(true)
+StartAttributeMonitor()
+StartGameTimerCheck()
+end
+if specialOn then
+SetSpecialRoundVisible(true)
+end
+end
+end
+Tabs.Visuals:Space()
+TimerDisplayToggle = Tabs.Visuals:Toggle({
+Title = "Timer Display",
+Flag = "TimerDisplayToggle",
+Value = false,
+Callback = function(state)
+TimerEnabled = state
+handleTimerToggles()
+end
+})
+Tabs.Visuals:Space()
+
+SpecialRoundToggle = Tabs.Visuals:Toggle({
+Title = "Special Round Display",
+Flag = "SpecialRoundToggle",
+Value = false,
+Callback = function(state)
+SpecialRoundEnabled = state
+handleTimerToggles()
+end
+})
+Tabs.Visuals:Space()
+local useCurrency = require(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency)
+local useProgression = require(ReplicatedStorage.Shared.UserData.ClientHooks.useProgression)
+local useEvent = require(ReplicatedStorage.Shared.UserData.ClientHooks.useEvent)
+
+local PlayerStatsEnabled = false
+local PlayerStats = nil
+local textLabels = {}
+local frontFrames = {}
+local observeConnections = {}
+function formatNumber(num)
+local str = tostring(math.floor(num))
+local formatted = ""
+local length = #str
+for i = 1, length do
+formatted = formatted .. str:sub(i, i)
+if (length - i) % 3 == 0 and i ~= length then
+formatted = formatted .. ","
+end
+end
+return formatted
+end
+
+function updateFrontFrameXSize(frame, textLabel)
+if not frame or not textLabel then return end
+local textBounds = textLabel.TextBounds
+frame.Size = UDim2.new(0, textBounds.X + 20, 1, 0)
+end
+
+function createResourceRow(name, defaultValue, textColor, iconAssetId, iconColor, layoutOrder, leftColumn)
+local container = Instance.new("Frame")
+container.Name = name
+container.BackgroundTransparency = 1
+container.Size = UDim2.fromScale(1, 1)
+container.LayoutOrder = layoutOrder
+container.Parent = leftColumn
+
+local background = Instance.new("ImageLabel")
+background.Name = "Background"
+background.BackgroundTransparency = 1
+background.Image = "rbxassetid://196969716"
+background.ImageColor3 = Color3.fromRGB(21, 21, 21)
+background.ImageTransparency = 0.4
+background.AnchorPoint = Vector2.new(0.5, 0.5)
+background.Position = UDim2.fromScale(0.5, 0.5)
+background.Size = UDim2.fromScale(1.25, 1.25)
+background.ZIndex = 1
+background.Parent = container
+
+local bgCorner = Instance.new("UICorner")
+bgCorner.CornerRadius = UDim.new(0, 4)
+bgCorner.Parent = background
+
+local icon = Instance.new("ImageLabel")
+icon.BackgroundTransparency = 1
+icon.Image = "rbxassetid://" .. iconAssetId
+if iconColor then
+icon.ImageColor3 = iconColor
+end
+icon.AnchorPoint = Vector2.new(0.5, 0.5)
+icon.Position = UDim2.fromScale(0.5, 0.5)
+icon.Size = UDim2.fromScale(0.8, 0.8)
+icon.ZIndex = 3
+icon.Parent = container
+
+local iconAspect = Instance.new("UIAspectRatioConstraint")
+iconAspect.Parent = icon
+
+local textLabel = Instance.new("TextLabel")
+textLabel.Name = "Value"
+textLabel.BackgroundTransparency = 1
+textLabel.Font = Enum.Font.GothamBold
+textLabel.Text = tostring(defaultValue)
+textLabel.TextColor3 = textColor
+textLabel.TextScaled = true
+textLabel.TextSize = 14
+textLabel.TextStrokeTransparency = 0.9
+textLabel.TextWrapped = true
+textLabel.TextXAlignment = Enum.TextXAlignment.Left
+textLabel.AnchorPoint = Vector2.new(0, 0.5)
+textLabel.Position = UDim2.new(1.3, 0, 0.5, 0)
+textLabel.Size = UDim2.new(6, 0, 0.8, 0)
+textLabel.ZIndex = 3
+textLabel.Parent = container
+
+textLabels[name] = textLabel
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Transparency = 0.5
+stroke.Parent = textLabel
+
+local clipLeft = Instance.new("Frame")
+clipLeft.BackgroundTransparency = 1
+clipLeft.ClipsDescendants = true
+clipLeft.Size = UDim2.fromScale(1, 1)
+clipLeft.ZIndex = 2
+clipLeft.Parent = container
+
+local leftEffect = Instance.new("Frame")
+leftEffect.BackgroundColor3 = Color3.new(0, 0, 0)
+leftEffect.BackgroundTransparency = 0.45
+leftEffect.Size = UDim2.new(2, 0, 1, 0)
+leftEffect.ZIndex = 2
+leftEffect.Parent = clipLeft
+
+local leftCorner = Instance.new("UICorner")
+leftCorner.CornerRadius = UDim.new(0, 4)
+leftCorner.Parent = leftEffect
+
+local clipFront = Instance.new("Frame")
+clipFront.Name = "Front"
+clipFront.BackgroundTransparency = 1
+clipFront.ClipsDescendants = true
+clipFront.Position = UDim2.new(1, 0, 0, 0)
+clipFront.Size = UDim2.new(0.5, 33, 1, 0)
+clipFront.ZIndex = 2
+clipFront.Parent = container
+
+local frontEffect = Instance.new("Frame")
+frontEffect.BackgroundColor3 = Color3.new(0, 0, 0)
+frontEffect.BackgroundTransparency = 0.9
+frontEffect.Position = UDim2.new(-1, 0, 0, 0)
+frontEffect.Size = UDim2.new(2, 0, 1, 0)
+frontEffect.ZIndex = 2
+frontEffect.Parent = clipFront
+
+local frontCorner = Instance.new("UICorner")
+frontCorner.CornerRadius = UDim.new(0, 4)
+frontCorner.Parent = frontEffect
+
+frontFrames[name] = {
+frame = clipFront,
+effect = frontEffect,
+textLabel = textLabel
+}
+
+task.spawn(function()
+task.wait()
+updateFrontFrameXSize(clipFront, textLabel)
+end)
+
+return textLabel
+end
+
+local function updateCurrencyUI()
+local allCurrencies = useCurrency.All()
+if textLabels["Tokens"] and allCurrencies["Tokens"] then
+textLabels["Tokens"].Text = formatNumber(allCurrencies["Tokens"])
+end
+if textLabels["Points"] and allCurrencies["Points"] then
+textLabels["Points"].Text = formatNumber(allCurrencies["Points"])
+end
+if textLabels["Survivals"] and allCurrencies["Survivals"] then
+textLabels["Survivals"].Text = formatNumber(allCurrencies["Survivals"])
+end
+if textLabels["Streak"] and allCurrencies["Streak"] then
+textLabels["Streak"].Text = formatNumber(allCurrencies["Streak"])
+end
+for _, data in pairs(frontFrames) do
+if data.frame and data.textLabel then
+updateFrontFrameXSize(data.frame, data.textLabel)
+end
+end
+end
+
+local function updateProgressionUI()
+if not PlayerStats then return end
+local level = useProgression.Level()
+local xp = useProgression.XP()
+local requiredXP = useProgression.RequiredXP() or (level * 100)
+local progress = useProgression.Progress() or 0
+
+PlayerStats.levelText.Text = "LEVEL " .. tostring(level)
+PlayerStats.expText.Text = formatNumber(xp) .. "/" .. formatNumber(requiredXP)
+PlayerStats.fill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+end
+
+local function updateEventUI()
+if textLabels["Tickets"] then
+textLabels["Tickets"].Text = formatNumber(useEvent.Balance())
+local data = frontFrames["Tickets"]
+if data and data.frame and data.textLabel then
+updateFrontFrameXSize(data.frame, data.textLabel)
+end
+end
+end
+
+function DisableScanData()
+PlayerStatsEnabled = false
+for _, disconnect in pairs(observeConnections) do
+if type(disconnect) == "function" then disconnect() end
+end
+observeConnections = {}
+if PlayerStats then
+PlayerStats.ScreenGui:Destroy()
+PlayerStats = nil
+end
+textLabels = {}
+frontFrames = {}
+end
+
+function EnableScanData()
+if PlayerStats then
+DisableScanData()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PlayerStats"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 333
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local views = Instance.new("Frame")
+views.Name = "Views"
+views.BackgroundTransparency = 1
+views.Size = UDim2.fromScale(1, 1)
+views.Position = UDim2.fromScale(0.5, 0.5)
+views.AnchorPoint = Vector2.new(0.5, 0.5)
+views.Parent = ScreenGui
+
+local defaultView = Instance.new("Frame")
+defaultView.Name = "Default"
+defaultView.BackgroundTransparency = 1
+defaultView.Size = UDim2.fromScale(1, 1)
+defaultView.Parent = views
+
+local bottom = Instance.new("Frame")
+bottom.Name = "Bottom"
+bottom.BackgroundTransparency = 1
+bottom.Position = UDim2.fromScale(0.01, 0.01)
+bottom.Size = UDim2.fromScale(0.98, 0.98)
+bottom.Parent = defaultView
+
+local aspectRatio = Instance.new("UIAspectRatioConstraint")
+aspectRatio.Parent = bottom
+
+local sizeConstraint = Instance.new("UISizeConstraint")
+sizeConstraint.MinSize = Vector2.new(450, 450)
+sizeConstraint.MaxSize = Vector2.new(700, 700)
+sizeConstraint.Parent = bottom
+
+local leftColumn = Instance.new("Frame")
+leftColumn.Name = "Left"
+leftColumn.BackgroundTransparency = 1
+leftColumn.Position = UDim2.new(0.004, 0, 0.06, 0)
+leftColumn.Size = UDim2.new(0.05, 0, 0.05, 0)
+leftColumn.Parent = bottom
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0.175, 0)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = leftColumn
+
+createResourceRow("Tokens", "0", Color3.fromRGB(163, 255, 87), "7149239101", Color3.fromRGB(163, 255, 87), 1, leftColumn)
+createResourceRow("Points", "0", Color3.new(1, 1, 1), "4648327306", nil, 2, leftColumn)
+createResourceRow("Survivals", "0", Color3.fromRGB(255, 188, 110), "88681516628510", Color3.fromRGB(255, 201, 162), 3, leftColumn)
+createResourceRow("Tickets", "0", Color3.fromRGB(255, 121, 121), "14478137255", Color3.fromRGB(255, 115, 115), 4, leftColumn)
+createResourceRow("Streak", "0", Color3.fromRGB(255, 217, 78), "13518130183", Color3.fromRGB(255, 217, 78), 5, leftColumn)
+
+local levelBar = Instance.new("Frame")
+levelBar.Name = "Level"
+levelBar.BackgroundColor3 = Color3.fromRGB(105, 138, 255)
+levelBar.BackgroundTransparency = 0.9
+levelBar.Position = UDim2.new(0, 4, 0, 4)
+levelBar.Size = UDim2.new(0.7, 0, 0.016, 0)
+levelBar.Parent = bottom
+
+local levelCorner = Instance.new("UICorner")
+levelCorner.CornerRadius = UDim.new(0.5, 0)
+levelCorner.Parent = levelBar
+
+local levelStroke = Instance.new("UIStroke")
+levelStroke.Thickness = 2
+levelStroke.Transparency = 0.5
+levelStroke.Parent = levelBar
+
+local barContainer = Instance.new("Frame")
+barContainer.Name = "Bar"
+barContainer.BackgroundTransparency = 1
+barContainer.ClipsDescendants = true
+barContainer.Size = UDim2.new(1, 0, 1, 0)
+barContainer.Parent = levelBar
+
+local fill = Instance.new("Frame")
+fill.BackgroundColor3 = Color3.fromRGB(105, 138, 255)
+fill.BackgroundTransparency = 0.2
+fill.Size = UDim2.new(0, 0, 1, 0)
+fill.ZIndex = 2
+fill.Parent = barContainer
+
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(0.5, 0)
+fillCorner.Parent = fill
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+ColorSequenceKeypoint.new(0.3149, Color3.fromRGB(241, 246, 249)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(168, 201, 222))
+})
+gradient.Rotation = 90
+gradient.Parent = fill
+
+local levelText = Instance.new("TextLabel")
+levelText.Name = "Level"
+levelText.BackgroundTransparency = 1
+levelText.Font = Enum.Font.GothamBold
+levelText.Text = "LEVEL 1"
+levelText.TextColor3 = Color3.fromRGB(105, 138, 255)
+levelText.TextScaled = true
+levelText.TextWrapped = true
+levelText.TextXAlignment = Enum.TextXAlignment.Left
+levelText.TextYAlignment = Enum.TextYAlignment.Bottom
+levelText.Position = UDim2.new(0, 0, 1.25, 0)
+levelText.Size = UDim2.new(0.5, 0, 1.5, 0)
+levelText.Parent = levelBar
+
+local levelTextStroke = Instance.new("UIStroke")
+levelTextStroke.Thickness = 2
+levelTextStroke.Transparency = 0.5
+levelTextStroke.Parent = levelText
+
+local expText = Instance.new("TextLabel")
+expText.Name = "Experience"
+expText.BackgroundTransparency = 1
+expText.Font = Enum.Font.GothamBold
+expText.Text = "0/100"
+expText.TextColor3 = Color3.fromRGB(105, 138, 255)
+expText.TextScaled = true
+expText.TextWrapped = true
+expText.TextXAlignment = Enum.TextXAlignment.Right
+expText.TextYAlignment = Enum.TextYAlignment.Bottom
+expText.AnchorPoint = Vector2.new(1, 0)
+expText.Position = UDim2.new(1, 0, 1.25, 0)
+expText.Size = UDim2.new(0.5, 0, 1.25, 0)
+expText.Parent = levelBar
+
+local expTextStroke = Instance.new("UIStroke")
+expTextStroke.Thickness = 2
+expTextStroke.Transparency = 0.5
+expTextStroke.Parent = expText
+
+PlayerStats = {
+ScreenGui = ScreenGui,
+levelText = levelText,
+expText = expText,
+fill = fill
+}
+
+PlayerStatsEnabled = true
+
+local currencyDisconnect = useCurrency.Observe(updateCurrencyUI)
+table.insert(observeConnections, currencyDisconnect)
+
+local progressionDisconnect = useProgression.Observe(updateProgressionUI)
+table.insert(observeConnections, progressionDisconnect)
+local eventDisconnect = useEvent.Observe(updateEventUI)
+table.insert(observeConnections, eventDisconnect)
+
+updateCurrencyUI()
+updateProgressionUI()
+updateEventUI()
+for name, data in pairs(frontFrames) do
+if data.textLabel then
+local conn = data.textLabel:GetPropertyChangedSignal("Text"):Connect(function()
+if PlayerStatsEnabled then
+updateFrontFrameXSize(data.frame, data.textLabel)
+end
+end)
+table.insert(observeConnections, function() conn:Disconnect() end)
+end
+end
+end
+PlayerStatsToggle = Tabs.Visuals:Toggle({
+Title = "Show Player Stats",
+Flag = "PlayerStatsToggle",
+Value = false,
+Callback = function(state)
+if state then
+EnableScanData()
+else
+DisableScanData()
+end
+end
+})
+local function scanDescendantsAsync(root, matchFolderName, targetName, callback)
+local stack = {}
+for _, child in ipairs(root:GetChildren()) do
+table.insert(stack, child)
+end
+
+local iterations = 0
+local found = nil
+
+local function step()
+while #stack > 0 do
+local node = table.remove(stack)
+if node:IsA("Folder") or node:IsA("Model") then
+if matchFolderName and node.Name == matchFolderName then
+local function findInFolder(folder, name)
+for _, child in ipairs(folder:GetChildren()) do
+if child.Name == name then return child end
+local result = findInFolder(child, name)
+if result then return result end
+end
+return nil
+end
+local innerResult = findInFolder(node, targetName)
+if innerResult then
+found = innerResult
+break
+end
+elseif not matchFolderName and node.Name == targetName then
+found = node
+break
+else
+for _, child in ipairs(node:GetChildren()) do
+table.insert(stack, child)
+end
+end
+end
+
+iterations = iterations + 1
+if iterations % 100 == 0 then
+task.wait()
+end
+end
+end
+
+coroutine.wrap(function()
+step()
+callback(found)
+end)()
+end
+
+do
+Tabs.Visuals:Section({ Title = "Cosmetics Changer", TextSize = 20 })
+Tabs.Visuals:Divider()
+
+local cosSwaps = {}
+local curCos = ""
+local newCos = ""
+
+local function swapCosmetics(current, target, onComplete)
+if current == "" or target == "" or current == target then
+onComplete(false)
+return
+end
+
+local key = current .. "_" .. target
+if cosSwaps[key] then
+local old = cosSwaps[key]
+swapCosmetics(old.target, old.current, function() end)
+cosSwaps[key] = nil
+end
+
+local items = ReplicatedStorage:FindFirstChild("Items")
+if not items then
+onComplete(false)
+return
+end
+
+local curFound, tarFound = nil, nil
+
+local function checkDone()
+if curFound and tarFound then
+local cur = curFound
+local tar = tarFound
+
+local temp = Instance.new("Folder")
+temp.Name = "__temp_cos_swap_" .. tostring(tick())
+temp.Parent = ReplicatedStorage or workspace
+
+local curChildren = {}
+local tarChildren = {}
+for _, child in ipairs(cur:GetChildren()) do table.insert(curChildren, child) end
+for _, child in ipairs(tar:GetChildren()) do table.insert(tarChildren, child) end
+
+for _, child in ipairs(curChildren) do child.Parent = temp end
+for _, child in ipairs(tarChildren) do child.Parent = cur end
+for _, child in ipairs(temp:GetChildren()) do child.Parent = tar end
+
+temp:Destroy()
+cosSwaps[key] = { current = current, target = target }
+onComplete(true)
+end
+end
+
+scanDescendantsAsync(items, "Cosmetics", current, function(result)
+curFound = result
+checkDone()
+end)
+
+scanDescendantsAsync(items, "Cosmetics", target, function(result)
+tarFound = result
+checkDone()
+end)
+end
+
+local function resetAllCosmetics(onComplete)
+local list = {}
+for k, v in pairs(cosSwaps) do table.insert(list, v) end
+local count = #list
+if count == 0 then
+onComplete()
+return
+end
+local done = 0
+for _, v in ipairs(list) do
+swapCosmetics(v.target, v.current, function()
+done = done + 1
+if done == count then
+cosSwaps = {}
+onComplete()
+end
+end)
+end
+end
+
+Tabs.Visuals:Input({
+Title = "Current Cosmetic Name",
+Placeholder = "",
+Callback = function(v) curCos = v end
+})
+
+Tabs.Visuals:Input({
+Title = "New Cosmetic Name",
+Placeholder = "",
+Callback = function(v) newCos = v end
+})
+
+Tabs.Visuals:Button({
+Title = "Swap Cosmetics",
+Icon = "refresh-cw",
+Callback = function()
+task.spawn(function()
+swapCosmetics(curCos, newCos, function(success)
+if success then
+WindUI:Notify({
+Title = "Cosmetics Swap",
+Content = '<font color="#00ff88"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-check</font> Swapped \'' .. curCos .. '\' with \'' .. newCos .. '\'</font>',
+Duration = 3
+})
+else
+WindUI:Notify({
+Title = "Swap Failed",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Check names – case‑sensitive</font>',
+Duration = 3
+})
+end
+end)
+end)
+end
+})
+
+Tabs.Visuals:Button({
+Title = "Reset Cosmetics",
+Icon = "trash-2",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+task.spawn(function()
+resetAllCosmetics(function()
+WindUI:Notify({
+Title = "Reset Cosmetics",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">trash-can</font>Your Cosmetics Have been Reset To deafult Parent</font>',
+Duration = 3
+})
+end)
+end)
+end
+})
+end
+
+do
+Tabs.Visuals:Section({ Title = "Emote Changer", TextSize = 20 })
+Tabs.Visuals:Divider()
+
+local currentEmotes = {}
+local selectEmotes = {}
+local emoteReplacements = {}
+local hookActive = false
+local lastEmoteName = nil
+
+local ReplicatedStorage = ReplicatedStorage
+local Registry = require(ReplicatedStorage.Items.Registry)
+
+local function setEmote(emoteID)
+if not emoteID then return end
+local player = game.Players.LocalPlayer
+local character = player.Character
+if not character then return end
+local tagValue = character:GetAttribute("Tag")
+if not tagValue then return end
+local tagBuf = buffer.create(2)
+buffer.writeu16(tagBuf, 0, tagValue)
+firesignal(ReplicatedStorage.Events.UpdateCharacterDataRegistry.OnClientEvent, {
+buffer.fromstring("\24\1"),
+emoteID,
+tagBuf
+})
+end
+
+for i = 1, 12 do
+currentEmotes[i] = ""
+selectEmotes[i] = ""
+end
+
+for i = 1, 12 do
+Tabs.Visuals:Input({
+Title = "Current Emote " .. i,
+Placeholder = "Enter emote name or ID",
+Callback = function(v) 
+currentEmotes[i] = v:gsub("%s+", "")
+end
+})
+end
+
+Tabs.Visuals:Divider()
+
+for i = 1, 12 do
+Tabs.Visuals:Input({
+Title = "Select Emote " .. i,
+Placeholder = "Enter emote name or ID",
+Callback = function(v) 
+selectEmotes[i] = v:gsub("%s+", "")
+end
+})
+end
+
+local function getAllEmotes()
+local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
+if not itemsFolder then return {} end
+
+local allEmotes = {}
+local function findEmotesFolders(parent)
+for _, child in ipairs(parent:GetChildren()) do
+if child:IsA("Folder") then
+if child.Name == "Emotes" then
+for _, emote in ipairs(child:GetChildren()) do
+if emote:IsA("ModuleScript") and emote:GetAttribute("ID") then
+table.insert(allEmotes, {Name = emote.Name, ID = emote:GetAttribute("ID")})
+end
+end
+else
+findEmotesFolders(child)
+end
+end
+end
+end
+findEmotesFolders(itemsFolder)
+return allEmotes
+end
+
+local function findEmoteInfo(emoteInput)
+if emoteInput == "" then return nil end
+
+local id = tonumber(emoteInput)
+if id then
+local config = Registry.GetConfig(id)
+if config then
+local allEmotes = getAllEmotes()
+for _, e in ipairs(allEmotes) do
+if e.ID == id then
+return {Name = e.Name, ID = id}
+end
+end
+return {Name = tostring(id), ID = id}
+else
+return nil
+end
+end
+local allEmotes = getAllEmotes()
+for _, emote in ipairs(allEmotes) do
+if emote.Name:lower() == emoteInput:lower() then
+return {Name = emote.Name, ID = emote.ID}
+end
+end
+return nil
+end
+
+local function buildEmoteMapping()
+emoteReplacements = {}
+for i = 1, 12 do
+local currentInput = currentEmotes[i] or ""
+local selectInput = selectEmotes[i] or ""
+if currentInput ~= "" and selectInput ~= "" then
+local currentInfo = findEmoteInfo(currentInput)
+local selectInfo = findEmoteInfo(selectInput)
+if currentInfo and selectInfo then
+emoteReplacements[currentInfo.Name] = {
+select = selectInfo.Name,
+selectID = selectInfo.ID,
+slot = i
+}
+end
+end
+end
+end
+
+local EmoteClass = require(ReplicatedStorage.Objects.Items.Emote)
+local origActivate = EmoteClass.Activate
+local origDeactivate = EmoteClass.Deactivate
+
+local function startEmoteWatcher()
+if hookActive then return end
+hookActive = true
+
+EmoteClass.Activate = function(self, p2, p3)
+origActivate(self, p2, p3)
+local anim = self.Animations and self.Animations.Animation
+if anim and anim.IsPlaying and anim.Speed > 0 then
+local module = self.EmoteModule
+local currentEmote = module and module.Name or "Unknown"
+if currentEmote ~= lastEmoteName then
+if emoteReplacements[currentEmote] then
+local replacement = emoteReplacements[currentEmote]
+local selectID = replacement.selectID
+if selectID then
+lastEmoteName = currentEmote
+setEmote(selectID)
+end
+end
+lastEmoteName = currentEmote
+end
+end
+end
+
+EmoteClass.Deactivate = function(self, ...)
+origDeactivate(self, ...)
+lastEmoteName = nil
+end
+end
+
+local function stopEmoteWatcher()
+hookActive = false
+EmoteClass.Activate = origActivate
+EmoteClass.Deactivate = origDeactivate
+lastEmoteName = nil
+end
+
+VisualsEmoteApply = Tabs.Visuals:Button({
+Title = "Apply Emote Mappings",
+Icon = "refresh-cw",
+Callback = function()
+local hasAnyEmote = false
+local incompleteSlots = {}
+local emptySlots = true
+
+for i = 1, 12 do
+local current = currentEmotes[i] or ""
+local select = selectEmotes[i] or ""
+if current ~= "" or select ~= "" then
+emptySlots = false
+if current ~= "" and select == "" then
+table.insert(incompleteSlots, string.format("Slot %d: Current set, Select missing", i))
+elseif current == "" and select ~= "" then
+table.insert(incompleteSlots, string.format("Slot %d: Select set, Current missing", i))
+else
+hasAnyEmote = true
+end
+end
+end
+
+if emptySlots then
+WindUI:Notify({
+Title = "Emote Changer",
+Content = '<font color="#ffaa00"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">triangle-exclamation</font> No emote fields are filled. Please enter at least one Current and Select pair.</font>',
+Duration = 5
+})
+return
+end
+
+if #incompleteSlots > 0 then
+local msg = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Failed to Apply Emote:</font>'
+for _, err in ipairs(incompleteSlots) do
+msg = msg .. '\n<font color="#ffaa00">' .. err .. '</font>'
+end
+WindUI:Notify({
+Title = "Emote Changer Error",
+Content = msg,
+Duration = 8
+})
+return
+end
+
+local allEmotes = getAllEmotes()
+buildEmoteMapping()
+
+local validMappings = 0
+local messages = {}
+
+for i = 1, 12 do
+local currentInput = currentEmotes[i] or ""
+local selectInput = selectEmotes[i] or ""
+if currentInput ~= "" and selectInput ~= "" then
+local currentInfo = findEmoteInfo(currentInput)
+local selectInfo = findEmoteInfo(selectInput)
+if currentInfo and selectInfo then
+validMappings = validMappings + 1
+table.insert(messages, string.format(
+'<font color="#00ff88"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-check</font> Slot %d:</font> <b>%s</b> <font color="#88ccff">→</font> <b>%s</b>',
+i, currentInfo.Name, selectInfo.Name
+))
+else
+local errors = {}
+if not currentInfo then
+errors[#errors+1] = string.format('<font color="#ff6666">Current "%s" not found</font>', currentInput)
+end
+if not selectInfo then
+errors[#errors+1] = string.format('<font color="#ff6666">Select "%s" not found</font>', selectInput)
+end
+table.insert(messages, string.format(
+'<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Slot %d:</font> %s',
+i, table.concat(errors, ", ")
+))
+end
+end
+end
+
+if validMappings == 0 then
+table.insert(messages, 1, '<font color="#ffaa00"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">triangle-exclamation</font> No valid emote mappings found.</font>')
+WindUI:Notify({
+Title = "Emote Changer Error",
+Content = table.concat(messages, "\n"),
+Duration = 8
+})
+return
+end
+
+stopEmoteWatcher()
+task.wait(0.1)
+startEmoteWatcher()
+
+table.insert(messages, 1, string.format(
+'<font color="#00ff88"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-check</font> %d emote mapping%s applied.</font>',
+validMappings, validMappings > 1 and "s" or ""
+))
+WindUI:Notify({
+Title = "Emote Changer",
+Content = table.concat(messages, "\n"),
+Duration = 8
+})
+end
+})
+
+VisualsEmoteReset = Tabs.Visuals:Button({
+Title = "Reset Emote Mappings",
+Icon = "trash-2",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+stopEmoteWatcher()
+emoteReplacements = {}
+
+for i = 1, 12 do
+currentEmotes[i] = ""
+selectEmotes[i] = ""
+end
+
+WindUI:Notify({
+Title = "Emote Changer",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">trash-can</font> All emote mappings have been reset.</font>',
+Duration = 3
+})
+end
+})
+end
+
+do
+Tabs.Visuals:Section({ Title = "Deployment Skin Changer", TextSize = 20 })
+Tabs.Visuals:Divider()
+
+local swaps = {}
+local curName = ""
+local newName = ""
+local deployType = ""
+
+local function findDeployment(type, name, callback)
+local packs = ReplicatedStorage:FindFirstChild("Items")
+if packs then packs = packs:FindFirstChild("ItemPacks") end
+if not packs then
+callback(nil)
+return
+end
+
+scanDescendantsAsync(packs, "Skins", nil, function(skinsFolder)
+if not skinsFolder then
+callback(nil)
+return
+end
+local deployables = skinsFolder:FindFirstChild("Deployables")
+if deployables then
+local typeFolder = deployables:FindFirstChild(type)
+if typeFolder then
+local folder = typeFolder:FindFirstChild(name)
+callback(folder)
+return
+end
+end
+callback(nil)
+end)
+end
+
+local function swap(type, current, target, onComplete)
+if type == "" or current == "" or target == "" or current == target then
+onComplete(false)
+return
+end
+
+local key = type .. "_" .. current
+if swaps[key] then
+local old = swaps[key]
+swap(type, old.target, old.current, function() end)
+swaps[key] = nil
+end
+
+local curFound, tarFound = nil, nil
+
+local function checkDone()
+if curFound and tarFound then
+local cur = curFound
+local tar = tarFound
+
+local temp = Instance.new("Folder")
+temp.Name = "__temp_swap_" .. tostring(tick())
+temp.Parent = ReplicatedStorage or workspace
+
+local curChildren = {}
+local tarChildren = {}
+for _, child in ipairs(cur:GetChildren()) do table.insert(curChildren, child) end
+for _, child in ipairs(tar:GetChildren()) do table.insert(tarChildren, child) end
+
+for _, child in ipairs(curChildren) do child.Parent = temp end
+for _, child in ipairs(tarChildren) do child.Parent = cur end
+for _, child in ipairs(temp:GetChildren()) do child.Parent = tar end
+
+temp:Destroy()
+swaps[key] = { type = type, current = current, target = target }
+onComplete(true)
+end
+end
+
+findDeployment(type, current, function(result)
+curFound = result
+checkDone()
+end)
+
+findDeployment(type, target, function(result)
+tarFound = result
+checkDone()
+end)
+end
+
+local function revertAll(onComplete)
+local list = {}
+for k, v in pairs(swaps) do table.insert(list, v) end
+local count = #list
+if count == 0 then
+onComplete()
+return
+end
+local done = 0
+for _, v in ipairs(list) do
+swap(v.type, v.target, v.current, function()
+done = done + 1
+if done == count then
+swaps = {}
+onComplete()
+end
+end)
+end
+end
+
+Tabs.Visuals:Input({
+Title = "Deployment Type",
+Placeholder = "",
+Value = "",
+Callback = function(v) if v ~= "" then deployType = v end end
+})
+
+Tabs.Visuals:Input({
+Title = "Current Deployment",
+Placeholder = "",
+Callback = function(v) curName = v end
+})
+
+Tabs.Visuals:Input({
+Title = "New Deployment",
+Placeholder = "",
+Callback = function(v) newName = v end
+})
+
+Tabs.Visuals:Button({
+Title = "Swap Skin",
+Icon = "refresh-cw",
+Callback = function()
+task.spawn(function()
+swap(deployType, curName, newName, function(success)
+if success then
+WindUI:Notify({
+Title = "Full Swap",
+Content = '<font color="#00ff88"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-check</font> Swapped \'' .. curName .. '\' with \'' .. newName .. '\'</font>',
+Duration = 3
+})
+else
+WindUI:Notify({
+Title = "Swap Failed",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Check names and type</font>',
+Duration = 3
+})
+end
+end)
+end)
+end
+})
+
+Tabs.Visuals:Button({
+Title = "Reset",
+Icon = "trash-2",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+task.spawn(function()
+revertAll(function()
+WindUI:Notify({
+Title = "Reverted",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">trash-can</font>All Deployment Skin Have been Reset</font>',
+Duration = 3
+})
+end)
+end)
+end
+})
+end
+
+do
+Tabs.Visuals:Section({ Title = "Tools Skin Changer", TextSize = 20 })
+Tabs.Visuals:Divider()
+
+local ToolSkinSawps = {}
+local activeToolsSwaps = {}
+local currentToolInput = ""
+local currentSkinInput = ""
+local selectedSkinInput = ""
+
+local function normalizeString(str)
+return str:gsub("%s+", ""):lower()
+end
+
+local function isValidTool(toolName)
+local tools = ReplicatedStorage:FindFirstChild("Tools")
+if not tools then return false end
+local tool = tools:FindFirstChild(toolName)
+if not tool then return false end
+local variants = tool:FindFirstChild("Variants")
+if not variants then return false end
+return true, tool, variants
+end
+
+local function isValidSkin(toolName, skinName)
+local toolValid, tool, variants = isValidTool(toolName)
+if not toolValid then return false end
+local skin = variants:FindFirstChild(skinName)
+if not skin then return false end
+return true, tool, variants, skin
+end
+
+local function revertSkinSwap(toolName, currentSkinName, selectedSkinName)
+local key = toolName .. "_" .. currentSkinName
+if not activeToolsSwaps[key] then return false end
+
+local currentValid, currentTool, currentVariants, currentSkin = isValidSkin(toolName, currentSkinName)
+local selectedValid, selectedTool, selectedVariants, selectedSkin = isValidSkin(toolName, selectedSkinName)
+
+if currentValid and selectedValid then
+pcall(function()
+local tempRoot = Instance.new("Folder")
+tempRoot.Name = "__temp_skin_revert_" .. tostring(tick()):gsub("%.", "_")
+tempRoot.Parent = currentVariants
+
+local tempCurrent = Instance.new("Folder")
+tempCurrent.Name = "tempCurrent"
+tempCurrent.Parent = tempRoot
+
+local tempSelected = Instance.new("Folder")
+tempSelected.Name = "tempSelected"
+tempSelected.Parent = tempRoot
+
+for _, child in ipairs(currentSkin:GetChildren()) do
+child.Parent = tempCurrent
+end
+
+for _, child in ipairs(selectedSkin:GetChildren()) do
+child.Parent = tempSelected
+end
+
+for _, child in ipairs(tempCurrent:GetChildren()) do
+child.Parent = selectedSkin
+end
+
+for _, child in ipairs(tempSelected:GetChildren()) do
+child.Parent = currentSkin
+end
+
+tempRoot:Destroy()
+end)
+end
+
+activeToolsSwaps[key] = nil
+return true
+end
+
+local function revertAllToolSkinSawps()
+local swapsToRevert = {}
+for key, swapData in pairs(activeToolsSwaps) do
+table.insert(swapsToRevert, swapData)
+end
+
+for _, swapData in ipairs(swapsToRevert) do
+revertSkinSwap(swapData.toolName, swapData.currentSkin, swapData.selectedSkin)
+end
+
+ToolSkinSawps = {}
+activeToolsSwaps = {}
+end
+
+local function swapSkins(toolName, currentSkinName, selectedSkinName)
+local currentNorm = normalizeString(currentSkinName)
+local selectedNorm = normalizeString(selectedSkinName)
+
+if toolName == "" or currentNorm == "" or selectedNorm == "" then
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#ffaa00"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">triangle-exclamation</font> All fields must be filled</font>',
+Duration = 3
+})
+return false
+end
+
+if currentNorm == selectedNorm then
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#ffaa00"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">triangle-exclamation</font> Skin names cannot be the same</font>',
+Duration = 3
+})
+return false
+end
+
+local currentValid, currentTool, currentVariants, currentSkin = isValidSkin(toolName, currentSkinName)
+local selectedValid, selectedTool, selectedVariants, selectedSkin = isValidSkin(toolName, selectedSkinName)
+
+if not currentValid then
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Current skin not found: ' .. currentSkinName .. '</font>',
+Duration = 3
+})
+return false
+end
+
+if not selectedValid then
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-x</font> Selected skin not found: ' .. selectedSkinName .. '</font>',
+Duration = 3
+})
+return false
+end
+
+local key = toolName .. "_" .. currentSkinName
+
+if activeToolsSwaps[key] then
+revertSkinSwap(toolName, currentSkinName, activeToolsSwaps[key].selectedSkin)
+end
+
+pcall(function()
+local tempRoot = Instance.new("Folder")
+tempRoot.Name = "__temp_skin_swap_" .. tostring(tick()):gsub("%.", "_")
+tempRoot.Parent = currentVariants
+
+local tempCurrent = Instance.new("Folder")
+tempCurrent.Name = "tempCurrent"
+tempCurrent.Parent = tempRoot
+
+local tempSelected = Instance.new("Folder")
+tempSelected.Name = "tempSelected"
+tempSelected.Parent = tempRoot
+
+for _, child in ipairs(currentSkin:GetChildren()) do
+child.Parent = tempCurrent
+end
+
+for _, child in ipairs(selectedSkin:GetChildren()) do
+child.Parent = tempSelected
+end
+
+for _, child in ipairs(tempCurrent:GetChildren()) do
+child.Parent = selectedSkin
+end
+
+for _, child in ipairs(tempSelected:GetChildren()) do
+child.Parent = currentSkin
+end
+
+tempRoot:Destroy()
+
+local swapData = {
+toolName = toolName,
+currentSkin = currentSkinName,
+selectedSkin = selectedSkinName
+}
+
+activeToolsSwaps[key] = swapData
+
+local found = false
+for i, swap in ipairs(ToolSkinSawps) do
+if swap.toolName == toolName and swap.currentSkin == currentSkinName then
+ToolSkinSawps[i] = swapData
+found = true
+break
+end
+end
+
+if not found then
+table.insert(ToolSkinSawps, swapData)
+end
+
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#00ff88"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">circle-check</font> Successfully swapped ' .. currentSkinName .. ' with ' .. selectedSkinName .. ' for ' .. toolName .. '</font>',
+Duration = 3
+})
+end)
+
+return true
+end
+
+Tabs.Visuals:Input({
+Title = "Tool Name",
+Placeholder = "Enter tool name",
+Callback = function(value)
+currentToolInput = value
+end
+})
+
+Tabs.Visuals:Input({
+Title = "Current Skin",
+Placeholder = "Enter current skin name",
+Callback = function(value)
+currentSkinInput = value
+end
+})
+
+Tabs.Visuals:Input({
+Title = "New Skin",
+Placeholder = "Enter new skin name",
+Callback = function(value)
+selectedSkinInput = value
+end
+})
+
+Tabs.Visuals:Button({
+Title = "Replace Skin Swap",
+Icon = "refresh-cw",
+Callback = function()
+swapSkins(currentToolInput, currentSkinInput, selectedSkinInput)
+end
+})
+
+Tabs.Visuals:Button({
+Title = "Reset All Skins",
+Icon = "trash-2",
+Color = Color3.fromHex("#FF3030"),
+Desc = "Revert all skin swaps",
+Callback = function()
+revertAllToolSkinSawps()
+WindUI:Notify({
+Title = "Skin Changer",
+Content = '<font color="#ff3030"><font family="rbxasset://LuaPackages/Packages/_Index/BuilderIcons/BuilderIcons/BuilderIcons.json" weight="Regular">trash-can</font> All skins have been reset to original</font>',
+Duration = 3
+})
+end
+})
+end
+Tabs.Visuals:Space()
+
+-- =========================== SETTINGS TAB (Minimal) ===========================
+Tabs.Settings:Section({ Title = "Settings", TextSize = 40 })
+Tabs.Settings:Section({ Title = "Config Manager", TextSize = 20 })
+Tabs.Settings:Divider()
+
+-- Services
+local ConfigManager = Window.ConfigManager
+local CurrentConfigName = "default"
+
+if ConfigManager then
+-- Ensure a default config exists
+local allConfigs = ConfigManager:AllConfigs() or {}
+if not table.find(allConfigs, "default") then
+local defaultConfig = ConfigManager:Config("default")
+if defaultConfig and defaultConfig.Save then
+defaultConfig:Save()
+end
+end
+
+Window.CurrentConfig = ConfigManager:Config(CurrentConfigName)
+
+Tabs.Settings:Input({
+Title = "Config Name",
+Placeholder = "default",
+Value = CurrentConfigName,
+Callback = function(value)
+CurrentConfigName = value or "default"
+end
+})
+
+Tabs.Settings:Button({
+Title = "Save Config",
+Icon = "save",
+Color = Color3.fromHex("#30FF6A"),
+Callback = function()
+if not ConfigManager then return end
+Window.CurrentConfig = ConfigManager:Config(CurrentConfigName)
+local success = Window.CurrentConfig:Save()
+WindUI:Notify({
+Title = success and "Config Saved" or "Save Failed",
+Content = success and ("Config '" .. CurrentConfigName .. "' saved") or "Could not save config",
+Duration = 3
+})
+end
+})
+
+Tabs.Settings:Button({
+Title = "Load Config",
+Icon = "folder-open",
+Color = Color3.fromHex("#30a4ff"),
+Callback = function()
+if not ConfigManager then return end
+Window.CurrentConfig = ConfigManager:Config(CurrentConfigName)
+local success = Window.CurrentConfig:Load()
+WindUI:Notify({
+Title = success and "Config Loaded" or "Load Failed",
+Content = success and ("Config '" .. CurrentConfigName .. "' loaded") or "Could not load config",
+Duration = 3
+})
+end
+})
+
+Tabs.Settings:Button({
+Title = "Delete Config",
+Icon = "trash",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+if not ConfigManager then return end
+local success = ConfigManager:DeleteConfig(CurrentConfigName)
+WindUI:Notify({
+Title = success and "Config Deleted" or "Delete Failed",
+Content = success and ("Config '" .. CurrentConfigName .. "' deleted") or "Could not delete config",
+Duration = 3
+})
+end
+})
+else
+Tabs.Settings:Button({
+Title = "Config Manager Unavailable",
+Desc = "Window.ConfigManager not available in this WindUI build",
+Callback = function() end
+})
+end
+
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "Keybinds", TextSize = 20 })
+Tabs.Settings:Divider()
+
+-- Bhop toggle keybind
+BhopKeybind = Tabs.Settings:Keybind({
+Title = "Bhop Toggle Key",
+Desc = "Keybind to toggle Bhop",
+Value = "",
+Flag = "BhopKeybind",
+Callback = function()
+if BhopToggle then
+BhopToggle:Set(not BhopToggle.Value)
+end
+end
+})
+
+-- Bhop Hold keybind
+BhopHoldKeybind = Tabs.Settings:Keybind({
+Title = "Bhop Hold JUMP",
+Desc = "Keybind to toggle Bhop Hold",
+Value = "",
+Flag = "BhopHoldKeybind",
+Callback = function()
+if BhopHoldToggle then
+BhopHoldToggle:Set(not BhopHoldToggle.Value)
+end
+end
+})
+
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "UI Visibility", TextSize = 20 })
+Tabs.Settings:Divider()
+
+Tabs.Settings:Toggle({
+Title = "Show UI",
+Flag = "ShowUI",
+Value = true,
+Callback = function(state)
+if state then
+Window:Show()
+else
+Window:Hide()
+end
+end
+})
+
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "Reset Controls", TextSize = 20 })
+Tabs.Settings:Divider()
+
+Tabs.Settings:Button({
+Title = "Reset Movement Settings",
+Desc = "Reset bhop and movement values to defaults",
+Icon = "refresh-cw",
+Color = Color3.fromHex("#FF3030"),
+Callback = function()
+-- Reset bhop
+if BhopToggle then BhopToggle:Set(false) end
+if BhopHoldToggle then BhopHoldToggle:Set(false) end
+accelerationValue = -0.2
+autoAccelerationEnabled = false
+if AccelerationInput then AccelerationInput:Set("-0.2") end
+if AutoAccelerationToggle then AutoAccelerationToggle:Set(false) end
+MovementValueSet("Friction", defaultMovementValues.Friction)
+MovementValueSet("JumpCap", defaultMovementValues.JumpCap)
+MovementValueSet("AirStrafeAcceleration", defaultMovementValues.AirStrafeAcceleration)
+MovementValueSet("BhopEnabled", false)
+if JumpCapInput then JumpCapInput:Set(tostring(defaultMovementValues.JumpCap)) end
+if AirStrafeAccelerationInput then AirStrafeAccelerationInput:Set(tostring(defaultMovementValues.AirStrafeAcceleration)) end
+WindUI:Notify({
+Title = "Reset Complete",
+Content = "All movement settings reset to defaults",
+Duration = 3
+})
+end
+})
+
+
+Window:SelectTab(1)
+
