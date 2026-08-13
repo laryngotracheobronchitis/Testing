@@ -269,6 +269,7 @@ originalRegistry(self, term)
 end
 local originalMovementUpdate = Movement.Update
 local lastFriction = nil
+local lastAirStrafe = nil
 Movement.Update = function(self, ...)
 originalMovementUpdate(self, ...)
 local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
@@ -319,6 +320,18 @@ MovementValueSet("Friction", defaultMovementValues.Friction)
 end
 lastFriction = desiredFriction
 end
+
+-- ============================================================
+-- PERSISTENT AIR STRAFE FIX:
+-- The server resets AirStrafeAcceleration every frame via
+-- originalMovementUpdate. We must re-apply our custom value
+-- every frame, just like we do with Friction.
+-- ============================================================
+if savedAirStrafeAccel ~= lastAirStrafe then
+    MovementValueSet("AirStrafeAcceleration", savedAirStrafeAccel)
+    lastAirStrafe = savedAirStrafeAccel
+end
+
 if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then
 self:AttemptJump()
 end
@@ -570,6 +583,9 @@ end
 local originalSetupCharacter = setupCharacter
 setupCharacter = function(character)
     originalSetupCharacter(character)
+    -- Reset tracking so values get re-applied on new character
+    lastAirStrafe = nil
+    lastFriction = nil
     -- Small delay to let the server assign the Tag attribute
     task.delay(0.5, function()
         ApplySavedMovementValues()
