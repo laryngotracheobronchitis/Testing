@@ -1,0 +1,2308 @@
+--[[
+    Dara Hub | Evade 2.1 — VERSI RINGKAS
+    ------------------------------------
+    - UI: WindUI RESMI (dipin ke tag rilis, bukan WindUI-Moded DaraHub)
+    - Show/Hide: OpenButton bawaan WindUI + Window:SetToggleKey (RightShift)
+    - Hanya fitur yang diminta; guard eksekusi & nama Flag asli dipertahankan
+    - Semua bagian dari baris ±1768 ke bawah (file terpotong) = REKONSTRUKSI
+      dari deskripsi dan WAJIB diverifikasi ulang dengan file asli.
+]]
+
+-- =========================================================
+-- KONSTANTA
+-- =========================================================
+-- CATATAN AUDIT: script boombox ini kode remote ter-obfuscate dari DaraHub.
+-- TIDAK BISA DIAUDIT — jangan jalankan kalau tidak percaya sumbernya.
+-- ( perilaku file asli dipertahankan: loadstring persis ke URL ini )
+local BOOMBOX_URL = "https://darahub.pages.dev/api/script/obfuscated/Fe/Boomboxs/EvadeOverhaul-RelicsXYZ.lua"
+
+-- WindUI resmi. PIN: ganti WINDUI_RELEASE_TAG ke tag rilis resmi yang kamu pakai
+-- (cek https://github.com/FootsiesFootsies/WindUI/releases). Kalau tag gagal,
+-- fallback ke branch main (unpinned) supaya script tetap jalan.
+local WINDUI_RELEASE_TAG = "v1.0.0"
+local WINDUI_PINNED_URL = ("https://raw.githubusercontent.com/FootsiesFootsies/WindUI/%s/main.lua"):format(WINDUI_RELEASE_TAG)
+local WINDUI_FALLBACK_URL = "https://raw.githubusercontent.com/FootsiesFootsies/WindUI/main/main.lua"
+
+-- =========================================================
+-- HELPER: FireClient (butuh getconnections) — port apa adanya
+-- =========================================================
+local function FireClient(path, ...)
+    if getconnections then
+        for _, c in getconnections(path.OnClientEvent) do
+            c.Function(...)
+        end
+    else
+        warn("Your Executor failed to run 'getconnections'")
+    end
+end
+
+-- =========================================================
+-- GUARD: script sudah dijalankan? (port; FIX: getgenv di-guard)
+-- =========================================================
+local genv = (typeof(getgenv) == "function" and getgenv()) or _G
+if genv.DaraHubExecuted then
+    FireClient(game:GetService("ReplicatedStorage").Events.SharedUISetType, "Notification", "Message", "Script Is Already Loaded, rejoin if you want to re-execute", "Error")
+    return
+end
+genv.DaraHubExecuted = true
+
+-- =========================================================
+-- MEMUAT WINDUI RESMI
+-- =========================================================
+local WindUI
+do
+    local ok, result = pcall(function()
+        return loadstring(game:HttpGet(WINDUI_PINNED_URL))()
+    end)
+    if ok and type(result) == "table" and result.CreateWindow then
+        WindUI = result
+    else
+        warn("[DaraHub] Rilis WindUI '" .. WINDUI_RELEASE_TAG .. "' gagal dimuat — fallback ke branch main (TIDAK dipin). Perbaiki WINDUI_RELEASE_TAG.")
+        WindUI = loadstring(game:HttpGet(WINDUI_FALLBACK_URL))()
+    end
+end
+
+-- =========================================================
+-- SERVICES
+-- =========================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- =========================================================
+-- MODULE GAME (path sesuai file asli — jangan diubah)
+-- =========================================================
+local InteractionTypes = require(ReplicatedStorage.Services.Asset.InteractionService.InteractionTypes)
+local CharacterService = require(ReplicatedStorage.Services.Asset.CharacterService)
+local Movement = require(ReplicatedStorage.Objects.Game.Character.Client.Movement)
+local Portal = require(ReplicatedStorage.Objects.Game.Tool.Tasks.Types.Portal)
+local JumpPadModule = require(ReplicatedStorage.Items.BaseItems.Loadout.Deployables.JumpPad.Modules.Client)
+
+local Interact = ReplicatedStorage.Events.Interact
+
+-- Force Enable Lookback and zoom on mobile (port dari blok require file asli)
+do
+    local ok, err = pcall(function()
+        for _, n in {"LookBack", "ADS"} do
+            local actionType = require(ReplicatedStorage.Objects.Game.Actions.ActionTypes[n])
+            if actionType and actionType.Requirements then
+                actionType.Requirements.Mobile = nil
+            end
+        end
+    end)
+    if not ok then
+        warn("[DaraHub] Gagal force-enable LookBack/ADS di mobile: " .. tostring(err))
+    end
+end
+
+-- =========================================================
+-- WINDOW (WindUI resmi)
+-- =========================================================
+local Window = WindUI:CreateWindow({
+    Title = "Dara Hub | Evade 2.1",
+    Icon = "https://darahub.pages.dev/icon.png",
+    Author = "Made by: Pnsdg And Yomka",
+    Folder = "DaraHub/Games/Evade", -- folder config lama tetap dipakai
+    Size = UDim2.fromOffset(580, 490),
+    Theme = "Dark",
+    SideBarWidth = 200,
+    -- Show/Hide memakai fitur bawaan WindUI (BUKAN tombol custom ala DaraHub)
+    OpenButton = {
+        Enabled = true,
+        ShowIconOnly = true
+    }
+})
+
+do
+    local ok, err = pcall(function()
+        Window:SetToggleKey(Enum.KeyCode.RightShift)
+    end)
+    if not ok then
+        warn("[DaraHub] Window:SetToggleKey tidak tersedia di versi WindUI ini: " .. tostring(err))
+    end
+end
+
+-- Ekstra tampilan dari file asli (sebagian mungkin hanya ada di WindUI-Moded → pcall)
+pcall(function() Window:DisableTopbarButtons({ "Fullscreen" }) end)
+pcall(function()
+    WindUI.TransparencyValue = 0.7
+    Window:ToggleTransparency(true)
+end)
+
+-- Tag executor & versi (port)
+do
+    local executor = (typeof(identifyexecutor) == "function") and identifyexecutor() or nil
+    if type(executor) == "table" then
+        for key, value in pairs(executor) do
+            print(key .. ": " .. tostring(value))
+        end
+    elseif type(executor) == "string" then
+        Window:Tag({ Title = "" .. executor })
+    else
+        print("The injector does not support identifyexecutor()")
+    end
+end
+Window:Tag({ Title = "v1.1.4", Color = Color3.fromHex("#30ff6a") })
+
+-- Tab (hanya tab yang diminta; ikon Lucide seperti file asli baris 15-70)
+local Tabs = {
+    Main = Window:Tab({ Title = "Main", Icon = "layout-grid" }),
+    Player = Window:Tab({ Title = "Player", Icon = "user" }),
+    Combat = Window:Tab({ Title = "Combat", Icon = "sword" }),
+    Auto = Window:Tab({ Title = "Auto", Icon = "repeat-2" }),
+    Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
+    Utility = Window:Tab({ Title = "Utility", Icon = "wrench" }),
+    Teleport = Window:Tab({ Title = "Teleport", Icon = "navigation" }),
+    Shop = Window:Tab({ Title = "Shop", Icon = "shopping-cart" })
+}
+
+-- =========================================================
+-- Mouse unlock (port) — bebaskan kursor Evade saat UI aktif
+-- =========================================================
+local function mouseUnlock(enabled)
+    local success, err = pcall(function()
+        local uiService = ReplicatedStorage:FindFirstChild("Services"):FindFirstChild("UI"):FindFirstChild("SharedUIService")
+        uiService.SetMouseActive:Fire("WindUI", enabled)
+    end)
+    if not success then
+        warn("Failed to set mouse active state: " .. tostring(err))
+    end
+end
+mouseUnlock(true)
+
+-- =========================================================
+-- ButtonLib mini — pengganti library DaraHub (tidak dipakai bersama WindUI resmi)
+-- API: ButtonLib.Create:Button / Create:Toggle, obj:SetVisible/SetText/Set,
+--      ButtonLib[Flag] = obj, ButtonLib:DestroyScreengui()
+-- =========================================================
+local ButtonLib = {}
+do
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DaraHubButtons"
+    screenGui.DisplayOrder = 999
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+
+    pcall(function()
+        screenGui.Parent = CoreGui
+    end)
+    if not screenGui.Parent then
+        screenGui.Parent = PlayerGui
+    end
+    ButtonLib.ScreenGui = screenGui
+
+    local function createButtonInstance(config)
+        local btn = Instance.new("TextButton")
+        btn.Name = config.Text or "DaraHubButton"
+        btn.Size = UDim2.new(0, 250, 0, 38)
+        btn.Position = config.Position or UDim2.new(0.5, -125, 0.5, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.Text = config.Text or "Button"
+        btn.AutoButtonColor = true
+        btn.Visible = config.Visible == true
+        btn.Parent = screenGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = btn
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(60, 60, 70)
+        stroke.Transparency = 0.4
+        stroke.Parent = btn
+
+        return btn
+    end
+
+    local function baseObject(btn)
+        local obj = { Instance = btn }
+        function obj:SetVisible(v)
+            btn.Visible = v and true or false
+        end
+        function obj:SetText(t)
+            btn.Text = tostring(t)
+        end
+        function obj:Destroy()
+            btn:Destroy()
+        end
+        return obj
+    end
+
+    function ButtonLib.Create:Button(config)
+        local btn = createButtonInstance(config)
+        local obj = baseObject(btn)
+        btn.MouseButton1Click:Connect(function()
+            if type(config.Callback) == "function" then
+                config.Callback()
+            end
+        end)
+        if config.Flag then ButtonLib[config.Flag] = obj end
+        return obj
+    end
+
+    function ButtonLib.Create:Toggle(config)
+        local btn = createButtonInstance(config)
+        local obj = baseObject(btn)
+        obj._state = config.Default == true
+
+        local function applyVisual()
+            btn.BackgroundColor3 = obj._state
+                and Color3.fromRGB(40, 160, 80)
+                or Color3.fromRGB(28, 28, 34)
+        end
+        applyVisual()
+
+        -- Set = ubah visual/state saja, TIDAK memanggil Callback (anti loop)
+        function obj:Set(v)
+            obj._state = v and true or false
+            applyVisual()
+        end
+
+        btn.MouseButton1Click:Connect(function()
+            obj:Set(not obj._state)
+            if type(config.Callback) == "function" then
+                config.Callback(obj._state)
+            end
+        end)
+
+        if config.Flag then ButtonLib[config.Flag] = obj end
+        return obj
+    end
+
+    function ButtonLib:DestroyScreengui()
+        if screenGui then screenGui:Destroy() end
+    end
+end
+
+-- =========================================================
+-- KARAKTER LOKAL (port)
+-- =========================================================
+local Character, Humanoid, HumanoidRootPart, CharacterTag
+
+local function GetCharacterTag(character)
+    if not character then return nil end
+    return character:GetAttribute("Tag")
+end
+
+local function setupCharacter(character)
+    Character = character
+    Humanoid = character:FindFirstChildOfClass("Humanoid")
+    HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    CharacterTag = GetCharacterTag(character)
+end
+
+if LocalPlayer.Character then
+    setupCharacter(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(setupCharacter)
+
+-- =========================================================
+-- SecurityPart (port) — dipakai "Teleport to SecurityPart"
+-- FIX: simpan referensi lokal walau part sudah ada (aslinya global tanpa referensi)
+-- =========================================================
+local SecurityPart = workspace:FindFirstChild("SecurityPart")
+if not SecurityPart then
+    SecurityPart = Instance.new("Part")
+    SecurityPart.Name = "SecurityPart"
+    SecurityPart.Size = Vector3.new(10, 1, 10)
+    SecurityPart.Position = Vector3.new(50000, 50000, 50000)
+    SecurityPart.Anchored = true
+    SecurityPart.CanCollide = true
+    SecurityPart.Parent = workspace
+end
+
+-- =========================================================
+-- CORE MOVEMENT / BHOP (port baris ±394-560)
+-- =========================================================
+local defaultMovementValues = {
+    SprintAcceleration = 1,
+    SprintCap = 2,
+    RunAccel = 1,
+    Friction = 5,
+    RunDeaccel = 700,
+    AirStrafeAcceleration = 182,
+    AirAcceleration = 1,
+    Speed = 1500,
+    JumpHeight = 3,
+    JumpCap = 1,
+    WalkSpeedMultiplier = 1,
+    JumpSpeedMultiplier = 1.45,
+    BhopEnabled = false,
+    GroundedDistCheck = 2.9
+}
+
+-- State bhop / auto jump (cabang "Auto Acceleration (Legit)" + getCurrentSpeed DIHAPUS)
+local autoJumpEnabled = false
+local autoJumpType = "Simulation"
+local bhopHoldEnabled = false
+local accelerationMethod = "Acceleration" -- "Acceleration" | "No Acceleration" | "Acceleration (No Ground Check)"
+local accelerationValue = -0.2
+local AutowallHop = false
+
+-- Nilai Friction milik user dari tab Player (dipakai saat restore; default = nilai asli)
+local frictionInputValue = defaultMovementValues.Friction
+
+local function MovementValueSet(MovementType, value)
+    if not CharacterTag then
+        CharacterTag = GetCharacterTag(LocalPlayer.Character)
+    end
+    if CharacterTag then
+        FireClient(ReplicatedStorage.Events.CharacterTask, CharacterTag, "ModifyMovement", {MovementType, value})
+    else
+        task.spawn(error, "Failed to Overwrite Movement Data! Or maybe your executor dose not support getconnections", 0)
+    end
+end
+
+local function isBhopFrictionOverrideActive()
+    return (autoJumpEnabled or bhopHoldEnabled) and accelerationMethod ~= "No Acceleration"
+end
+
+local originalMovementUpdate = Movement.Update
+local lastFriction = nil
+
+local function movementUpdateHook(self, ...)
+    originalMovementUpdate(self, ...)
+
+    local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+
+    local LocalPlayerData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+    local movementData = LocalPlayerData and LocalPlayerData.Movement
+    local state = movementData and movementData.State
+    if not state then
+        state = self.State
+    end
+
+    local grounded = self.DataRegistry:Get("Grounded")
+
+    -- ---- Friction override bhop ----
+    local desiredFriction = nil
+    if accelerationMethod ~= "No Acceleration" then
+        local isBhopActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
+        if isBhopActive then
+            if accelerationMethod == "Acceleration (No Ground Check)" then
+                -- TAMBAHAN: override TANPA syarat grounded (berlaku di udara, tanah, dan ramp)
+                desiredFriction = accelerationValue
+            elseif not grounded then
+                desiredFriction = accelerationValue
+            end
+        end
+    end
+
+    if desiredFriction ~= lastFriction then
+        if desiredFriction ~= nil then
+            MovementValueSet("Friction", desiredFriction)
+        else
+            -- FIX: restore ke nilai Friction milik user (tab Player), bukan selalu default 5
+            MovementValueSet("Friction", frictionInputValue)
+        end
+        lastFriction = desiredFriction
+    end
+
+    -- ---- Auto wall hop (port apa adanya) ----
+    if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then
+        self:AttemptJump()
+    end
+
+    -- ---- Auto jump saat grounded (port apa adanya) ----
+    if autoJumpEnabled and grounded then
+        if autoJumpType == "Realistic" then
+            self:AttemptJump()
+        else
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+
+    -- ---- Bhop hold jump (port apa adanya) ----
+    if bhopHoldEnabled and grounded and humanoid.Jump == true then
+        self:AttemptJump()
+    end
+end
+
+do
+    local okHook, errHook = pcall(function()
+        Movement.Update = movementUpdateHook
+    end)
+    if not okHook then
+        warn("[DaraHub] Gagal meng-hook Movement.Update: " .. tostring(errHook) .. " — fitur Bhop/Auto Jump tidak akan berfungsi.")
+    end
+end
+
+-- FIX: reset cache friction saat respawn, supaya override diterapkan ulang ke karakter baru
+LocalPlayer.CharacterAdded:Connect(function()
+    lastFriction = nil
+end)
+
+local function updateBhopEnabled()
+    -- FIX: kedua mode "Acceleration" (termasuk No Ground Check) dihitung aktif
+    local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and accelerationMethod ~= "No Acceleration"
+    MovementValueSet("BhopEnabled", shouldEnable)
+end
+
+local function ToggleBhop(state)
+    autoJumpEnabled = state
+    updateBhopEnabled()
+end
+
+local function ToggleBhopHold(state)
+    bhopHoldEnabled = state
+    updateBhopEnabled()
+end
+
+local function SetAccelerationMethod(method)
+    accelerationMethod = method
+    updateBhopEnabled()
+    if not (autoJumpEnabled or bhopHoldEnabled) then
+        MovementValueSet("Friction", frictionInputValue) -- FIX: pakai nilai user, bukan default
+        lastFriction = nil
+    end
+end
+
+-- =========================================================
+-- HELPER STATUS PEMAIN (port; FIX: cek DataRegistry dulu)
+-- =========================================================
+local function GetStatus(player)
+    local character = player.Character
+    if not character then
+        return "DEAD"
+    end
+    local charData = CharacterService:GetCharacterFromPlayer(player)
+    if charData and charData.DataRegistry and charData.DataRegistry:Get("Downed") then
+        return "DOWNED"
+    end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health > 0 then
+        return "ALIVE"
+    end
+    return "DEAD"
+end
+
+local function isPlayerDowned(player)
+    return GetStatus(player) == "DOWNED"
+end
+
+-- =========================================================
+-- HELPER TELEPORT (dipakai tab Auto & Teleport)
+-- =========================================================
+local function getRootPart(model)
+    if typeof(model) ~= "Instance" then return nil end
+    if model:IsA("BasePart") then return model end
+    return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+end
+
+local function teleportTo(target)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        WindUI:Notify({ Title = "Teleport", Content = "Karakter belum siap.", Duration = 3 })
+        return false
+    end
+    local cf = nil
+    if typeof(target) == "Instance" then
+        local part = getRootPart(target)
+        if part then cf = part.CFrame end
+    elseif typeof(target) == "CFrame" then
+        cf = target
+    elseif typeof(target) == "Vector3" then
+        cf = CFrame.new(target)
+    end
+    if not cf then
+        WindUI:Notify({ Title = "Teleport", Content = "Target tidak valid.", Duration = 3 })
+        return false
+    end
+    hrp.CFrame = cf + Vector3.new(0, 3, 0) -- offset kecil supaya tidak nempel/nge-clip
+    return true
+end
+
+-- REKONSTRUKSI: cara mencari spawn/NPC/objective/ticket tidak terlihat di lampiran
+local function getSpawnCFrame()
+    local spawnLocation = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+    if spawnLocation then
+        return spawnLocation.CFrame
+    end
+    local map = workspace:FindFirstChild("Map")
+    if map then
+        local spawnFolder = map:FindFirstChild("Spawns", true) or map:FindFirstChild("Spawn", true)
+        if spawnFolder then
+            if spawnFolder:IsA("BasePart") then
+                return spawnFolder.CFrame
+            end
+            return spawnFolder:GetPivot()
+        end
+    end
+    return nil
+end
+
+local function looksLikeNPC(model)
+    return model:FindFirstChildOfClass("Humanoid") ~= nil
+        or model:FindFirstChildOfClass("BillboardGui") ~= nil
+        or model:FindFirstChildOfClass("SurfaceGui") ~= nil
+end
+
+local function collectNPCs()
+    local npcs, seen = {}, {}
+    local function tryAdd(model)
+        if typeof(model) ~= "Instance" or not model:IsA("Model") then return end
+        if Players:GetPlayerFromCharacter(model) then return end
+        if getRootPart(model) and looksLikeNPC(model) and not seen[model] then
+            seen[model] = true
+            table.insert(npcs, model)
+        end
+    end
+    for _, name in ipairs({ "NPCs", "NPC", "Npcs", "Nextbots", "Bots" }) do
+        local container = workspace:FindFirstChild(name)
+        if container then
+            for _, child in ipairs(container:GetChildren()) do
+                tryAdd(child)
+            end
+        end
+    end
+    if #npcs == 0 then
+        for _, child in ipairs(workspace:GetChildren()) do
+            tryAdd(child)
+        end
+    end
+    return npcs
+end
+
+local function collectObjectives()
+    local objectives, seen = {}, {}
+    for _, name in ipairs({ "Objectives", "Objective" }) do
+        local container = workspace:FindFirstChild(name)
+        if container then
+            for _, child in ipairs(container:GetChildren()) do
+                if (child:IsA("BasePart") or child:IsA("Model")) and not seen[child] then
+                    seen[child] = true
+                    table.insert(objectives, child)
+                end
+            end
+        end
+    end
+    if #objectives == 0 then
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if #objectives >= 50 then break end
+            if (d:IsA("BasePart") or d:IsA("Model")) and not seen[d] and d.Name:lower():find("objective") then
+                seen[d] = true
+                table.insert(objectives, d)
+            end
+        end
+    end
+    return objectives
+end
+
+local function findTicket()
+    local ticket = workspace:FindFirstChild("Ticket", true)
+    if not ticket then
+        local map = workspace:FindFirstChild("Map")
+        if map then
+            ticket = map:FindFirstChild("Ticket", true)
+        end
+    end
+    return ticket
+end
+
+local function safeRefreshDropdown(dropdown, values, selected)
+    if not dropdown then return end
+    if #values == 0 then
+        values = { "(kosong)" }
+        selected = "(kosong)"
+    end
+    local ok = pcall(function()
+        dropdown:Refresh(values, selected)
+    end)
+    if not ok then
+        warn("[DaraHub] Dropdown Refresh gagal — signature API WindUI mungkin berbeda (cek versi).")
+    end
+end
+
+-- =========================================================
+-- TAB MAIN
+-- =========================================================
+Tabs.Main:Space()
+
+-- Force Enable Everyone's Carry (port baris ±165-200)
+local function CanBeCarried(value)
+    for _, interaction in ipairs(InteractionTypes.Revive.Interactions) do
+        if interaction.Name == "Carry" then
+            interaction.Requirements.CanBeCarried = value
+        end
+    end
+end
+
+Tabs.Main:Toggle({
+    Title = "Force Enable Everyone's Carry",
+    Desc = [[Are you tired of those cornballs always turning off carry for their dada/Eboy?
+This toggle is for you. No matter how they try to disable carry, you will still be able to carry them, but they will still be able to uncarry when they turn off their carry.]],
+    Callback = function(s)
+        if s then
+            CanBeCarried(nil)
+        else
+            CanBeCarried(true)
+        end
+    end
+})
+
+Tabs.Main:Space()
+
+-- Get Free FE Boombox Sound Player (port; URL dipindah ke konstanta BOOMBOX_URL)
+local FEBoombox
+FEBoombox = Tabs.Main:Button({
+    Title = "Get Free FE Boombox Sound Player",
+    Callback = function()
+        pcall(function() -- FIX: jangan crash kalau Destroy tidak ada
+            if FEBoombox and FEBoombox.Destroy then
+                FEBoombox:Destroy()
+            end
+        end)
+        loadstring(game:HttpGet(BOOMBOX_URL))()
+    end
+})
+
+-- =========================================================
+-- CUSTOM TOP GUI (port baris ±240-345): Zoom, Leaderboard, Front View/Reload
+-- =========================================================
+local MobileTopbar = {}
+
+local function SendKeybindEvent(key, bool)
+    ReplicatedStorage.Services.Client.KeybindService.SendKeybindEvent:Fire({
+        Key = key,
+        Down = bool
+    })
+end
+
+if UserInputService.TouchEnabled then
+    local currentMouseHold, createdButtons = {}, {}
+
+    local function updateAllButtons()
+        for key, held in pairs(currentMouseHold) do
+            if held then
+                SendKeybindEvent(key, false)
+            end
+            currentMouseHold[key] = nil
+        end
+        for _, buttonData in pairs(createdButtons) do
+            if buttonData and buttonData.updateVisualState then
+                pcall(buttonData.updateVisualState)
+            end
+        end
+    end
+    MobileTopbar.UpdateAllButtons = updateAllButtons
+
+    local topbarStandard = PlayerGui:FindFirstChild("TopbarStandard")
+    local targetParent = nil
+
+    if topbarStandard then
+        local main = topbarStandard:FindFirstChild("Main")
+        if main then
+            local holders = main:FindFirstChild("Holders")
+            if holders then
+                targetParent = holders:FindFirstChild("Left")
+                if targetParent then
+                    for _, child in ipairs(targetParent:GetChildren()) do
+                        if child.Name == "TopbarStandard" then
+                            child:Destroy()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if not targetParent then
+        if topbarStandard then
+            topbarStandard:Destroy()
+        end
+        pcall(function() -- FIX: SetCore bisa error di beberapa executor
+            StarterGui:SetCore("TopbarEnabled", false)
+        end)
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "TopbarStandard"
+        screenGui.IgnoreGuiInset = false
+        screenGui.ScreenInsets = Enum.ScreenInsets.TopbarSafeInsets
+        screenGui.DisplayOrder = 100
+        screenGui.ResetOnSpawn = false
+        screenGui.Parent = PlayerGui
+
+        local holders = Instance.new("Frame")
+        holders.Name = "Holders"
+        holders.BackgroundTransparency = 1
+        holders.BorderSizePixel = 0
+        holders.Position = UDim2.new(0, 0, 0, 0)
+        holders.Size = UDim2.new(1, 0, 1, -2)
+        holders.Parent = screenGui
+
+        local frame = Instance.new("Frame")
+        frame.Name = "Main"
+        frame.BackgroundTransparency = 1
+        frame.BorderSizePixel = 0
+        frame.Position = UDim2.new(0, 0, 0, 0)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.Parent = holders
+
+        local scrollingFrame = Instance.new("ScrollingFrame")
+        scrollingFrame.Name = "Right"
+        scrollingFrame.Parent = frame
+        scrollingFrame.BackgroundTransparency = 1
+        scrollingFrame.BorderSizePixel = 0
+        scrollingFrame.Position = UDim2.new(0, 12, 0, 0)
+        scrollingFrame.Size = UDim2.new(1, -24, 1, 0)
+        scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.X
+        scrollingFrame.ScrollBarThickness = 0
+        scrollingFrame.ScrollingDirection = Enum.ScrollingDirection.X
+        scrollingFrame.ScrollingEnabled = false
+
+        local uiListLayout = Instance.new("UIListLayout")
+        uiListLayout.Parent = scrollingFrame
+        uiListLayout.Padding = UDim.new(0, 12)
+        uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+        uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+
+        targetParent = scrollingFrame
+    else
+        pcall(function()
+            StarterGui:SetCore("TopbarEnabled", true)
+        end)
+    end
+
+    -- FIX: field "label"/"enablesLockValue" tidak pernah dipakai → dihapus
+    local keybindButtonsConfig = {
+        { name = "SecondaryButton", layoutOrder = 999, icon = "rbxassetid://126943351764139", key = "Secondary" },   -- Zoom
+        { name = "ReloadButton", layoutOrder = 997, icon = "rbxassetid://78648212535999", key = "Reload" },          -- Front View/Reload
+        { name = "LeaderboardButton", layoutOrder = 998, icon = "rbxassetid://5107166345", key = "Leaderboard" }    -- Leaderboard
+    }
+
+    local function createKeybindButton(config, parent)
+        local Button = Instance.new("Frame")
+        Button.Name = config.name
+        Button.Parent = parent
+        Button.BackgroundTransparency = 1
+        Button.ClipsDescendants = true
+        Button.LayoutOrder = config.layoutOrder
+        Button.Size = UDim2.new(0, 44, 0, 44)
+        Button.ZIndex = 20
+
+        local IconButton = Instance.new("Frame")
+        IconButton.Name = "IconButton"
+        IconButton.Parent = Button
+        IconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        IconButton.BackgroundTransparency = 0.3
+        IconButton.BorderSizePixel = 0
+        IconButton.ClipsDescendants = true
+        IconButton.Size = UDim2.new(1, 0, 1, 0)
+        IconButton.ZIndex = 2
+
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(1, 0)
+        UICorner.Parent = IconButton
+
+        local IconImage = Instance.new("ImageLabel")
+        IconImage.Parent = IconButton
+        IconImage.AnchorPoint = Vector2.new(0.5, 0.5)
+        IconImage.BackgroundTransparency = 1
+        IconImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+        IconImage.Size = UDim2.new(0.5, 0, 0.5, 0)
+        IconImage.ZIndex = 15
+        IconImage.Image = config.icon
+
+        local IconImageRatio = Instance.new("UIAspectRatioConstraint")
+        IconImageRatio.Parent = IconImage
+        IconImageRatio.DominantAxis = Enum.DominantAxis.Height
+
+        local ClickRegion = Instance.new("TextButton")
+        ClickRegion.Parent = IconButton
+        ClickRegion.BackgroundTransparency = 1
+        ClickRegion.Size = UDim2.new(1, 0, 1, 0)
+        ClickRegion.ZIndex = 20
+        ClickRegion.Text = ""
+
+        local IconOverlay = Instance.new("Frame")
+        IconOverlay.Parent = IconButton
+        IconOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        IconOverlay.BackgroundTransparency = 0.925
+        IconOverlay.Size = UDim2.new(1, 0, 1, 0)
+        IconOverlay.Visible = false
+        IconOverlay.ZIndex = 6
+
+        local UICorner_Overlay = Instance.new("UICorner")
+        UICorner_Overlay.CornerRadius = UDim.new(1, 0)
+        UICorner_Overlay.Parent = IconOverlay
+
+        local function getIsActive()
+            return currentMouseHold[config.key] or false
+        end
+
+        local function updateVisualState()
+            IconOverlay.Visible = getIsActive()
+        end
+
+        ClickRegion.MouseButton1Down:Connect(function()
+            currentMouseHold[config.key] = true
+            SendKeybindEvent(config.key, true)
+            updateVisualState()
+        end)
+
+        ClickRegion.MouseButton1Up:Connect(function()
+            if currentMouseHold[config.key] then
+                currentMouseHold[config.key] = false
+                SendKeybindEvent(config.key, false)
+                updateVisualState()
+            end
+        end)
+
+        createdButtons[config.key] = { Button = Button, updateVisualState = updateVisualState }
+    end
+
+    for _, config in ipairs(keybindButtonsConfig) do
+        createKeybindButton(config, targetParent)
+    end
+end
+
+-- OnOpen/OnClose window (port; ditulis SETELAH topbar supaya satu pendaftaran)
+Window:OnOpen(function()
+    mouseUnlock(true)
+    -- FIX: updateAllButtons di file asli tidak pernah dipanggil (kode mati);
+    -- dilepas ke sini supaya tombol topbar mobile tidak "nyangkut" saat UI terbuka.
+    if MobileTopbar.UpdateAllButtons then
+        pcall(MobileTopbar.UpdateAllButtons)
+    end
+end)
+Window:OnClose(function()
+    mouseUnlock(false)
+end)
+
+-- =========================================================
+-- TAB PLAYER — Section "Bounce" (port baris 665-790)
+-- =========================================================
+local stopRampBooster -- forward (diisi section Ramp Booster, dipakai cleanup)
+
+Tabs.Player:Section({ Title = "Player", TextSize = 40 })
+Tabs.Player:Divider()
+Tabs.Player:Section({ Title = "Modify Bounce", TextSize = 20 })
+
+-- Modify Multiplier (port baris 665-715)
+local bounceConnection = nil
+local BounceSpeed = 0
+
+Tabs.Player:Toggle({
+    Title = "Modify Multiplier",
+    Flag = "BounceEnabled",
+    Value = false,
+    Callback = function(state)
+        if bounceConnection then
+            bounceConnection:Disconnect()
+            bounceConnection = nil
+        end
+        if state then
+            bounceConnection = RunService.RenderStepped:Connect(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                local humanoid = char:FindFirstChild("Humanoid")
+                if not humanoid then return end
+                if humanoid.Health <= 0 then return end
+                humanoid.WalkSpeed = BounceSpeed
+            end)
+        else
+            local char = LocalPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = 0
+                end
+            end
+        end
+    end
+})
+
+Tabs.Player:Input({
+    Title = "Multiplier value",
+    Flag = "VelocityMultiplier",
+    Placeholder = "80",
+    NumbersOnly = true,
+    Callback = function(value)
+        BounceSpeed = tonumber(value) or 0
+    end
+})
+
+-- Super Bounce (port baris 715-790; FIX: typo "Supper" → "Super")
+Tabs.Player:Section({ Title = "Super Bounce", TextSize = 20 })
+Tabs.Player:Divider()
+
+local BounceHeight = 190
+
+local BounceInput = Tabs.Player:Input({
+    Title = "Bounce Height",
+    Placeholder = "190",
+    Callback = function(value)
+        BounceHeight = tonumber(value) or 190 -- FIX: fallback konsisten dengan placeholder (aslinya 50)
+    end
+})
+
+local function triggerSuperBounce() -- port baris ±728
+    if not LocalPlayer.Character then return end
+    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+    local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if humanoid and rootPart then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        rootPart.Velocity = Vector3.new(rootPart.Velocity.X, BounceHeight, rootPart.Velocity.Z)
+    end
+end
+
+local SuperBounceButton -- forward declaration
+
+local SuperBounceToggle = Tabs.Player:Toggle({
+    Title = "Super Bounce", -- FIX: typo asli "Supper Bounce"
+    Flag = "SuperBounceToggle",
+    Value = false,
+    Callback = function(state)
+        if SuperBounceButton then
+            SuperBounceButton:SetVisible(state)
+        end
+    end
+})
+
+SuperBounceButton = ButtonLib.Create:Button({
+    Text = "Super Bounce",
+    Flag = "SuperBounce",
+    Position = UDim2.new(0.5, -125, 0.2, 0),
+    Visible = false,
+    Callback = function()
+        triggerSuperBounce()
+    end
+})
+
+-- (Modify Edge Trimp sengaja TIDAK diambil — di luar daftar)
+
+-- =========================================================
+-- TAB PLAYER — Ramp Booster (port baris 1100-1170)
+-- =========================================================
+Tabs.Player:Space()
+
+do
+    local rampBoostMultiplier = 2
+    local rampBoostConnection = nil
+
+    stopRampBooster = function()
+        if rampBoostConnection then
+            rampBoostConnection:Disconnect()
+            rampBoostConnection = nil
+        end
+    end
+
+    local function startRampBooster()
+        stopRampBooster()
+        local armed = true
+        rampBoostConnection = RunService.Heartbeat:Connect(function(dt)
+            local character = LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            local root = humanoid and (humanoid.RootPart or character.PrimaryPart)
+            if not root then return end
+
+            local velocity = root.AssemblyLinearVelocity
+            local vy = velocity.Y
+            local gravity = workspace.Gravity
+            local jumpSpeed = humanoid.UseJumpPower and humanoid.JumpPower or math.sqrt(2 * gravity * humanoid.JumpHeight)
+            local limit = jumpSpeed + gravity * dt
+
+            if not armed and vy <= 0 then
+                armed = true
+            end
+
+            if armed and vy > limit then
+                armed = false
+                root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy * rampBoostMultiplier, velocity.Z)
+            end
+        end)
+    end
+
+    Tabs.Player:Toggle({
+        Title = "Ramp Booster",
+        Desc = "Multiplies your upward speed when a ramp launches you",
+        Flag = "RampBoosterToggle",
+        Value = false,
+        Callback = function(state)
+            if state then
+                startRampBooster()
+            else
+                stopRampBooster()
+            end
+        end
+    })
+
+    Tabs.Player:Input({
+        Title = "Ramp Booster Multiplier",
+        Flag = "RampBoosterMultiplierInput",
+        Placeholder = "2",
+        NumbersOnly = false,
+        Value = "2",
+        Callback = function(v)
+            local n = tonumber(v)
+            if n and n > 0 then
+                rampBoostMultiplier = n
+            end
+        end
+    })
+end
+
+-- =========================================================
+-- TAB PLAYER — Section "Modification" (port baris 1296-1437, hanya 6 input)
+-- =========================================================
+Tabs.Player:Space()
+Tabs.Player:Section({ Title = "Modification" })
+
+Tabs.Player:Input({
+    Title = "Jump Cap",
+    Placeholder = tostring(defaultMovementValues.JumpCap),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.JumpCap),
+    Callback = function(value)
+        MovementValueSet("JumpCap", tonumber(value))
+    end
+})
+
+Tabs.Player:Input({
+    Title = "Air Acceleration",
+    Placeholder = tostring(defaultMovementValues.AirAcceleration),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.AirAcceleration),
+    Callback = function(value)
+        MovementValueSet("AirAcceleration", tonumber(value))
+    end
+})
+
+Tabs.Player:Space()
+
+Tabs.Player:Input({
+    Title = "Sprint Acceleration",
+    Placeholder = tostring(defaultMovementValues.SprintAcceleration),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.SprintAcceleration),
+    Callback = function(value)
+        MovementValueSet("SprintAcceleration", tonumber(value))
+    end
+})
+
+Tabs.Player:Space()
+
+Tabs.Player:Input({
+    Title = "Run Acceleration",
+    Placeholder = tostring(defaultMovementValues.RunAccel),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.RunAccel),
+    Callback = function(value)
+        MovementValueSet("RunAccel", tonumber(value))
+    end
+})
+
+Tabs.Player:Input({
+    Title = "Run Deacceleration",
+    Placeholder = tostring(defaultMovementValues.RunDeaccel),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.RunDeaccel),
+    Callback = function(value)
+        MovementValueSet("RunDeaccel", tonumber(value))
+    end
+})
+
+Tabs.Player:Space()
+
+-- Friction: punya logika khusus — jangan menimpa override bhop secara diam-diam
+Tabs.Player:Input({
+    Title = "Friction",
+    Placeholder = tostring(defaultMovementValues.Friction),
+    NumbersOnly = true,
+    Value = tostring(defaultMovementValues.Friction),
+    Callback = function(value)
+        local n = tonumber(value)
+        frictionInputValue = n or defaultMovementValues.Friction
+        -- FIX: override bhop prioritas selama aktif; nilai user diterapkan saat override nonaktif
+        if not isBhopFrictionOverrideActive() then
+            MovementValueSet("Friction", frictionInputValue)
+            lastFriction = nil
+        end
+    end
+})
+
+-- =========================================================
+-- TAB COMBAT
+-- =========================================================
+-- Infinite Range (port baris 1728-1768; loop "AutomaticFunctions" direkonstruksi
+-- mengikuti pola tombol "Visual No Tool Delay" — file asli terpotong persis di sini)
+Tabs.Combat:Button({
+    Title = "Infinite Range",
+    Callback = function()
+        local function setInfiniteRange(data)
+            if type(data) ~= "table" then return end
+            for key, value in pairs(data) do
+                if (key == "Range" or key == "LungeRange" or key == "HearingRange") and type(value) == "number" then
+                    data[key] = math.huge
+                elseif key == "DamageDistanceInterval" and type(value) == "table" and #value >= 2 then
+                    value[2] = math.huge
+                elseif type(value) == "table" then
+                    setInfiniteRange(value)
+                end
+            end
+        end
+
+        for _, tool in pairs(ReplicatedStorage.Tools:GetChildren()) do
+            if tool:IsA("ModuleScript") then
+                local success, toolData = pcall(require, tool)
+                if success and type(toolData) == "table" and toolData.Tasks then
+                    for _, task in ipairs(toolData.Tasks) do
+                        for _, func in ipairs(task.Functions or {}) do
+                            for _, activation in ipairs(func.Activations or {}) do
+                                for _, method in ipairs(activation.Methods or {}) do
+                                    if method.Info then setInfiniteRange(method.Info) end
+                                end
+                            end
+                        end
+                        for _, autoFunc in ipairs(task.AutomaticFunctions or {}) do
+                            for _, method in ipairs(autoFunc.Methods or {}) do
+                                if method.Info then setInfiniteRange(method.Info) end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+})
+
+Tabs.Combat:Space()
+
+-- Portal Bypass (REKONSTRUKSI baris 1769-1778): override Portal.IsPortalPossible → selalu true
+Tabs.Combat:Button({
+    Title = "Portal Bypass",
+    Callback = function()
+        local ok, err = pcall(function()
+            if type(Portal.IsPortalPossible) ~= "function" then
+                error("IsPortalPossible tidak ditemukan di module Portal")
+            end
+            Portal.IsPortalPossible = function()
+                return true
+            end
+        end)
+        if ok then
+            WindUI:Notify({ Title = "Portal Bypass", Content = "IsPortalPossible sekarang selalu true.", Duration = 3 })
+        else
+            warn("[DaraHub] Portal Bypass gagal: " .. tostring(err))
+            WindUI:Notify({ Title = "Portal Bypass", Content = "Gagal — cek console.", Duration = 3 })
+        end
+    end
+})
+
+Tabs.Combat:Space()
+
+-- Bypass "TooMany" Consumables Item Limit (REKONSTRUKSI baris 1826-1864;
+-- path sesuai deskripsi: PlayerGui.Shared.HUD.Interactors.Popups.Usables.Wheel → Item1-Item4)
+Tabs.Combat:Button({
+    Title = 'Bypass "TooMany" Consumables Item Limit',
+    Callback = function()
+        local ok, err = pcall(function()
+            local sharedGui = PlayerGui:FindFirstChild("Shared")
+            local hud = sharedGui and sharedGui:FindFirstChild("HUD")
+            local interactors = hud and hud:FindFirstChild("Interactors")
+            local popups = interactors and interactors:FindFirstChild("Popups")
+            local usables = popups and popups:FindFirstChild("Usables")
+            local wheel = usables and usables:FindFirstChild("Wheel")
+            if not wheel then
+                error("Wheel popup Usables tidak ditemukan (buka wheel item dulu, lalu coba lagi)")
+            end
+            for i = 1, 4 do
+                local item = wheel:FindFirstChild("Item" .. i)
+                if item then
+                    local tooMany = item:FindFirstChild("TooMany")
+                    if tooMany then
+                        tooMany:Destroy()
+                    end
+                end
+            end
+        end)
+        if ok then
+            WindUI:Notify({ Title = "TooMany Bypass", Content = "Elemen 'TooMany' dihapus dari Item1-Item4.", Duration = 3 })
+        else
+            warn("[DaraHub] TooMany bypass gagal: " .. tostring(err))
+            WindUI:Notify({ Title = "TooMany Bypass", Content = "Gagal — cek console.", Duration = 3 })
+        end
+    end
+})
+
+-- =========================================================
+-- TAB AUTO — Section "Bhop" (UI baris 2024-2113; logika inti sudah di hook Movement)
+-- =========================================================
+Tabs.Auto:Section({ Title = "Bhop", TextSize = 20 })
+
+local BhopScreenButton -- forward declaration (tombol layar)
+
+local BhopToggleUI = Tabs.Auto:Toggle({
+    Title = "Bhop",
+    Flag = "BhopToggle",
+    Value = false,
+    Callback = function(state)
+        ToggleBhop(state)
+        if BhopScreenButton then
+            BhopScreenButton:Set(state)
+        end
+    end
+})
+
+Tabs.Auto:Toggle({
+    Title = "Bhop Hold Jump",
+    Flag = "BhopHoldToggle",
+    Value = false,
+    Callback = function(state)
+        ToggleBhopHold(state)
+    end
+})
+
+Tabs.Auto:Dropdown({
+    Title = "Bhop Mode",
+    Flag = "BhopMode",
+    Values = { "Acceleration", "No Acceleration", "Acceleration (No Ground Check)" },
+    Value = "Acceleration",
+    Callback = function(value)
+        SetAccelerationMethod(value)
+    end
+})
+
+Tabs.Auto:Input({
+    Title = "Bhop Acceleration (Negative Only)",
+    Flag = "BhopAccelerationInput",
+    Desc = "Hanya angka negatif, contoh: -0.2",
+    Placeholder = "-0.2",
+    NumbersOnly = false, -- harus false supaya tanda minus diterima
+    Value = "-0.2",
+    Callback = function(value)
+        local n = tonumber(value)
+        if n and n < 0 then
+            accelerationValue = n
+        end
+    end
+})
+
+Tabs.Auto:Dropdown({
+    Title = "Auto Jump Mode",
+    Flag = "AutoJumpMode",
+    Values = { "Simulation", "Realistic" },
+    Value = "Simulation",
+    Callback = function(value)
+        autoJumpType = value
+    end
+})
+
+Tabs.Auto:Toggle({
+    Title = "Auto Wall Hop",
+    Flag = "AutoWallHop",
+    Value = false,
+    Callback = function(state)
+        AutowallHop = state
+    end
+})
+
+Tabs.Auto:Toggle({
+    Title = "Show Bhop Button",
+    Flag = "ShowBhopButton",
+    Value = false,
+    Callback = function(state)
+        if BhopScreenButton then
+            BhopScreenButton:SetVisible(state)
+            BhopScreenButton:Set(autoJumpEnabled) -- sinkron warna tombol dengan state bhop
+        end
+    end
+})
+
+BhopScreenButton = ButtonLib.Create:Toggle({
+    Text = "Bhop",
+    Flag = "Bhop",
+    Default = false,
+    Visible = false,
+    Position = UDim2.new(0.5, -125, 0.4, 0),
+    Callback = function(s)
+        ToggleBhop(s) -- paksa state langsung (aman walau :Set WindUI tidak memicu callback)
+        if BhopToggleUI and BhopToggleUI.Set then
+            pcall(function() BhopToggleUI:Set(s) end)
+        end
+    end
+})
+
+-- =========================================================
+-- TAB AUTO — Section "Auto": Self Revive (REKONSTRUKSI baris 2638-2800)
+-- =========================================================
+Tabs.Auto:Section({ Title = "Auto" })
+
+local SelfRevive = {
+    Enabled = false,
+    Method = "Spawnpoint",
+    Connection = nil,
+    LastAttempt = 0,
+}
+
+function SelfRevive:IsDowned()
+    local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+    if charData and charData.DataRegistry then
+        return charData.DataRegistry:Get("Downed") == true
+    end
+    return false
+end
+
+-- REKONSTRUKSI: payload Interact untuk "Fake Revive" TIDAK terlihat di lampiran.
+-- Verifikasi signature remote ini dengan file asli sebelum dipakai serius.
+function SelfRevive:FakeRevive()
+    local tag = GetCharacterTag(LocalPlayer.Character)
+    if not tag then return false end
+    local ok, err = pcall(function()
+        Interact:FireServer("Revive", tag)
+    end)
+    if not ok then
+        warn("[DaraHub] FakeRevive gagal: " .. tostring(err))
+    end
+    return ok
+end
+
+function SelfRevive:Spawnpoint()
+    local cf = getSpawnCFrame()
+    if not cf then
+        warn("[DaraHub] Spawnpoint revive: spawn tidak ditemukan")
+        return false
+    end
+    return teleportTo(cf)
+end
+
+function SelfRevive:ApplyMethod()
+    if self.Method == "Fake Revive" then
+        return self:FakeRevive()
+    end
+    return self:Spawnpoint()
+end
+
+function SelfRevive:Stop()
+    self.Enabled = false
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+end
+
+function SelfRevive:Start()
+    self:Stop()
+    self.Enabled = true
+    self.Connection = RunService.Heartbeat:Connect(function()
+        if not self.Enabled then return end
+        if os.clock() - self.LastAttempt < 1 then return end -- debounce 1 detik
+        if self:IsDowned() then
+            self.LastAttempt = os.clock()
+            self:ApplyMethod()
+        end
+    end)
+end
+
+Tabs.Auto:Toggle({
+    Title = "Auto Self Revive",
+    Flag = "AutoSelfReviveToggle",
+    Desc = "Otomatis revive diri sendiri saat downed. (REKONSTRUKSI — verifikasi dengan file asli)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            SelfRevive:Start()
+        else
+            SelfRevive:Stop()
+        end
+    end
+})
+
+Tabs.Auto:Dropdown({
+    Title = "Self Revive Method",
+    Flag = "SelfReviveMethod",
+    Values = { "Spawnpoint", "Fake Revive" },
+    Value = "Spawnpoint",
+    Callback = function(value)
+        SelfRevive.Method = value
+    end
+})
+
+Tabs.Auto:Button({
+    Title = "Manual Revive",
+    Callback = function()
+        if SelfRevive:IsDowned() then
+            SelfRevive:ApplyMethod()
+        else
+            WindUI:Notify({ Title = "Manual Revive", Content = "Kamu sedang tidak downed.", Duration = 3 })
+        end
+    end
+})
+
+Tabs.Auto:Button({
+    Title = "Force Respawn",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.Health = 0
+        else
+            WindUI:Notify({ Title = "Force Respawn", Content = "Karakter belum siap.", Duration = 3 })
+        end
+    end
+})
+
+-- =========================================================
+-- TAB VISUALS (REKONSTRUKSI baris 3510-4494 — hanya 4 fitur dari daftar)
+-- =========================================================
+local forceVisibleTasks = {}
+
+local function stopForceVisible(key)
+    local entry = forceVisibleTasks[key]
+    if entry then
+        entry.Active = false -- thread akan restore kondisi awal & berhenti sendiri
+    end
+end
+
+local function startForceVisible(key, guiNames)
+    stopForceVisible(key)
+    local entry = { Active = true, Cache = {} }
+    forceVisibleTasks[key] = entry
+
+    task.spawn(function()
+        while entry.Active do
+            for _, inst in ipairs(PlayerGui:GetDescendants()) do
+                for _, name in ipairs(guiNames) do
+                    if inst.Name == name then
+                        pcall(function()
+                            if entry.Cache[inst] == nil then
+                                entry.Cache[inst] = (inst:IsA("ScreenGui") and inst.Enabled)
+                                    or (inst:IsA("GuiObject") and inst.Visible) or false
+                            end
+                            if inst:IsA("ScreenGui") then
+                                inst.Enabled = true
+                            elseif inst:IsA("GuiObject") then
+                                inst.Visible = true
+                            end
+                        end)
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+        -- OFF: pulihkan kondisi awal yang tersimpan
+        for inst, original in pairs(entry.Cache) do
+            pcall(function()
+                if inst.Parent then
+                    if inst:IsA("ScreenGui") then
+                        inst.Enabled = original
+                    elseif inst:IsA("GuiObject") then
+                        inst.Visible = original
+                    end
+                end
+            end)
+        end
+        if forceVisibleTasks[key] == entry then
+            forceVisibleTasks[key] = nil
+        end
+    end)
+end
+
+Tabs.Visuals:Toggle({
+    Title = "Timer Display",
+    Flag = "TimerDisplay",
+    Desc = "Paksa GUI timer ronde tetap terlihat. (REKONSTRUKSI — nama GUI heuristik)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startForceVisible("Timer", { "Timer", "TimerText", "RoundTimer", "Countdown" })
+        else
+            stopForceVisible("Timer")
+        end
+    end
+})
+
+Tabs.Visuals:Toggle({
+    Title = "Special Round Display",
+    Flag = "SpecialRoundDisplay",
+    Desc = "Paksa GUI special round tetap terlihat. (REKONSTRUKSI — nama GUI heuristik)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startForceVisible("SpecialRound", { "SpecialRound", "SpecialRoundDisplay", "SpecialRoundInfo" })
+        else
+            stopForceVisible("SpecialRound")
+        end
+    end
+})
+
+-- Show Player Stats: overlay status pemain memakai GetStatus (logika asli yang terlihat)
+local statsOverlay = { Gui = nil, Active = false, LoopId = 0 }
+
+local function stopStatsOverlay()
+    statsOverlay.Active = false
+    if statsOverlay.Gui then
+        statsOverlay.Gui:Destroy()
+        statsOverlay.Gui = nil
+    end
+end
+
+local function startStatsOverlay()
+    stopStatsOverlay()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "DaraHubPlayerStats"
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 100
+    gui.Parent = PlayerGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "StatsPanel"
+    frame.AnchorPoint = Vector2.new(1, 0)
+    frame.Position = UDim2.new(1, -12, 0, 12)
+    frame.Size = UDim2.new(0, 200, 0, 0)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+    frame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    frame.BackgroundTransparency = 0.25
+    frame.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 2)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = frame
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 4)
+    padding.PaddingBottom = UDim.new(0, 4)
+    padding.PaddingLeft = UDim.new(0, 6)
+    padding.PaddingRight = UDim.new(0, 6)
+    padding.Parent = frame
+
+    statsOverlay.Gui = gui
+    statsOverlay.Active = true
+    statsOverlay.LoopId = statsOverlay.LoopId + 1
+    local myLoop = statsOverlay.LoopId
+
+    task.spawn(function()
+        while statsOverlay.Active and statsOverlay.LoopId == myLoop do
+            for _, child in ipairs(frame:GetChildren()) do
+                if child:IsA("TextLabel") then
+                    child:Destroy()
+                end
+            end
+            for order, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local label = Instance.new("TextLabel")
+                    label.BackgroundTransparency = 1
+                    label.Size = UDim2.new(1, 0, 0, 16)
+                    label.Font = Enum.Font.Gotham
+                    label.TextSize = 13
+                    label.TextColor3 = Color3.fromRGB(235, 235, 235)
+                    label.TextXAlignment = Enum.TextXAlignment.Left
+                    label.LayoutOrder = order
+                    label.Text = player.Name .. ": " .. GetStatus(player)
+                    label.Parent = frame
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+Tabs.Visuals:Toggle({
+    Title = "Show Player Stats",
+    Flag = "ShowPlayerStats",
+    Desc = "Overlay kecil berisi status semua pemain (ALIVE/DOWNED/DEAD). (REKONSTRUKSI)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startStatsOverlay()
+        else
+            stopStatsOverlay()
+        end
+    end
+})
+
+Tabs.Visuals:Toggle({
+    Title = "Always Show Death Feed",
+    Flag = "AlwaysShowDeathFeed",
+    Desc = "Paksa death feed tetap terlihat. (REKONSTRUKSI — nama GUI heuristik)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            startForceVisible("DeathFeed", { "DeathFeed", "KillFeed" })
+        else
+            stopForceVisible("DeathFeed")
+        end
+    end
+})
+
+-- =========================================================
+-- TAB UTILITY
+-- =========================================================
+-- Invis Walls Collide (REKONSTRUKSI baris 8100-8137; default true seperti asli)
+local invisWalls = { Cache = {}, Active = false, LoopId = 0 }
+
+local function restoreInvisWalls()
+    for part, original in pairs(invisWalls.Cache) do
+        if part.Parent then
+            pcall(function()
+                part.CanCollide = original
+            end)
+        end
+    end
+    table.clear(invisWalls.Cache)
+end
+
+local function stopInvisWalls()
+    invisWalls.Active = false
+    restoreInvisWalls()
+end
+
+local function scanInvisWalls()
+    local root = workspace:FindFirstChild("Map") or workspace -- hemat perf: scan Map dulu
+    for _, part in ipairs(root:GetDescendants()) do
+        if part:IsA("BasePart") and invisWalls.Cache[part] == nil then
+            -- heuristik dinding tak terlihat: transparan penuh, anchored, solid
+            if part.Transparency >= 0.99 and part.Anchored and part.CanCollide then
+                invisWalls.Cache[part] = true
+                pcall(function()
+                    part.CanCollide = false
+                end)
+            end
+        end
+    end
+end
+
+Tabs.Utility:Toggle({
+    Title = "Invis Walls Collide",
+    Flag = "InvisWallsCollide",
+    Desc = "OFF = tembus dinding tak terlihat (invisible walls). Default ON = perilaku normal game. (REKONSTRUKSI)",
+    Value = true,
+    Callback = function(state)
+        if state then
+            invisWalls.Active = false
+            restoreInvisWalls()
+        else
+            invisWalls.Active = true
+            invisWalls.LoopId = invisWalls.LoopId + 1
+            local myLoop = invisWalls.LoopId
+            task.spawn(function()
+                while invisWalls.Active and invisWalls.LoopId == myLoop do
+                    scanInvisWalls()
+                    task.wait(3)
+                end
+            end)
+        end
+    end
+})
+
+-- Section "Lag Switch" — KOSONG sesuai permintaan
+Tabs.Utility:Section({ Title = "Lag Switch", TextSize = 20 })
+-- TODO: diisi sendiri oleh pemilik
+
+-- Jump Pad Bounce Modifier (REKONSTRUKSI baris 8286-8328)
+local JumpPadValue = 360
+local originalJumpPadUse = nil
+local jumpPadHooked = false
+
+local function findRootFromArgs(...)
+    local n = select("#", ...)
+    for i = 1, n do
+        local v = select(i, ...)
+        if typeof(v) == "Instance" then
+            if v:IsA("BasePart") and v.Name == "HumanoidRootPart" then
+                return v
+            elseif v:IsA("Model") then
+                local hrp = v:FindFirstChild("HumanoidRootPart")
+                if hrp then return hrp end
+            elseif v:IsA("Player") and v.Character then
+                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then return hrp end
+            end
+        elseif type(v) == "table" and typeof(v.Character) == "Instance" then
+            local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then return hrp end
+        end
+    end
+    return nil
+end
+
+Tabs.Utility:Toggle({
+    Title = "Jump Pad Bounce Modifier",
+    Flag = "JumpPadBounceModifier",
+    Desc = "Override JumpPadModule.Use dengan ApplyImpulse(0, Jump Value, 0). (REKONSTRUKSI)",
+    Value = false,
+    Callback = function(state)
+        if state then
+            if not jumpPadHooked then
+                local ok, err = pcall(function()
+                    originalJumpPadUse = JumpPadModule.Use
+                    JumpPadModule.Use = function(...)
+                        local rootPart = findRootFromArgs(...)
+                        if rootPart then
+                            pcall(function()
+                                rootPart:ApplyImpulse(Vector3.new(0, JumpPadValue, 0))
+                            end)
+                        end
+                    end
+                end)
+                if ok then
+                    jumpPadHooked = true
+                else
+                    warn("[DaraHub] Gagal hook JumpPadModule.Use (mungkin read-only): " .. tostring(err))
+                end
+            end
+        else
+            if jumpPadHooked then
+                pcall(function()
+                    JumpPadModule.Use = originalJumpPadUse
+                end)
+                originalJumpPadUse = nil
+                jumpPadHooked = false
+            end
+        end
+    end
+})
+
+Tabs.Utility:Input({
+    Title = "Jump Value",
+    Flag = "JumpPadValueInput",
+    Placeholder = "360",
+    NumbersOnly = true,
+    Value = "360",
+    Callback = function(value)
+        JumpPadValue = tonumber(value) or 360
+    end
+})
+
+-- =========================================================
+-- TAB TELEPORT (REKONSTRUKSI baris 8598-9111)
+-- =========================================================
+Tabs.Teleport:Section({ Title = "Teleports", TextSize = 20 })
+
+local npcCache = {}
+local objectiveCache = {}
+local selectedTargetName = nil
+local selectedObjectiveName = nil
+local targetDropdown, objectiveDropdown
+
+-- Tombol cepat
+Tabs.Teleport:Button({
+    Title = "Teleport to Spawn",
+    Callback = function()
+        local cf = getSpawnCFrame()
+        if cf then
+            teleportTo(cf)
+        else
+            WindUI:Notify({ Title = "Teleport", Content = "Spawn tidak ditemukan.", Duration = 3 })
+        end
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Random Player",
+    Callback = function()
+        local candidates = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and getRootPart(player.Character) then
+                table.insert(candidates, player)
+            end
+        end
+        if #candidates == 0 then
+            WindUI:Notify({ Title = "Teleport", Content = "Tidak ada player lain.", Duration = 3 })
+            return
+        end
+        teleportTo(candidates[math.random(#candidates)].Character)
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Downed Player",
+    Callback = function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and isPlayerDowned(player) and player.Character then
+                if getRootPart(player.Character) then
+                    teleportTo(player.Character)
+                    WindUI:Notify({ Title = "Teleport", Content = "Teleport ke " .. player.Name .. " (downed).", Duration = 3 })
+                    return
+                end
+            end
+        end
+        WindUI:Notify({ Title = "Teleport", Content = "Tidak ada player yang downed.", Duration = 3 })
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Ticket",
+    Callback = function()
+        local ticket = findTicket()
+        if ticket then
+            teleportTo(ticket)
+        else
+            WindUI:Notify({ Title = "Teleport", Content = "Ticket tidak ditemukan di map.", Duration = 3 })
+        end
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to NPC",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local best, bestDist = nil, math.huge
+        for _, npc in ipairs(collectNPCs()) do
+            local root = getRootPart(npc)
+            if root then
+                local dist = (root.Position - hrp.Position).Magnitude
+                if dist < bestDist then
+                    best, bestDist = npc, dist
+                end
+            end
+        end
+        if best then
+            teleportTo(best)
+        else
+            WindUI:Notify({ Title = "Teleport", Content = "NPC tidak ditemukan.", Duration = 3 })
+        end
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to SecurityPart",
+    Callback = function()
+        teleportTo(SecurityPart)
+    end
+})
+
+-- Select Player or NPC + refresh + teleport selected
+local function refreshPlayerNpcList()
+    local values = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(values, player.Name)
+        end
+    end
+    npcCache = collectNPCs()
+    for _, npc in ipairs(npcCache) do
+        table.insert(values, npc.Name)
+    end
+    safeRefreshDropdown(targetDropdown, values, values[1])
+end
+
+targetDropdown = Tabs.Teleport:Dropdown({
+    Title = "Select Player or NPC",
+    Flag = "TeleportTarget",
+    Values = { "(kosong)" },
+    Value = "(kosong)",
+    Callback = function(value)
+        selectedTargetName = value
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Refresh Player List",
+    Callback = function()
+        refreshPlayerNpcList()
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Selected",
+    Callback = function()
+        if not selectedTargetName or selectedTargetName == "(kosong)" then
+            WindUI:Notify({ Title = "Teleport", Content = "Belum ada target dipilih.", Duration = 3 })
+            return
+        end
+        local player = Players:FindFirstChild(selectedTargetName)
+        if player and player.Character then
+            teleportTo(player.Character)
+            return
+        end
+        for _, npc in ipairs(npcCache) do
+            if npc.Name == selectedTargetName then
+                teleportTo(npc)
+                return
+            end
+        end
+        WindUI:Notify({ Title = "Teleport", Content = "Target tidak ditemukan — coba Refresh.", Duration = 3 })
+    end
+})
+
+-- Select Objective + teleport + refresh
+local function refreshObjectives()
+    objectiveCache = collectObjectives()
+    local values = {}
+    for _, obj in ipairs(objectiveCache) do
+        table.insert(values, obj.Name)
+    end
+    safeRefreshDropdown(objectiveDropdown, values, values[1])
+end
+
+objectiveDropdown = Tabs.Teleport:Dropdown({
+    Title = "Select Objective",
+    Flag = "TeleportObjective",
+    Values = { "(kosong)" },
+    Value = "(kosong)",
+    Callback = function(value)
+        selectedObjectiveName = value
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Objective",
+    Callback = function()
+        if not selectedObjectiveName or selectedObjectiveName == "(kosong)" then
+            WindUI:Notify({ Title = "Teleport", Content = "Belum ada objective dipilih.", Duration = 3 })
+            return
+        end
+        for _, obj in ipairs(objectiveCache) do
+            if obj.Name == selectedObjectiveName then
+                teleportTo(obj)
+                return
+            end
+        end
+        WindUI:Notify({ Title = "Teleport", Content = "Objective tidak ditemukan — coba Refresh.", Duration = 3 })
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Refresh Objectives",
+    Callback = function()
+        refreshObjectives()
+    end
+})
+
+-- Section "Teleport to Coordinates"
+Tabs.Teleport:Section({ Title = "Teleport to Coordinates", TextSize = 20 })
+
+local targetCoords = ""
+
+Tabs.Teleport:Input({
+    Title = "Target Coordinates",
+    Flag = "TeleportCoords",
+    Placeholder = "0, 0, 0",
+    NumbersOnly = false,
+    Callback = function(value)
+        targetCoords = value
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport to Coordinates",
+    Callback = function()
+        local nums = {}
+        for num in tostring(targetCoords):gmatch("[-+]?%d+%.?%d*") do
+            table.insert(nums, tonumber(num))
+        end
+        if #nums < 3 then
+            WindUI:Notify({ Title = "Teleport", Content = "Format: X, Y, Z (contoh: 100, 50, -20).", Duration = 3 })
+            return
+        end
+        teleportTo(Vector3.new(nums[1], nums[2], nums[3]))
+    end
+})
+
+-- =========================================================
+-- TAB SHOP (REKONSTRUKSI baris 9112-9948)
+-- Struktur & loop lengkap; getShopStock/purchaseItem/canAfford = best-effort
+-- dan WAJIB disesuaikan dengan file asli.
+-- =========================================================
+local shopStates = {}
+
+-- Hook currency game (path dari blok require file asli) — best-effort, pcall
+local useCurrencyHook
+pcall(function()
+    useCurrencyHook = require(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency)
+end)
+
+local function canAfford(item)
+    -- REKONSTRUKSI: kalau saldo tidak bisa dicek, kembalikan true (server memvalidasi juga)
+    if type(useCurrencyHook) ~= "function" then return true end
+    local ok, res = pcall(useCurrencyHook)
+    if not ok then return true end
+    local balance = nil
+    if type(res) == "number" then
+        balance = res
+    elseif type(res) == "table" then
+        if type(res.Tokens) == "number" then
+            balance = res.Tokens
+        elseif type(res.Value) == "number" then
+            balance = res.Value
+        elseif type(res.Get) == "function" then
+            local ok2, v = pcall(function() return res:Get() end)
+            if ok2 and type(v) == "number" then balance = v end
+        end
+    end
+    local price = item.Cost and item.Cost.Amount
+    if type(balance) == "number" and type(price) == "number" then
+        return balance >= price
+    end
+    return true
+end
+
+-- REKONSTRUKSI: enumerasi item ber-harga dari ReplicatedStorage.Items (heuristik)
+local function getCostInfo(itemData)
+    if type(itemData) ~= "table" then return nil end
+    local cost = itemData.Cost or itemData.Price or (itemData.Info and itemData.Info.Cost)
+    if type(cost) == "number" then
+        return { Amount = cost, Currency = nil, Multiple = false }
+    elseif type(cost) == "table" then
+        return {
+            Amount = cost.Amount or cost.Price,
+            Currency = cost.Currency or cost.Type,
+            Multiple = type(cost.Currencies) == "table" or type(cost.Options) == "table",
+        }
+    end
+    return nil
+end
+
+local function enumeratePurchasableItems()
+    local list = {}
+    local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
+    if itemsFolder then
+        for _, child in ipairs(itemsFolder:GetChildren()) do
+            if child:IsA("ModuleScript") then
+                local ok, data = pcall(require, child)
+                if ok and type(data) == "table" then
+                    local cost = getCostInfo(data)
+                    if cost then
+                        table.insert(list, {
+                            Name = data.Name or child.Name,
+                            ModuleName = child.Name,
+                            Data = data,
+                            Cost = cost,
+                        })
+                    end
+                end
+            end
+        end
+    end
+    table.sort(list, function(a, b) return a.Name:lower() < b.Name:lower() end)
+    return list
+end
+
+-- REKONSTRUKSI: filter per-shop — SESUAIKAN dengan file asli!
+local function matchesShop(item, shopType)
+    local data, currency = item.Data, item.Cost.Currency
+    if shopType == "Token Shop" then
+        return currency == "Tokens" or currency == "Token"
+    elseif shopType == "Multiple Type Items" then
+        return item.Cost.Multiple == true
+    elseif shopType == "Event Shop" then
+        return data.Event ~= nil or data.IsEvent == true or currency == "Tickets"
+    elseif shopType == "Daily Shop" then
+        return data.Daily == true or data.Shop == "Daily"
+    end
+    return false
+end
+
+local function getShopStock(shopType)
+    local stock = {}
+    for _, item in ipairs(enumeratePurchasableItems()) do
+        if matchesShop(item, shopType) then
+            table.insert(stock, item)
+        end
+    end
+    if #stock == 0 then
+        warn("[DaraHub] Filter stok '" .. shopType .. "' kosong — fallback ke semua item ber-harga. Perbaiki matchesShop() sesuai file asli.")
+        stock = enumeratePurchasableItems()
+    end
+    return stock
+end
+
+-- REKONSTRUKSI: remote pembelian asli tidak terlihat di lampiran.
+-- Coba kandidat remote umum; kalau tidak ada → warn sekali dan loop jadi no-op.
+local purchaseRemoteWarned = false
+local function purchaseItem(item)
+    local events = ReplicatedStorage:FindFirstChild("Events")
+    if events then
+        for _, remoteName in ipairs({ "PurchaseItem", "BuyItem", "ShopPurchase" }) do
+            local remote = events:FindFirstChild(remoteName)
+            if remote and remote:IsA("RemoteEvent") then
+                local ok, err = pcall(function()
+                    remote:FireServer(item.ModuleName)
+                end)
+                if not ok then
+                    warn("[DaraHub] purchaseItem gagal: " .. tostring(err))
+                end
+                return ok
+            end
+        end
+    end
+    if not purchaseRemoteWarned then
+        purchaseRemoteWarned = true
+        warn("[DaraHub] Remote pembelian shop tidak ditemukan — isi purchaseItem() di TAB SHOP sesuai file asli (baris 9112-9948).")
+    end
+    return false
+end
+
+local function buildShopSection(shopTitle)
+    local key = shopTitle:gsub("%s", "")
+    local state = {
+        Selected = nil,
+        Stock = {},
+        AutoBuySelected = false,
+        AutoBuyAll = false,
+        Running = false,
+        Attempted = {}, -- anti rebuy: tiap item hanya dicoba sekali per sesi toggle
+        Dropdown = nil,
+    }
+    shopStates[key] = state
+
+    Tabs.Shop:Section({ Title = shopTitle, TextSize = shopTitle == "Multiple Type Items" and 16 or 20 })
+
+    state.Dropdown = Tabs.Shop:Dropdown({
+        Title = shopTitle .. " Items",
+        Flag = "Shop" .. key .. "Items",
+        Values = { "(memuat...)" },
+        Value = "(memuat...)",
+        Callback = function(value)
+            state.Selected = value
+        end
+    })
+
+    local function refreshStock()
+        state.Stock = getShopStock(shopTitle)
+        local names = {}
+        for _, item in ipairs(state.Stock) do
+            table.insert(names, item.Name)
+        end
+        safeRefreshDropdown(state.Dropdown, names, names[1])
+        if #names == 0 then
+            WindUI:Notify({ Title = shopTitle, Content = "Stok tidak ditemukan — cek console.", Duration = 4 })
+        end
+    end
+    refreshStock()
+
+    local function startLoop()
+        if state.Running then return end
+        state.Running = true
+        task.spawn(function()
+            -- loop berhenti bersih saat kedua toggle OFF (kondisi dicek tiap iterasi)
+            while state.Running and (state.AutoBuySelected or state.AutoBuyAll) do
+                if state.AutoBuyAll then
+                    for _, item in ipairs(state.Stock) do
+                        if not state.Running or not state.AutoBuyAll then break end
+                        if not state.Attempted[item.ModuleName] then
+                            state.Attempted[item.ModuleName] = true
+                            if canAfford(item) then
+                                purchaseItem(item)
+                            end
+                            task.wait(0.4)
+                        end
+                    end
+                elseif state.AutoBuySelected and state.Selected then
+                    for _, item in ipairs(state.Stock) do
+                        if item.Name == state.Selected then
+                            if canAfford(item) then
+                                purchaseItem(item)
+                            end
+                            break
+                        end
+                    end
+                end
+                task.wait(2)
+            end
+            state.Running = false
+        end)
+    end
+
+    Tabs.Shop:Toggle({
+        Title = "Auto Buy Selected",
+        Flag = "Shop" .. key .. "AutoBuySelected",
+        Value = false,
+        Callback = function(v)
+            state.AutoBuySelected = v
+            if v then
+                state.Attempted = {}
+                startLoop()
+            end
+        end
+    })
+
+    Tabs.Shop:Toggle({
+        Title = "Auto Buy All",
+        Flag = "Shop" .. key .. "AutoBuyAll",
+        Value = false,
+        Callback = function(v)
+            state.AutoBuyAll = v
+            if v then
+                state.Attempted = {}
+                startLoop()
+            end
+        end
+    })
+end
+
+local shopLoaded = false
+Tabs.Shop:Button({
+    Title = "Load Shop Automation",
+    Desc = "Memuat section Daily Shop, Token Shop (Multiple Type Items), dan Event Shop. (REKONSTRUKSI)",
+    Callback = function()
+        if shopLoaded then
+            WindUI:Notify({ Title = "Shop", Content = "Section shop sudah dimuat.", Duration = 3 })
+            return
+        end
+        shopLoaded = true
+        buildShopSection("Daily Shop")
+        buildShopSection("Token Shop")
+        buildShopSection("Multiple Type Items") -- sub-section Token Shop
+        buildShopSection("Event Shop")
+    end
+})
+
+-- =========================================================
+-- CLEANUP — dipanggil saat window dihancurkan (anti kebocoran connection)
+-- =========================================================
+local function cleanup()
+    if bounceConnection then
+        bounceConnection:Disconnect()
+        bounceConnection = nil
+    end
+    if stopRampBooster then stopRampBooster() end
+    SelfRevive:Stop()
+    stopInvisWalls()
+    if jumpPadHooked then
+        pcall(function()
+            JumpPadModule.Use = originalJumpPadUse
+        end)
+        jumpPadHooked = false
+        originalJumpPadUse = nil
+    end
+    for key in pairs(forceVisibleTasks) do
+        stopForceVisible(key)
+    end
+    stopStatsOverlay()
+    for _, state in pairs(shopStates) do
+        state.AutoBuySelected = false
+        state.AutoBuyAll = false
+        state.Running = false
+    end
+    if MobileTopbar.UpdateAllButtons then
+        pcall(MobileTopbar.UpdateAllButtons) -- lepas semua keybind yang tertahan
+    end
+    ButtonLib:DestroyScreengui()
+    mouseUnlock(false)
+end
+
+if typeof(Window.OnDestroy) == "function" then
+    Window:OnDestroy(function()
+        cleanup()
+    end)
+elseif Window.OnDestroy and typeof(Window.OnDestroy.Connect) == "function" then
+    Window.OnDestroy:Connect(function()
+        cleanup()
+    end)
+else
+    warn("[DaraHub] Window.OnDestroy tidak tersedia di WindUI ini — matikan toggle manual sebelum re-execute.")
+end
