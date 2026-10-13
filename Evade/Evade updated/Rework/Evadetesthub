@@ -1,12 +1,18 @@
 -- ============================================================================
--- Dara Hub | Evade 2.1 (Summarized & Cleaned Version)
+-- Dara Hub | Evade 2.1 (Summarized, Cleaned & Anti-Freeze Version)
 -- ============================================================================
 
+-- FIX: FireClient dibungkus pcall untuk mencegah error merambat dan membekukan karakter
 function FireClient(path, ...)
     if getconnections then
-        for _,c in getconnections(path.OnClientEvent) do
-            c.Function(...)
-        end
+        local ok, err = pcall(function()
+            for _,c in getconnections(path.OnClientEvent) do
+                if type(c.Function) == "function" then
+                    c.Function(...)
+                end
+            end
+        end)
+        if not ok then warn("FireClient error:", err) end
     else 
         warn("Your Executor failed to run 'getconnections'")
     end
@@ -22,7 +28,7 @@ getgenv().DaraHubExecuted = true
 -- UI INITIALIZATION (WindUI)
 -- ============================================================================
 local BaseURL = "https://darahub.pages.dev"
-loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
+loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))()
 WindUI = loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua"))()
 
 Window = WindUI:CreateWindow({
@@ -74,7 +80,9 @@ Tabs = {
 function mouseUnlock(enabled)
     local success, err = pcall(function()
         local uiService = game:GetService("ReplicatedStorage"):FindFirstChild("Services"):FindFirstChild("UI"):FindFirstChild("SharedUIService")
-        uiService.SetMouseActive:Fire("WindUI", enabled)
+        if uiService and uiService.SetMouseActive then
+            uiService.SetMouseActive:Fire("WindUI", enabled)
+        end
     end)
     if not success then warn("Failed to set mouse active state: " .. tostring(err)) end
 end
@@ -88,7 +96,9 @@ Window:OnDestroy(function()
 end)
 
 function SendKeybindEvent(key, bool)
-    ReplicatedStorage.Services.Client.KeybindService.SendKeybindEvent:Fire({ Key = key, Down = bool })
+    local ok, err = pcall(function()
+        ReplicatedStorage.Services.Client.KeybindService.SendKeybindEvent:Fire({ Key = key, Down = bool })
+    end)
 end
 
 -- Custom Top GUI (Mobile/Touch)
@@ -216,7 +226,7 @@ LocalPlayer.CharacterAdded:Connect(setupCharacter)
 local changePlayerMode = ReplicatedStorage.Events.SetPlayerMode
 
 -- ============================================================================
--- MOVEMENT HOOK & CORE LOGIC
+-- MOVEMENT HOOK & CORE LOGIC (FIXED ANTI-FREEZE)
 -- ============================================================================
 local defaultMovementValues = {
     SprintAcceleration = 1, SprintCap = 2, RunAccel = 1, Friction = 5, RunDeaccel = 700,
@@ -245,18 +255,22 @@ function getCurrentSpeed(character)
     return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
 end
 
+-- FIX: MovementValueSet dibungkus pcall
 function MovementValueSet(MovementType, value)
     if not CharacterTag then CharacterTag = GetCharacterTag(LocalPlayer.Character) end
     if CharacterTag then
-        FireClient(ReplicatedStorage.Events.CharacterTask, CharacterTag, "ModifyMovement", {MovementType, value})
+        pcall(FireClient, ReplicatedStorage.Events.CharacterTask, CharacterTag, "ModifyMovement", {MovementType, value})
     end
 end
 
 local originalMovement_update = Movement.Update
 local lastFriction = nil
 
+-- FIX: Movement.Update dibungkus pcall total agar karakter TIDAK FREEZE jika ada error
 Movement.Update = function(self, ...)
-    originalMovementUpdate(self, ...)
+    local ok, err = pcall(originalMovement_update, self, ...)
+    if not ok then warn("Movement.Update original error:", err) end
+    
     local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
     if not humanoid then return end
     
@@ -275,30 +289,37 @@ Movement.Update = function(self, ...)
                 desiredFriction = accelerationValue
             end
         elseif accelerationMethod == "Acceleration (No Ground Check)" then
-            -- FIX: Added No Ground Check mode for ramps/ground acceleration
             desiredFriction = accelerationValue
         end
     end
 
     if desiredFriction ~= lastFriction then
         if desiredFriction ~= nil then
-            MovementValueSet("Friction", desiredFriction)
+            pcall(MovementValueSet, "Friction", desiredFriction)
         else
-            MovementValueSet("Friction", defaultMovementValues.Friction)
+            pcall(MovementValueSet, "Friction", defaultMovementValues.Friction)
         end
         lastFriction = desiredFriction
     end
 
-    if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then self:AttemptJump() end
-    if autoJumpEnabled and grounded then
-        if autoJumpType == "Realistic" then self:AttemptJump() else humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+    if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then 
+        pcall(function() self:AttemptJump() end) 
     end
-    if bhopHoldEnabled and grounded and humanoid.Jump == true then self:AttemptJump() end
+    if autoJumpEnabled and grounded then
+        if autoJumpType == "Realistic" then 
+            pcall(function() self:AttemptJump() end) 
+        else 
+            pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) 
+        end
+    end
+    if bhopHoldEnabled and grounded and humanoid.Jump == true then 
+        pcall(function() self:AttemptJump() end) 
+    end
 end
 
 function updateBhopEnabled()
     local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and accelerationMethod ~= "No Acceleration"
-    MovementValueSet("BhopEnabled", shouldEnable)
+    pcall(MovementValueSet, "BhopEnabled", shouldEnable)
 end
 function ToggleBhop(state) autoJumpEnabled = state updateBhopEnabled() end
 function ToggleBhopHold(state) bhopHoldEnabled = state updateBhopEnabled() end
@@ -306,7 +327,7 @@ function SetAccelerationMethod(method)
     accelerationMethod = method
     updateBhopEnabled()
     if not (autoJumpEnabled or bhopHoldEnabled) then
-        MovementValueSet("Friction", defaultMovementValues.Friction)
+        pcall(MovementValueSet, "Friction", defaultMovementValues.Friction)
         lastFriction = nil
     end
 end
@@ -378,13 +399,15 @@ function triggerSuperBounce()
     local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
     local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if humanoid and rootPart then
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, BounceHeight, rootPart.AssemblyLinearVelocity.Z)
+        pcall(function()
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, BounceHeight, rootPart.AssemblyLinearVelocity.Z)
+        end)
     end
 end
 
 Tabs.Player:Toggle({
-    Title = "Super Bounce", -- FIX: Typo "Supper" corrected to "Super"
+    Title = "Super Bounce",
     Flag = "SuperBounceToggle", Value = false,
     Callback = function(state)
         SuperBounceEnabled = state
@@ -445,7 +468,7 @@ local modInputs = {
 }
 for _, data in ipairs(modInputs) do
     local inp = Tabs.Player:Input({ Title=data.Title, Placeholder=tostring(defaultMovementValues[data.Val]), NumbersOnly=true, Value=tostring(defaultMovementValues[data.Val]) })
-    inp.Callback = function(value) MovementValueSet(data.Val, tonumber(value)) end
+    inp.Callback = function(value) pcall(MovementValueSet, data.Val, tonumber(value)) end
     Tabs.Player:Space()
 end
 
@@ -666,7 +689,6 @@ local PlayerStats = nil
 local textLabels = {}
 local observeConnections = {}
 function formatNumber(num) local str = tostring(math.floor(num)); local formatted = ""; local length = #str; for i = 1, length do formatted = formatted .. str:sub(i, i); if (length - i) % 3 == 0 and i ~= length then formatted = formatted .. "," end end; return formatted end
-function updateFrontFrameXSize(frame, textLabel) if not frame or not textLabel then return end; local textBounds = textLabel.TextBounds; frame.Size = UDim2.new(0, textBounds.X + 20, 1, 0) end
 function createResourceRow(name, defaultValue, textColor, iconAssetId, iconColor, layoutOrder, leftColumn)
     local container = Instance.new("Frame"); container.Name = name; container.BackgroundTransparency = 1; container.Size = UDim2.fromScale(1, 1); container.LayoutOrder = layoutOrder; container.Parent = leftColumn
     local icon = Instance.new("ImageLabel"); icon.BackgroundTransparency = 1; icon.Image = "rbxassetid://" .. iconAssetId; if iconColor then icon.ImageColor3 = iconColor end; icon.AnchorPoint = Vector2.new(0.5, 0.5); icon.Position = UDim2.fromScale(0.5, 0.5); icon.Size = UDim2.fromScale(0.8, 0.8); icon.ZIndex = 3; icon.Parent = container
