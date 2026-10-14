@@ -1,8 +1,11 @@
 --[[
-        Dara Hub | Evade 2.1 (Lite / Ringkas)
-        Dibangun ulang dari DaraHubNext.txt (versi asli 10.768 baris).
-        Hanya fitur terpilih yang dipertahankan, semua dependensinya dibawa utuh
-        (nama Flag, remote, path ReplicatedStorage, dan struktur tabel dipertahankan).
+    Dara Hub | Evade 2.1 - VERSI RINGKAS
+    Basis: DaraHubNext.txt (script asli) - hanya fitur yang diminta yang dipertahankan.
+    Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop
+    Tab yang dihapus       : ESP, Misc, Settings, info, Others
+    Penambahan             : "Air Strafe Acceleration" (section Modification, tab Player),
+                             mode "Acceleration (No Ground Check)" pada Bhop Mode (tab Auto),
+                             section kosong "Lag Switch" (tab Utility, TODO diisi pemilik).
 ]]
 
 function FireClient(path, ...)
@@ -19,8 +22,23 @@ return
 end
 getgenv().DaraHubExecuted = true
 local BaseURL = "https://darahub.pages.dev"
-loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff (ButtonLib, dll)
-WindUI = loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua"))()
+
+-- FIX: pemuatan library dibungkus pcall + warn agar penyebab gagal terlihat jelas di console
+local okLib = pcall(function()
+loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
+end)
+if not okLib then
+warn("[Dara Hub] Gagal memuat library (LoadAll.lua). Periksa koneksi/executor lalu eksekusi ulang.")
+return
+end
+local okWindUI, WindUIMod = pcall(function()
+return loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua"))()
+end)
+if not okWindUI or type(WindUIMod) ~= "table" then
+warn("[Dara Hub] Gagal memuat WindUI (WindUI-Moded/main.lua). Periksa koneksi/executor lalu eksekusi ulang.")
+return
+end
+WindUI = WindUIMod
 
 Window = WindUI:CreateWindow({
 NewElements = true,
@@ -41,12 +59,19 @@ WindUI.TransparencyValue = 0.7
 Window:ToggleTransparency(true)
 Window:DisableTopbarButtons({ "Fullscreen" })
 Window:SetIconSize(48)
-executor = identifyexecutor()
-if type(executor) == "table" then
+-- Show/Hide window memakai fitur native WindUI: OpenButton (di CreateWindow) + SetToggleKey.
+-- FIX: SetToggleKey dipindah keluar dari tab Settings yang dihapus (nilai default sama: RightControl)
+Window:SetToggleKey(Enum.KeyCode.RightControl)
+
+-- FIX: identifyexecutor dibungkus pcall (tidak semua executor menyediakan fungsi ini)
+local okExec, executor = pcall(function()
+return identifyexecutor()
+end)
+if okExec and type(executor) == "table" then
 for key, value in pairs(executor) do
 print(key .. ": " .. tostring(value))
 end
-elseif type(executor) == "string" then
+elseif okExec and type(executor) == "string" then
 Window:Tag({
 Title = "" .. executor
 })
@@ -91,6 +116,7 @@ ButtonLib:DestroyScreengui()
 mouseUnlock(false)
 if stopRampBooster then stopRampBooster() end
 end)
+
 -- Services & Variable
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -99,24 +125,34 @@ local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- require (hanya module yang dipakai fitur terpilih)
-local ServerStateRegistryService = require(ReplicatedStorage.Services.Data.ServerStateRegistryService)
-local CharacterService = require(ReplicatedStorage.Services.Asset.CharacterService)
-local InteractionTypes = require(ReplicatedStorage.Services.Asset.InteractionService.InteractionTypes)
-local Movement = require(ReplicatedStorage.Objects.Game.Character.Client.Movement)
-local Portal = require(ReplicatedStorage.Objects.Game.Tool.Tasks.Types.Portal)
-local useCurrency = require(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency)
-local useProgression = require(ReplicatedStorage.Shared.UserData.ClientHooks.useProgression)
-local useEvent = require(ReplicatedStorage.Shared.UserData.ClientHooks.useEvent)
-local DeathFeed = require(ReplicatedStorage.Services.UI.GameUIService.Types.DeathFeed)
-local UseInventory = require(ReplicatedStorage.Shared.UserData.ClientHooks.useInventory)
-local JumpPadModule = require(ReplicatedStorage.Items.BaseItems.Loadout.Deployables.JumpPad.Modules.Client)
-local Currency = require(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency)
-local Config = require(ReplicatedStorage.Shared.UserData.Battlepass.Config)
+-- require
+-- FIX: semua require dibungkus pcall + warn supaya module yang gagal dimuat terlihat jelas (perilaku sama saat sukses)
+local function safeRequire(path, name)
+local ok, result = pcall(require, path)
+if not ok then
+warn("[Dara Hub] Gagal require '" .. tostring(name) .. "': " .. tostring(result))
+end
+return result
+end
+local ServerStateRegistryService = safeRequire(ReplicatedStorage.Services.Data.ServerStateRegistryService, "ServerStateRegistryService")
+local CharacterService = safeRequire(ReplicatedStorage.Services.Asset.CharacterService, "CharacterService")
+local InteractionTypes = safeRequire(ReplicatedStorage.Services.Asset.InteractionService.InteractionTypes, "InteractionTypes")
+local Movement = safeRequire(ReplicatedStorage.Objects.Game.Character.Client.Movement, "Movement")
+local Portal = safeRequire(ReplicatedStorage.Objects.Game.Tool.Tasks.Types.Portal, "Portal")
+local useCurrency = safeRequire(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency, "useCurrency")
+local useProgression = safeRequire(ReplicatedStorage.Shared.UserData.ClientHooks.useProgression, "useProgression")
+local useEvent = safeRequire(ReplicatedStorage.Shared.UserData.ClientHooks.useEvent, "useEvent")
+local DeathFeed = safeRequire(ReplicatedStorage.Services.UI.GameUIService.Types.DeathFeed, "DeathFeed")
+local UseInventory = safeRequire(ReplicatedStorage.Shared.UserData.ClientHooks.useInventory, "useInventory")
+local JumpPadModule = safeRequire(ReplicatedStorage.Items.BaseItems.Loadout.Deployables.JumpPad.Modules.Client, "JumpPadModule")
+local Currency = safeRequire(ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency, "Currency")
+local Config = safeRequire(ReplicatedStorage.Shared.UserData.Battlepass.Config, "Config")
 
 -- Force Enable Lookback and zoom on mobile
 for _, n in {"LookBack", "ADS"} do
-    require(ReplicatedStorage.Objects.Game.Actions.ActionTypes[n]).Requirements.Mobile = nil
+    pcall(function()
+        require(ReplicatedStorage.Objects.Game.Actions.ActionTypes[n]).Requirements.Mobile = nil
+    end)
 end
 
 local Character
@@ -144,7 +180,7 @@ LocalPlayer.CharacterAdded:Connect(function(character)
 setupCharacter(character)
 end)
 
--- Top bar buttons (Custom Top GUI milik DaraHub: Zoom, Front View/Reload, Leaderboard)
+-- Top bar buttons (Custom Top GUI: Zoom, Front View/Reload, Leaderboard)
 function SendKeybindEvent(key, bool)
 ReplicatedStorage.Services.Client.KeybindService.SendKeybindEvent:Fire({
 Key = key,
@@ -274,6 +310,16 @@ for _, config in ipairs(keybindButtonsConfig) do
 createKeybindButton(config, targetParent) 
 end 
 end
+
+if not workspace:FindFirstChild("SecurityPart") then
+SecurityPart = Instance.new("Part")
+SecurityPart.Name = "SecurityPart"
+SecurityPart.Size = Vector3.new(10, 1, 10)
+SecurityPart.Position = Vector3.new(50000, 50000, 50000)
+SecurityPart.Anchored = true
+SecurityPart.CanCollide = true
+SecurityPart.Parent = workspace
+end
 -----------------------------------------Modification Stuffs-----------------------------------------------------
 local defaultMovementValues = {
 SprintAcceleration = 1,
@@ -297,8 +343,20 @@ local autoJumpType = "Simulation"
 local bhopHoldEnabled = false
 local accelerationMethod = "Acceleration"
 local accelerationValue = -0.2
-local customFriction = nil -- FIX: menyimpan Friction yang diisi user di tab Player agar bisa dikembalikan saat override bhop berhenti
-
+local customFriction = nil -- FIX: menyimpan Friction kustom dari input tab Player agar restore saat bhop berhenti kembali ke nilai yang benar (bukan selalu default)
+function getCurrentSpeed(character)
+if not character then return 0 end
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not hrp then return 0 end
+for _, child in ipairs(hrp:GetChildren()) do
+if child:IsA("LinearVelocity") and child.Name:find("LinearVelocity") then
+local pv = child.PlaneVelocity
+return (pv.X * pv.X + pv.Y * pv.Y) ^ 0.5
+end
+end
+local velocity = hrp.AssemblyLinearVelocity
+return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
+end
 function MovementValueSet(MovementType, value)
 if not CharacterTag then
 CharacterTag = GetCharacterTag(LocalPlayer.Character)
@@ -314,6 +372,7 @@ Movement.Update = function(self, ...)
 originalMovementUpdate(self, ...)
 local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
 if not humanoid then return end
+local LocalPlayer = game:GetService("Players").LocalPlayer
 local LocalPlayerData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
 local movementData = LocalPlayerData and LocalPlayerData.Movement
 local state = movementData and movementData.State
@@ -322,10 +381,12 @@ state = self.State
 end
 local grounded = self.DataRegistry:Get("Grounded")
 local desiredFriction = nil
-if accelerationMethod == "Acceleration" or accelerationMethod == "Acceleration (No Ground Check)" then
+-- FIX/ADD: Bhop Mode kini punya 3 pilihan.
+--  "Acceleration"                    -> override Friction hanya saat TIDAK grounded (perilaku asli)
+--  "Acceleration (No Ground Check)"  -> override Friction berlaku di udara, di tanah, dan di ramp (tanpa cek grounded)
+--  "No Acceleration"                 -> tanpa override Friction
+if desiredFriction == nil and accelerationMethod ~= "No Acceleration" then
 local isBhopActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
--- FIX: mode "Acceleration (No Ground Check)" mengabaikan cek grounded, jadi override Friction
--- tetap aktif di udara, di tanah, dan di ramp (di mode asli override hanya berjalan saat tidak grounded)
 if isBhopActive and (accelerationMethod == "Acceleration (No Ground Check)" or not grounded) then
 desiredFriction = accelerationValue
 end
@@ -334,8 +395,7 @@ if desiredFriction ~= lastFriction then
 if desiredFriction ~= nil then
 MovementValueSet("Friction", desiredFriction)
 else
--- FIX: saat override bhop berhenti, Friction kembali ke nilai input user (jika pernah diisi),
--- bukan selalu ke nilai default
+-- FIX: restore memakai customFriction dulu (nilai dari input Friction tab Player), baru default, agar tidak saling menimpa diam-diam dengan input Player
 MovementValueSet("Friction", customFriction or defaultMovementValues.Friction)
 end
 lastFriction = desiredFriction
@@ -354,10 +414,9 @@ if bhopHoldEnabled and grounded and humanoid.Jump == true then
 self:AttemptJump()
 end
 end
-local ACCEL_MODES = { ["Acceleration"] = true, ["Acceleration (No Ground Check)"] = true }
 function updateBhopEnabled()
--- FIX: kedua mode "Acceleration" (dengan/tanpa ground check) dianggap aktif; "No Acceleration" tidak memakai override
-local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and ACCEL_MODES[accelerationMethod] == true
+-- FIX: kedua mode "Acceleration" dianggap aktif untuk BhopEnabled (sebelumnya hanya "Acceleration")
+local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and (accelerationMethod == "Acceleration" or accelerationMethod == "Acceleration (No Ground Check)")
 MovementValueSet("BhopEnabled", shouldEnable)
 end
 function ToggleBhop(state)
@@ -372,23 +431,14 @@ function SetAccelerationMethod(method)
 accelerationMethod = method
 updateBhopEnabled()
 if not (autoJumpEnabled or bhopHoldEnabled) then
+-- FIX: restore memakai customFriction dulu, baru default (sama seperti alasan di Movement.Update)
 MovementValueSet("Friction", customFriction or defaultMovementValues.Friction)
-end
--- FIX: paksa evaluasi ulang Friction pada Movement.Update berikutnya supaya tidak ada override basi saat ganti mode
 lastFriction = nil
+end
 end
 ---------------------------------------------------------------------------------------------------------------------------
 
-if not workspace:FindFirstChild("SecurityPart") then
-SecurityPart = Instance.new("Part")
-SecurityPart.Name = "SecurityPart"
-SecurityPart.Size = Vector3.new(10, 1, 10)
-SecurityPart.Position = Vector3.new(50000, 50000, 50000)
-SecurityPart.Anchored = true
-SecurityPart.CanCollide = true
-SecurityPart.Parent = workspace
-end
--- Main Tab
+-- ================= TAB MAIN =================
 Tabs.Main:Space()
 
 function CanBeCarried(value)
@@ -419,7 +469,8 @@ FEBoombox:Destroy()
 loadstring(game:HttpGet(BaseURL .. "/api/script/obfuscated/Fe/Boomboxs/EvadeOverhaul-RelicsXYZ.lua"))()
 end
 })
--- Player Tabs
+
+-- ================= TAB PLAYER =================
 Tabs.Player:Section({ Title = "Player", TextSize = 40 })
 Tabs.Player:Divider()
 Tabs.Player:Section({Title="Modify Bounce",TextSize=20})
@@ -470,6 +521,7 @@ Callback = function(value)
 BounceSpeed = tonumber(value) or 0
 end
 })
+
 Tabs.Player:Section({ Title = "Supper Bounce", TextSize = 20 })
 Tabs.Player:Divider()
 
@@ -513,13 +565,15 @@ Flag = "SuperBounce",
 Position = UDim2.new(0.5, -125, 0.2, 0),
 Visible = false,
 Callback = function()
-pcall(triggerSuperBounce) -- FIX: bungkus pcall agar tombol layar tidak error saat karakter belum load
+triggerSuperBounce()
 end
 })
 if ButtonLib.SuperBounce then
 ButtonLib.SuperBounce:SetText("Supper Bounce")
 end
+
 Tabs.Player:Space()
+
 do
 local rampBoostMultiplier = 2
 local rampBoostConnection = nil
@@ -589,6 +643,9 @@ end
 Tabs.Player:Space()
 Tabs.Player:Section({Title="Modification"})
 
+-- Section Modification: Jump Cap, Air Strafe Acceleration (TAMBAHAN), Air Acceleration,
+-- Sprint Acceleration, Run Acceleration, Run Deacceleration, Friction.
+
 JumpCapInput = Tabs.Player:Input({
 Title="Jump Cap", 
 Placeholder=tostring(defaultMovementValues.JumpCap), 
@@ -601,6 +658,18 @@ end
 
 Tabs.Player:Space()
 
+-- ADD: input "Air Strafe Acceleration" (nilai asli ada di defaultMovementValues.AirStrafeAcceleration = 182).
+-- Tanpa input ini, Air Acceleration saja tidak mengubah kecepatan strafe di udara (dua-duanya dipakai game).
+AirStrafeAccelerationInput = Tabs.Player:Input({
+Title="Air Strafe Acceleration", 
+Placeholder=tostring(defaultMovementValues.AirStrafeAcceleration), 
+NumbersOnly=true, 
+Value=tostring(defaultMovementValues.AirStrafeAcceleration)
+})
+AirStrafeAccelerationInput.Callback = function(value)
+MovementValueSet("AirStrafeAcceleration", tonumber(value))
+end
+
 AirAccelerationInput = Tabs.Player:Input({
 Title="Air Acceleration", 
 Placeholder=tostring(defaultMovementValues.AirAcceleration), 
@@ -611,6 +680,8 @@ AirAccelerationInput.Callback = function(value)
 MovementValueSet("AirAcceleration", tonumber(value))
 end
 
+Tabs.Player:Space()
+
 SprintAccelerationInput = Tabs.Player:Input({
 Title="Sprint Acceleration", 
 Placeholder=tostring(defaultMovementValues.SprintAcceleration), 
@@ -620,8 +691,6 @@ Value=tostring(defaultMovementValues.SprintAcceleration)
 SprintAccelerationInput.Callback = function(value)
 MovementValueSet("SprintAcceleration", tonumber(value))
 end
-
-Tabs.Player:Space()
 
 RunAccelInput = Tabs.Player:Input({
 Title="Run Acceleration", 
@@ -643,8 +712,6 @@ RunDeaccelInput.Callback = function(value)
 MovementValueSet("RunDeaccel", tonumber(value))
 end
 
-Tabs.Player:Space()
-
 FrictionInput = Tabs.Player:Input({
 Title="Friction", 
 Placeholder=tostring(defaultMovementValues.Friction), 
@@ -652,11 +719,12 @@ NumbersOnly=true,
 Value=tostring(defaultMovementValues.Friction)
 })
 FrictionInput.Callback = function(value)
-local n = tonumber(value)
-customFriction = n -- FIX: catat nilai user supaya bisa dikembalikan setelah override bhop berhenti
-MovementValueSet("Friction", n)
+-- FIX: simpan nilai custom agar restore friction (saat bhop berhenti) kembali ke nilai ini, bukan default
+customFriction = tonumber(value)
+MovementValueSet("Friction", tonumber(value))
 end
--- Combat Tab (tanpa section)
+
+-- ================= TAB COMBAT =================
 Tabs.Combat:Button({
 Title = "Infinite Range",
 Callback = function()
@@ -701,11 +769,9 @@ Tabs.Combat:Space()
 Tabs.Combat:Button({
 Title = "Portal bypass",
 Callback = function()
-pcall(function() -- FIX: pcall agar gagal override tidak membuat script crash
 Portal.IsPortalPossible = function(...)
 return true
 end
-end)
 end
 })
 Tabs.Combat:Space()
@@ -746,10 +812,8 @@ end
 end
 end
 })
-Tabs.Combat:Space()
--- Auto Tab
-Tabs.Auto:Section({ Title = "Auto", TextSize = 40 })
-local changePlayerMode = ReplicatedStorage.Events.SetPlayerMode
+
+-- ================= TAB AUTO =================
 Tabs.Auto:Section({Title="Bhop"})
 
 BhopToggle = Tabs.Auto:Toggle({
@@ -770,10 +834,13 @@ ToggleBhopHold(state)
 end
 })
 
+-- ADD: pilihan ketiga "Acceleration (No Ground Check)" pada Bhop Mode.
+-- Mode ini menerapkan override Friction tanpa cek grounded (berlaku di udara, di tanah, dan di ramp),
+-- sehingga acceleration tetap jalan saat menempel tanah/ramp.
 AccelerationDropdown = Tabs.Auto:Dropdown({
 Title = "Bhop Mode",
 Flag = "AccelerationDropdown",
-Values = { "No Acceleration", "Acceleration", "Acceleration (No Ground Check)" }, -- FIX: tambahan mode ketiga (tanpa ground check)
+Values = { "No Acceleration", "Acceleration", "Acceleration (No Ground Check)" },
 Value = "Acceleration",
 Callback = function(value)
 SetAccelerationMethod(value)
@@ -801,8 +868,8 @@ Values = {  "Simulation", "Realistic" },
 Value = "Simulation",
 Callback = function(value)
 autoJumpType = value
--- FIX: file asli memanggil unloadBhop()/loadBhop() yang tidak pernah didefinisikan (error saat dipanggil).
--- autoJumpType dibaca langsung oleh Movement.Update setiap frame, jadi tidak perlu reload apa pun.
+-- FIX: pemanggilan unloadBhop()/loadBhop() dihapus - kedua fungsi ini tidak pernah didefinisikan
+-- di file asli sehingga memanggilnya hanya menghasilkan error; mode baru berlaku pada update berikutnya.
 end
 })
 
@@ -839,6 +906,10 @@ end
 }).Position = UDim2.new(0.5, -125, 0.4, 0)
 
 Tabs.Auto:Space()
+Tabs.Auto:Section({ Title = "Auto" })
+
+local changePlayerMode = ReplicatedStorage.Events.SetPlayerMode
+
 SelfRevive = {
 Method = "Spawnpoint",
 Enabled = false,
@@ -1002,10 +1073,11 @@ Callback = function()
 changePlayerMode:FireServer(true)
 end
 })
-Tabs.Auto:Space()
--- Visuals Tab
+
+-- ================= TAB VISUALS =================
 Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
 Tabs.Visuals:Divider()
+
 local TimerGUI = nil
 local TimerEnabled = false
 local SpecialRoundEnabled = false
@@ -1933,8 +2005,8 @@ if s then ForceDeathFeed() else RestoreOldDeathFeed() end
 end
 })
 end
--- Utility Tab
-Tabs.Utility:Space()
+
+-- ================= TAB UTILITY =================
 Tabs.Utility:Toggle({
 Title = "Invis Walls Collide",
 Value = true,
@@ -1971,9 +2043,11 @@ end
 end
 })
 Tabs.Utility:Space()
--- Section Lag Switch: sengaja dikosongkan (fitur Lag Switch asli dihapus dari versi ringkas ini)
-Tabs.Utility:Section({ Title = "Lag Switch", TextSize = 20 })
+
+-- Section "Lag Switch" sengaja dikosongkan (fitur lag switch asli dihapus).
 -- TODO: diisi sendiri oleh pemilik
+Tabs.Utility:Section({ Title = "Lag Switch", TextSize = 20 })
+
 Tabs.Utility:Space()
 
 local JumpPadValue = 360
@@ -2019,9 +2093,9 @@ JumpPadValue = num
 end
 end
 })
-Tabs.Utility:Space()
 
--- Helper teleport (dipindah utuh dari file asli, dipakai hanya oleh tab Teleport)
+-- ================= TAB TELEPORT =================
+-- Helper teleport (dipindah utuh dari file asli, hanya dipakai tab Teleport)
 function isNPCModel(model)
 if not model or not model:IsA("Model") then return false end
 if model:GetAttribute("AI") == true then return true end
@@ -2036,10 +2110,9 @@ end
 return false
 end
 
--- FIX: di file asli isModelDowned didefinisikan dua kali; versi kedua yang efektif saat runtime, jadi hanya versi itu yang dipertahankan
 function isModelDowned(model)
 if not model or not model:IsA("Model") then return false end
-local humanoid = model:FindFirstChildOfClass("Humanoid")
+local humanoid = model:FindFirstChild("Humanoid")
 if humanoid and humanoid.Health <= 0 then return true end
 return false
 end
@@ -2167,12 +2240,6 @@ hrp.CFrame = cframeOffset
 end
 end
 
-function teleportToPart(part, offset)
-if part then
-teleportToCFrame(part.CFrame + offset)
-end
-end
-
 function teleportToRandomFromList(list, offset)
 if #list > 0 then
 local target = list[math.random(1, #list)]
@@ -2220,12 +2287,6 @@ end
 end
 end
 
-function teleportToSelectedPlayer(plr, offset)
-if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-teleportToCFrame(plr.Character.HumanoidRootPart.CFrame + offset)
-end
-end
-
 function teleportToObjective(objectiveName, offset)
 local objectives = getObjectives()
 for _, obj in ipairs(objectives) do
@@ -2258,7 +2319,6 @@ print("SecurityPart not found")
 end
 end
 
--- teleports tab
 Tabs.Teleport:Section({ Title = "Teleports", TextSize = 20 })
 Tabs.Teleport:Divider()
 Tabs.Teleport:Space()
@@ -2772,8 +2832,10 @@ end
 root.CFrame = CFrame.new(x, y, z)
 end
 })
--- Shop Tab
+
+-- ================= TAB SHOP =================
 local ItemRegistry = ReplicatedStorage.Items.Registry
+
 LoadAutoShop = Tabs.Shop:Button({
 Title = "Load Shop Automation",
 Callback = function()
