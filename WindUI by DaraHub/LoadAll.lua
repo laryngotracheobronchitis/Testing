@@ -1,7 +1,7 @@
 local fileNames = {
     "ButtonLib.lua",  -- read docs at https://darahub.pages.dev/Module/Library/GUI/Documents/ButtonLib.md
     "NotifyToast.lua", -- read docs at https://darahub.pages.dev/Module/Library/GUI/Documents/NotifyToast.md
-    "CallDialogScreen.lua",  -- read docs at https://darahub.pages.dev/Module/Library/GUI/Documents/CallDialogScreen.md
+    "ErrorPrompt.lua", -- read docs at https://darahub.pages.dev/Module/Library/GUI/Documents/ErrorPrompt.md
 }
 
 local baseUrl = "https://darahub.pages.dev/Module/Library/GUI/"
