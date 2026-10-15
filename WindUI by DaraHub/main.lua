@@ -12,7 +12,6 @@
     Github: https://github.com/Footagesus/WindUI
     Discord: https://discord.gg/ftgs-development-hub-1300692552005189632
     License: MIT
-    Fixed Dragging System By Pnsdg
 ]]
 
 local a a={cache={}, load=function(b)if not a.cache[b]then a.cache[b]={c=a[b]()}end return a.cache[b].c end}do function a.a()local b=(cloneref or clonereference or function(b)return b end)
@@ -1123,9 +1122,46 @@ end
 return x
 end
 
+function p.ResolveIconRadius(z)
+-- Supports: number | UDim | UDim2 | { TopLeft, TopRight, BottomRight, BottomLeft }
+if z==nil then
+return UDim.new(0,0)
+end
+local t=typeof(z)
+if t=="number" then
+return UDim.new(0,z)
+elseif t=="UDim" then
+return z
+elseif t=="UDim2" then
+-- allow UDim2 by taking X (Scale, Offset)
+return UDim.new(z.X.Scale,z.X.Offset)
+elseif t=="table" then
+local function toUDim(c)
+if c==nil then return UDim.new(0,0) end
+local ct=typeof(c)
+if ct=="number" then return UDim.new(0,c) end
+if ct=="UDim" then return c end
+if ct=="UDim2" then return UDim.new(c.X.Scale,c.X.Offset) end
+if ct=="table" and c.Scale~=nil then return UDim.new(c.Scale,c.Offset or 0) end
+return UDim.new(0,0)
+end
+local tl=toUDim(z.TopLeft or z.TL or z[1])
+local tr=toUDim(z.TopRight or z.TR or z[2])
+local br=toUDim(z.BottomRight or z.BR or z[3])
+local bl=toUDim(z.BottomLeft or z.BL or z[4])
+-- UICorner is uniform only → use max scale & offset across corners
+local maxScale=math.max(tl.Scale,tr.Scale,br.Scale,bl.Scale)
+local maxOffset=math.max(tl.Offset,tr.Offset,br.Offset,bl.Offset)
+return UDim.new(maxScale,maxOffset)
+end
+return UDim.new(0,0)
+end
+
 function p.Image(v,x,z,A,B,C,F,G)
 A=A or"Temp"
 x=p.SanitizeFilename(x)
+
+local radiusUDim=p.ResolveIconRadius(z)
 
 local H=r("Frame",{
 Size=UDim2.new(0,0,0,0),
@@ -1140,7 +1176,8 @@ ImageColor3=C and(G or"Icon")or nil,
 }or nil,
 },{
 r("UICorner",{
-CornerRadius=UDim.new(0,z),
+CornerRadius=radiusUDim,
+Name="IconCorner",
 }),
 }),
 })
@@ -1156,11 +1193,17 @@ Colors={
 },
 }.IconFrame
 J.Parent=H
+-- apply radius to icon pack frame too
+local corner=Instance.new("UICorner")
+corner.Name="IconCorner"
+corner.CornerRadius=radiusUDim
+corner.Parent=J
 elseif string.find(v,"http")and not string.find(v,"roblox.com")then
 local J="WindUI/"..A.."/assets/."..B.."-"..x..".png"
+local ImageLabelRef = H:FindFirstChild("ImageLabel")
 local L,M=pcall(function()
 task.spawn(function()
-local L=p.Request
+local body = p.Request
 and p.Request{
 Url=v,
 Method="GET",
@@ -1168,34 +1211,42 @@ Method="GET",
 or{}
 
 if not d:IsStudio()and writefile then
-writefile(J,L)
+writefile(J,body)
 end
 
-
-local M,N=pcall(getcustomasset,J)
-if M then
-H.ImageLabel.Image=N
+local ok, asset = pcall(getcustomasset,J)
+if ok then
+-- Safe access: Frame/ImageLabel may have been destroyed (SetIcon called twice on HTTP icons causes race)
+if ImageLabelRef and ImageLabelRef.Parent and ImageLabelRef.Parent == H and H.Parent then
+ImageLabelRef.Image = asset
+elseif H and H.Parent then
+local il = H:FindFirstChild("ImageLabel")
+if il then
+il.Image = asset
+end
+end
 else
 warn(
 string.format(
 "[ WindUI.Creator ] Failed to load custom asset '%s': %s",
 J,
-tostring(N)
+tostring(asset)
 )
 )
+if H and H.Parent then
 H:Destroy()
-
+end
 return
 end
 end)
 end)
 if not L then
 warn(
-"[ WindUI.Creator ]  '"..identifyexecutor()
-or"Studio".."' doesnt support the URL Images. Error: "..M
+"[ WindUI.Creator ]  '"..(identifyexecutor and identifyexecutor() or "Studio").."' doesnt support the URL Images. Error: "..tostring(M)
 )
-
+if H and H.Parent then
 H:Destroy()
+end
 end
 elseif v==""then
 H.Visible=false
@@ -2683,7 +2734,7 @@ local aq
 
 if ag.Icon then
 aq=
-ab.Image(ag.Icon,ag.Title..":"..ag.Icon,0,"Temp","KeySystem",ag.IconThemed)
+ab.Image(ag.Icon,ag.Title..":"..ag.Icon,ag.IconRadius or 0,"Temp","KeySystem",ag.IconThemed)
 aq.Size=UDim2.new(0,24,0,24)
 aq.LayoutOrder=-1
 end
@@ -3523,6 +3574,7 @@ Title=ae.Title or"Dialog",
 Content=ae.Content,
 Icon=ae.Icon,
 IconThemed=ae.IconThemed,
+IconRadius=ae.IconRadius,
 Thumbnail=ae.Thumbnail,
 Buttons=ae.Buttons,
 
@@ -3550,7 +3602,7 @@ if ag.Icon then
 al=ab.Image(
 ag.Icon,
 ag.Title..":"..ag.Icon,
-0,
+ae.IconRadius or (ae.WindUI and ae.WindUI.Window and ae.WindUI.Window.IconRadius) or 0,
 ae.WindUI.Window,
 "Popup",
 true,
@@ -4383,7 +4435,7 @@ IconSize=16,
 
 local ai
 if ah.Icon then
-ai=ab.Image(ah.Icon,ah.Icon,0,af.Window,"Tag",false)
+ai=ab.Image(ah.Icon,ah.Icon,af.IconRadius or (af.Window and af.Window.IconRadius) or 0,af.Window,"Tag",false)
 
 ai.Size=UDim2.new(0,ah.IconSize,0,ah.IconSize)
 ai.ImageLabel.ImageColor3=typeof(ah.Color)=="Color3"
@@ -4491,7 +4543,7 @@ function ah.SetIcon(am,an)
 ah.Icon=an
 
 if an then
-ai=ab.Image(an,an,0,af.Window,"Tag",false)
+ai=ab.Image(an,an,af.IconRadius or (af.Window and af.Window.IconRadius) or 0,af.Window,"Tag",false)
 
 ai.Size=UDim2.new(0,ah.IconSize,0,ah.IconSize)
 ai.Parent=al
@@ -4912,41 +4964,29 @@ local ab=a.load'c'
 local ac=ab.New
 local ad=ab.Tween
 
+local uis=(cloneref or clonereference or function(x)return x end)(game:GetService"UserInputService")
 
-local ae=(cloneref or clonereference or function(ae)return ae end)
-
-
-ae(game:GetService"UserInputService")
-
+local DRAG_THRESHOLD=5
 
 function aa.New(af)
 local ag={
-Button=nil
+Button=nil,
+IsIconOnly=false,
+ClickCallback=nil, -- set by Window; only fired if not dragged
 }
 
-local ah
+local ah -- icon
 
-
-
-
-
-
-
-
-
-
-
-
-
-local ai=ac("TextLabel",{
-Text=af.Title,
+local titleLabel=ac("TextLabel",{
+Text=af.Title or"",
 TextSize=17,
 FontFace=Font.new(ab.Font,Enum.FontWeight.Medium),
 BackgroundTransparency=1,
 AutomaticSize="XY",
+Name="Title",
 })
 
-local aj=ac("Frame",{
+local dragHandle=ac("Frame",{
 Size=UDim2.new(0,36,0,36),
 BackgroundTransparency=1,
 Name="Drag",
@@ -4959,21 +4999,21 @@ Size=UDim2.new(0,18,0,18),
 BackgroundTransparency=1,
 Position=UDim2.new(0.5,0,0.5,0),
 AnchorPoint=Vector2.new(0.5,0.5),
-ThemeTag={
-ImageColor3="Icon",
-},
+ThemeTag={ImageColor3="Icon"},
 ImageTransparency=.3,
 })
 })
-local ak=ac("Frame",{
+
+local separator=ac("Frame",{
 Size=UDim2.new(0,1,1,0),
 Position=UDim2.new(0,36,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 BackgroundColor3=Color3.new(1,1,1),
 BackgroundTransparency=.9,
+Name="Separator",
 })
 
-local al=ac("Frame",{
+local root=ac("Frame",{
 Size=UDim2.new(0,0,0,0),
 Position=UDim2.new(0.5,0,0,28),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -4981,95 +5021,242 @@ Parent=af.Parent,
 BackgroundTransparency=1,
 Active=true,
 Visible=false,
+Name="OpenButtonRoot",
 })
 
+local scaleObj=ac("UIScale",{Scale=1,Parent=root})
 
-local am=ac("UIScale",{
-Scale=1,
-})
-
-local an=ac("Frame",{
+local main=ac("Frame",{
 Size=UDim2.new(0,0,0,44),
 AutomaticSize="X",
-Parent=al,
-Active=false,
+Parent=root,
+Active=true,
 BackgroundTransparency=.25,
 ZIndex=99,
 BackgroundColor3=Color3.new(0,0,0),
+Name="OpenButtonFrame",
 },{
-am,
-ac("UICorner",{
-CornerRadius=UDim.new(1,0)
-}),
+ac("UICorner",{CornerRadius=UDim.new(1,0),Name="Corner"}),
 ac("UIStroke",{
-Thickness=1,
+Thickness=1.5,
 ApplyStrokeMode="Border",
 Color=Color3.new(1,1,1),
 Transparency=0,
+Name="Stroke",
 },{
 ac("UIGradient",{
-Color=ColorSequence.new(Color3.fromHex"40c9ff",Color3.fromHex"e81cff")
+Color=ColorSequence.new(Color3.fromHex"40c9ff",Color3.fromHex"e81cff"),
+Name="StrokeGradient",
 })
 }),
-aj,
-ak,
+})
 
-ac("UIListLayout",{
-Padding=UDim.new(0,4),
-FillDirection="Horizontal",
-VerticalAlignment="Center",
-}),
-
-ac("TextButton",{
+local textBtn=ac("TextButton",{
 AutomaticSize="XY",
 Active=true,
 BackgroundTransparency=1,
 Size=UDim2.new(0,0,0,36),
-
+Name="TextButton",
 BackgroundColor3=Color3.new(1,1,1),
+Text="",
+Parent=main,
+AutoButtonColor=false,
 },{
-ac("UICorner",{
-CornerRadius=UDim.new(1,-4)
-}),
-ah,
-ac("UIListLayout",{
-Padding=UDim.new(0,af.UIPadding),
-FillDirection="Horizontal",
-VerticalAlignment="Center",
-}),
-ai,
+ac("UICorner",{CornerRadius=UDim.new(1,-4),Name="Corner"}),
 ac("UIPadding",{
 PaddingLeft=UDim.new(0,11),
 PaddingRight=UDim.new(0,11),
+Name="Pad",
 }),
-}),
-ac("UIPadding",{
+})
+
+local listLayout=ac("UIListLayout",{
+Padding=UDim.new(0,4),
+FillDirection="Horizontal",
+VerticalAlignment="Center",
+Parent=main,
+})
+
+local btnListLayout=ac("UIListLayout",{
+Padding=UDim.new(0,af.UIPadding or 8),
+FillDirection="Horizontal",
+VerticalAlignment="Center",
+HorizontalAlignment="Center",
+Parent=textBtn,
+})
+
+local outerPad=ac("UIPadding",{
 PaddingLeft=UDim.new(0,4),
 PaddingRight=UDim.new(0,4),
+Parent=main,
+Name="OuterPad",
 })
-})
 
-ag.Button=an
+dragHandle.Parent=main
+separator.Parent=main
+titleLabel.Parent=textBtn
 
+ag.Button=main
 
+-- ===== Drag + click with threshold (no click after drag) =====
+local dragData={
+dragging=false,
+dragStart=nil,
+startPos=nil,
+dragDistance=0,
+isDragging=false,
+currentTouch=nil,
+CanDraggable=true,
+}
+local moveConn,endConn=nil,nil
+
+local function resetDrag()
+dragData.dragging=false
+dragData.dragStart=nil
+dragData.startPos=nil
+dragData.dragDistance=0
+dragData.isDragging=false
+dragData.currentTouch=nil
+if moveConn then moveConn:Disconnect() moveConn=nil end
+if endConn then endConn:Disconnect() endConn=nil end
+end
+
+local function updatePos(input)
+if not dragData.dragging or not dragData.CanDraggable then return end
+local delta=input.Position-dragData.dragStart
+dragData.dragDistance=math.sqrt(delta.X*delta.X+delta.Y*delta.Y)
+if dragData.dragDistance>DRAG_THRESHOLD then
+dragData.isDragging=true
+root.Position=UDim2.new(
+dragData.startPos.X.Scale,
+dragData.startPos.X.Offset+delta.X,
+dragData.startPos.Y.Scale,
+dragData.startPos.Y.Offset+delta.Y
+)
+end
+end
+
+local function onInputEnded(input)
+local isMouse=input.UserInputType==Enum.UserInputType.MouseButton1
+local isTouch=input.UserInputType==Enum.UserInputType.Touch and input==dragData.currentTouch
+if not (isMouse or isTouch) then return end
+if not dragData.dragging then return end
+
+local wasDragged=dragData.isDragging or dragData.dragDistance>DRAG_THRESHOLD
+resetDrag()
+
+-- only fire click if NOT dragged
+if not wasDragged then
+if ag.ClickCallback then
+pcall(ag.ClickCallback)
+end
+end
+end
+
+local function onInputBegan(input)
+if not dragData.CanDraggable then
+-- still allow click when not draggable
+if (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch)
+and input.UserInputState==Enum.UserInputState.Begin then
+-- wait for end to click
+dragData.dragging=true
+dragData.dragStart=input.Position
+dragData.startPos=root.Position
+dragData.dragDistance=0
+dragData.isDragging=false
+if input.UserInputType==Enum.UserInputType.Touch then
+dragData.currentTouch=input
+end
+endConn=uis.InputEnded:Connect(onInputEnded)
+end
+return
+end
+
+if (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch)
+and input.UserInputState==Enum.UserInputState.Begin then
+dragData.dragging=true
+dragData.dragStart=input.Position
+dragData.startPos=root.Position
+dragData.dragDistance=0
+dragData.isDragging=false
+if input.UserInputType==Enum.UserInputType.Touch then
+dragData.currentTouch=input
+else
+dragData.currentTouch=nil
+end
+
+if moveConn then moveConn:Disconnect() end
+if endConn then endConn:Disconnect() end
+
+moveConn=uis.InputChanged:Connect(function(moveInput)
+if dragData.dragging and (moveInput.UserInputType==Enum.UserInputType.MouseMovement or moveInput==dragData.currentTouch) then
+updatePos(moveInput)
+end
+end)
+
+endConn=uis.InputEnded:Connect(onInputEnded)
+end
+end
+
+-- listen on root / main / textBtn
+root.InputBegan:Connect(onInputBegan)
+main.InputBegan:Connect(onInputBegan)
+textBtn.InputBegan:Connect(onInputBegan)
+
+-- block default MouseButton1Click so external handlers don't double-fire
+-- (Window will use ClickCallback instead)
+textBtn.MouseButton1Click:Connect(function()
+-- intentionally empty / swallow when we handle via threshold
+end)
+
+ab.AddSignal(main:GetPropertyChangedSignal"AbsoluteSize",function()
+if not ag.IsIconOnly then
+root.Size=UDim2.new(0,main.AbsoluteSize.X,0,main.AbsoluteSize.Y)
+end
+end)
+
+ab.AddSignal(textBtn.MouseEnter,function()
+if not ag.IsIconOnly then
+ad(textBtn,.1,{BackgroundTransparency=.93}):Play()
+end
+end)
+ab.AddSignal(textBtn.MouseLeave,function()
+if not ag.IsIconOnly then
+ad(textBtn,.1,{BackgroundTransparency=1}):Play()
+end
+end)
 
 function ag.SetIcon(ao,ap)
-if ah then
-ah:Destroy()
-end
-if ap then
+if ah then ah:Destroy() ah=nil end
+if not ap then return end
+
 ah=ab.Image(
 ap,
-af.Title,
-0,
+af.Title or"Open",
+af.IconRadius or 0,
 af.Folder,
 "OpenButton",
 true,
 af.IconThemed
 )
-ah.Size=UDim2.new(0,22,0,22)
+ah.Name="Icon"
 ah.LayoutOrder=-1
-ah.Parent=ag.Button.TextButton
+ah.Parent=textBtn
+
+if ag.IsIconOnly then
+ah.Size=UDim2.new(1,0,1,0)
+ah.Position=UDim2.new(0.5,0,0.5,0)
+ah.AnchorPoint=Vector2.new(0.5,0.5)
+if ah:IsA("GuiObject") then ah.BackgroundTransparency=1 end
+local img=ah:FindFirstChildWhichIsA("ImageLabel",true) or (ah:IsA("ImageLabel") and ah)
+if img then
+img.BackgroundTransparency=1
+img.Size=UDim2.new(1,0,1,0)
+end
+else
+ah.Size=UDim2.new(0,22,0,22)
+ah.Position=UDim2.new(0,0,0,0)
+ah.AnchorPoint=Vector2.new(0,0)
 end
 end
 
@@ -5077,50 +5264,106 @@ if af.Icon then
 ag:SetIcon(af.Icon)
 end
 
+local function applyIconOnlyStyle(isIconOnly)
+ag.IsIconOnly=isIconOnly==true
+local stroke=main:FindFirstChild("Stroke")
+local corner=main:FindFirstChild("Corner")
+local btnCorner=textBtn:FindFirstChild("Corner")
+local pad=textBtn:FindFirstChild("Pad")
 
+if isIconOnly then
+titleLabel.Visible=false
+dragHandle.Visible=false
+separator.Visible=false
+listLayout.Parent=nil
+btnListLayout.Parent=nil
+outerPad.Parent=nil
+if stroke then stroke.Enabled=false stroke.Transparency=1 end
+if corner then corner.CornerRadius=UDim.new(0,0) end
+if btnCorner then btnCorner.CornerRadius=UDim.new(0,0) end
 
-ab.AddSignal(an:GetPropertyChangedSignal"AbsoluteSize",function()
-al.Size=UDim2.new(
-0,an.AbsoluteSize.X,
-0,an.AbsoluteSize.Y
-)
-end)
-
-ab.AddSignal(an.TextButton.MouseEnter,function()
-ad(an.TextButton,.1,{BackgroundTransparency=.93}):Play()
-end)
-ab.AddSignal(an.TextButton.MouseLeave,function()
-ad(an.TextButton,.1,{BackgroundTransparency=1}):Play()
-end)
-
-local ao=ab.Drag(al)
-
+main.AutomaticSize=Enum.AutomaticSize.None
+main.Size=UDim2.new(0,30,0,30)
+main.BackgroundTransparency=1
+textBtn.AutomaticSize=Enum.AutomaticSize.None
+textBtn.Size=UDim2.new(1,0,1,0)
+textBtn.BackgroundTransparency=1
+if pad then
+pad.PaddingLeft=UDim.new(0,0)
+pad.PaddingRight=UDim.new(0,0)
+pad.PaddingTop=UDim.new(0,0)
+pad.PaddingBottom=UDim.new(0,0)
+end
+root.Size=UDim2.new(0,30,0,30)
+root.BackgroundTransparency=1
+if ah then
+ah.Size=UDim2.new(1,0,1,0)
+ah.Position=UDim2.new(0.5,0,0.5,0)
+ah.AnchorPoint=Vector2.new(0.5,0.5)
+if ah:IsA("GuiObject") then ah.BackgroundTransparency=1 end
+local img=ah:FindFirstChildWhichIsA("ImageLabel",true) or (ah:IsA("ImageLabel") and ah)
+if img then img.BackgroundTransparency=1 img.Size=UDim2.new(1,0,1,0) end
+end
+else
+titleLabel.Visible=true
+dragHandle.Visible=true
+separator.Visible=true
+listLayout.Parent=main
+btnListLayout.Parent=textBtn
+outerPad.Parent=main
+if stroke then stroke.Enabled=true stroke.Transparency=0 end
+if corner then corner.CornerRadius=UDim.new(1,0) end
+if btnCorner then btnCorner.CornerRadius=UDim.new(1,-4) end
+main.AutomaticSize=Enum.AutomaticSize.X
+main.Size=UDim2.new(0,0,0,44)
+main.BackgroundTransparency=.25
+textBtn.AutomaticSize=Enum.AutomaticSize.XY
+textBtn.Size=UDim2.new(0,0,0,36)
+textBtn.BackgroundTransparency=1
+if pad then
+pad.PaddingLeft=UDim.new(0,11)
+pad.PaddingRight=UDim.new(0,11)
+end
+if ah then
+ah.Size=UDim2.new(0,22,0,22)
+ah.Position=UDim2.new(0,0,0,0)
+ah.AnchorPoint=Vector2.new(0,0)
+end
+end
+end
 
 function ag.Visible(ap,aq)
-al.Visible=aq
+root.Visible=aq
 end
 
 function ag.SetScale(ap,aq)
-am.Scale=aq
+scaleObj.Scale=tonumber(aq) or 1
 end
 
 function ag.Edit(ap,aq)
+aq=aq or {}
 local ar={
 Title=aq.Title,
 Icon=aq.Icon,
 Enabled=aq.Enabled,
 Position=aq.Position,
-OnlyIcon=aq.OnlyIcon or false,
-Draggable=aq.Draggable or nil,
+OnlyIcon=aq.OnlyIcon,
+ShowIconOnly=aq.ShowIconOnly,
+Draggable=aq.Draggable,
 OnlyMobile=aq.OnlyMobile,
 CornerRadius=aq.CornerRadius or UDim.new(1,0),
-StrokeThickness=aq.StrokeThickness or 2,
+StrokeThickness=aq.StrokeThickness or 1.5,
 Scale=aq.Scale or 1,
-Color=aq.Color
-or ColorSequence.new(Color3.fromHex"40c9ff",Color3.fromHex"e81cff"),
+Color=aq.Color or ColorSequence.new(Color3.fromHex"40c9ff",Color3.fromHex"e81cff"),
+Size=aq.Size,
 }
 
-
+local iconOnly=false
+if ar.ShowIconOnly~=nil then
+iconOnly=ar.ShowIconOnly==true
+elseif ar.OnlyIcon~=nil then
+iconOnly=ar.OnlyIcon==true
+end
 
 if ar.Enabled==false then
 af.IsOpenButtonEnabled=false
@@ -5132,40 +5375,28 @@ else
 af.IsPC=false
 end
 
+applyIconOnlyStyle(iconOnly)
 
-if ar.Draggable==false and aj and ak then
-aj.Visible=ar.Draggable
-ak.Visible=ar.Draggable
-
-if ao then
-ao:Set(ar.Draggable)
+if ar.Draggable==false then
+dragHandle.Visible=false
+separator.Visible=false
+dragData.CanDraggable=false
+else
+if not iconOnly then
+dragHandle.Visible=true
+separator.Visible=true
 end
-end
-
-if ar.Position and al then
-al.Position=ar.Position
-end
-
-if ar.OnlyIcon==true and ai then
-ai.Visible=false
-an.TextButton.UIPadding.PaddingLeft=UDim.new(0,7)
-an.TextButton.UIPadding.PaddingRight=UDim.new(0,7)
-elseif ar.OnlyIcon==false then
-ai.Visible=true
-an.TextButton.UIPadding.PaddingLeft=UDim.new(0,11)
-an.TextButton.UIPadding.PaddingRight=UDim.new(0,11)
+dragData.CanDraggable=true
 end
 
+if ar.Position and root then
+root.Position=ar.Position
+end
 
-
-
-
-if ai then
-if ar.Title then
-ai.Text=ar.Title
-ab:ChangeTranslationKey(ai,ar.Title)
-elseif ar.Title==nil then
-
+if not iconOnly and titleLabel and ar.Title then
+titleLabel.Text=ar.Title
+if ab.ChangeTranslationKey then
+pcall(function() ab:ChangeTranslationKey(titleLabel,ar.Title) end)
 end
 end
 
@@ -5173,22 +5404,32 @@ if ar.Icon then
 ag:SetIcon(ar.Icon)
 end
 
-an.UIStroke.UIGradient.Color=ar.Color
-if Glow then
-Glow.UIGradient.Color=ar.Color
+if iconOnly and ar.Size then
+local s=ar.Size
+if typeof(s)=="number" then
+main.Size=UDim2.new(0,s,0,s)
+root.Size=UDim2.new(0,s,0,s)
+elseif typeof(s)=="UDim2" then
+main.Size=s
+root.Size=s
+end
 end
 
-an.UICorner.CornerRadius=ar.CornerRadius
-an.TextButton.UICorner.CornerRadius=UDim.new(ar.CornerRadius.Scale,ar.CornerRadius.Offset-4)
-an.UIStroke.Thickness=ar.StrokeThickness
+if not iconOnly then
+local stroke=main:FindFirstChild("Stroke")
+if stroke and stroke:FindFirstChild("StrokeGradient") then
+stroke.StrokeGradient.Color=ar.Color
+stroke.Thickness=ar.StrokeThickness
+end
+main.Corner.CornerRadius=ar.CornerRadius
+textBtn.Corner.CornerRadius=UDim.new(ar.CornerRadius.Scale,ar.CornerRadius.Offset-4)
+end
 
 ag:SetScale(ar.Scale)
 end
 
 return ag
 end
-
-
 
 return aa end function a.A()
 local aa={}
@@ -6147,6 +6388,7 @@ Title=ae.Title or"Button",
 Desc=ae.Desc or nil,
 Icon=ae.Icon or"mouse-pointer-click",
 IconThemed=ae.IconThemed or false,
+IconRadius=ae.IconRadius,
 Color=ae.Color,
 Justify=ae.Justify or"Between",
 IconAlign=ae.IconAlign or"Right",
@@ -6195,7 +6437,7 @@ Size=ae.Size,
 af.UIElements.ButtonIcon=aa.Image(
 af.Icon,
 af.Icon,
-0,
+ae.IconRadius or (ae.Window and ae.Window.IconRadius) or 0,
 ae.Window.Folder,
 "Button",
 not af.Color and true or nil,
@@ -7930,7 +8172,7 @@ UIElements={},
 }
 local ay
 if ax.Icon then
-ay=aj.Image(ax.Icon,ax.Icon,0,am.Window.Folder,"Dropdown",true)
+ay=aj.Image(ax.Icon,ax.Icon,ax.IconRadius or (am.Window and am.Window.IconRadius) or 0,am.Window.Folder,"Dropdown",true)
 ay.Size=
 UDim2.new(0,ax.IconSize or ao.TabIcon,0,ax.IconSize or ao.TabIcon)
 ay.ImageLabel.ImageTransparency=aq=="Dropdown"and 0.2 or 0
@@ -10582,6 +10824,7 @@ Icon=an.Icon,
 IconColor=an.IconColor,
 IconShape=an.IconShape,
 IconThemed=an.IconThemed,
+IconRadius=an.IconRadius,
 Locked=an.Locked,
 ShowTabTitle=an.ShowTabTitle,
 TabTitleAlign=an.TabTitleAlign or"Left",
@@ -10709,7 +10952,7 @@ if ap.Icon then
 as=ah.Image(
 ap.Icon,
 ap.Icon..":"..ap.Title,
-0,
+ap.IconRadius or Window.IconRadius or 0,
 Window.Folder,
 ap.__type,
 ap.IconColor and false or true,
@@ -10775,7 +11018,7 @@ ap.UIElements.Main.Frame.TextLabel.Size=UDim2.new(1,ar,0,0)
 end
 
 at=
-ah.Image(ap.Icon,ap.Icon..":"..ap.Title,0,Window.Folder,ap.__type,true,ap.IconThemed)
+ah.Image(ap.Icon,ap.Icon..":"..ap.Title,ap.IconRadius or Window.IconRadius or 0,Window.Folder,ap.__type,true,ap.IconThemed)
 at.Size=UDim2.new(0,16,0,16)
 at.ImageLabel.ImageTransparency=not ap.Locked and 0 or 0.7
 ar=-30
@@ -11032,7 +11275,7 @@ task.spawn(function()
 local az
 if ap.CustomEmptyPage.Icon then
 az=
-ah.Image(ap.CustomEmptyPage.Icon,ap.CustomEmptyPage.Icon,0,"Temp","EmptyPage",true)
+ah.Image(ap.CustomEmptyPage.Icon,ap.CustomEmptyPage.Icon,ap.CustomEmptyPage.IconRadius or Window.IconRadius or 0,"Temp","EmptyPage",true)
 az.Size=
 UDim2.fromOffset(ap.CustomEmptyPage.IconSize or 48,ap.CustomEmptyPage.IconSize or 48)
 end
@@ -11198,7 +11441,7 @@ if ap.Icon then
 aq=ae.Image(
 ap.Icon,
 ap.Icon,
-0,
+ap.IconRadius or 0,
 am,
 "Section",
 true,
@@ -12750,7 +12993,7 @@ function au.CreateTopbarButton(u,v,x,z,A,B,C,F)
 local G=al.Image(
 x,
 x,
-0,
+au.IconRadius or 0,
 au.Folder,
 "WindowTopbarIcon",
 au.Topbar.ButtonsType=="Default"and true or false,
@@ -12981,21 +13224,14 @@ p.Size=UDim2.new(0,au.IconSize,0,au.IconSize)
 p.Position=UDim2.new(0.5,0,0.5,0)
 p.AnchorPoint=Vector2.new(0.5,0.5)
 
-au.OpenButtonMain:SetIcon(au.Icon)
-
-
-
-
-
-
-
-
-
-
-
+-- Do NOT call SetIcon again here.
+-- OpenButton.New(au) already called SetIcon(au.Icon) when Icon was provided.
+-- Calling it a second time for HTTP icons causes a race: first download callback
+-- tries to set Image on a destroyed Frame named "Icon" → error.
+-- au.OpenButtonMain:SetIcon(au.Icon)
 else
-au.OpenButtonMain:SetIcon(au.Icon)
-
+-- only clear if no icon
+au.OpenButtonMain:SetIcon(nil)
 end
 end)
 
@@ -13442,12 +13678,10 @@ end
 end
 end
 
-if au.OpenButtonMain and au.OpenButtonMain.Button then
-al.AddSignal(au.OpenButtonMain.Button.TextButton.MouseButton1Click,function()
-
-
+if au.OpenButtonMain then
+au.OpenButtonMain.ClickCallback=function()
 au:Open()
-end)
+end
 end
 
 al.AddSignal(ae.InputBegan,function(z,A)
@@ -13600,7 +13834,7 @@ if G.Icon then
 N=al.Image(
 G.Icon,
 H.Title..":"..G.Icon,
-0,
+G.IconRadius or au.IconRadius or 0,
 au,
 "Dialog",
 true,
@@ -14057,7 +14291,7 @@ function au.DisableTopbarButtons(M,N)
 for O,P in next,N do
 for Q,R in next,au.TopBarButtons do
 if R.Name==P then
-R.Object.Visible=false
+R.Object.Parent.Visible=false
 end
 end
 end
