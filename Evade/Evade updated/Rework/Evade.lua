@@ -2104,6 +2104,8 @@ lagDuration = 0.5
 lagMethod = "CPU Cycle"
 local isLagActive = false
 local demonDelayMS = 200
+local demonResizeActive = false -- FIX(floating): penanda apakah HRP sedang di-resize oleh mode Demon
+local demonOriginalSize = nil   -- FIX(floating): ukuran asli HRP, dikembalikan setelah dash selesai
 
 local CachedRayParams = RaycastParams.new()
 CachedRayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -2304,7 +2306,24 @@ end
 end
 end
 
+-- FIX (floating): sebelumnya hrp.Size = 3,20,3 dibiarkan PERMANEN. Root part setinggi 20 stud
+-- membuat karakter melayang setelah dash: posisi tegak dijaga dari BAWAH root part yang kini
+-- 10 stud di bawah pusat, jadi karakter terangkat ~10 stud dari tanah (terasa saat lompat/
+-- mid-air, lalu hover terus). Solusi: resize tetap dilakukan agar dash bekerja seperti aslinya,
+-- tapi ukuran asli HRP disimpan dan dikembalikan otomatis 0.4 detik kemudian.
+if not demonResizeActive then
+demonOriginalSize = hrp.Size
+end
+demonResizeActive = true
 hrp.Size = Vector3.new(3, 20, 3)
+task.delay(0.4, function()
+if hrp and hrp.Parent and demonResizeActive then
+pcall(function()
+hrp.Size = demonOriginalSize
+end)
+end
+demonResizeActive = false
+end)
 end
 
 ButtonLib.Create:Button({
