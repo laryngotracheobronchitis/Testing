@@ -3,15 +3,10 @@ local ButtonLib = {}
 local CoreGui = game:GetService("CoreGui")
 local camera = workspace.CurrentCamera
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 getgenv().ButtonLib = ButtonLib
 
 local DraggingSystem = {}
-
-function DraggingSystem.GetDistance(pos1, pos2)
-    return math.sqrt((pos2.X - pos1.X)^2 + (pos2.Y - pos1.Y)^2)
-end
 
 function DraggingSystem.IsMouseOverFrame(Frame, Position)
     local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize
@@ -19,27 +14,6 @@ function DraggingSystem.IsMouseOverFrame(Frame, Position)
         and Position.X <= AbsPos.X + AbsSize.X
         and Position.Y >= AbsPos.Y
         and Position.Y <= AbsPos.Y + AbsSize.Y
-end
-
-function DraggingSystem.GetTopmostButtonAtPosition(Position, excludeFrame)
-    local darahubGui = CoreGui:FindFirstChild("Darahub")
-    if not darahubGui then return nil end
-    
-    local topmostButton = nil
-    local highestZIndex = -1
-    
-    for _, child in ipairs(darahubGui:GetChildren()) do
-        if child:IsA("Frame") and child.Visible and child ~= excludeFrame then
-            if DraggingSystem.IsMouseOverFrame(child, Position) then
-                if child.ZIndex > highestZIndex then
-                    highestZIndex = child.ZIndex
-                    topmostButton = child
-                end
-            end
-        end
-    end
-    
-    return topmostButton, highestZIndex
 end
 
 function DraggingSystem.IsClickInput(Input)
@@ -60,17 +34,31 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
     local dragging = false
     local dragStart = nil
     local startPos = nil
-    local dragDistance = 0
-    local DRAG_THRESHOLD = 5
     local originalZIndex = MainFrame.ZIndex
     local isDraggingStarted = false
     local currentTouch = nil
+    
+    local startPosition = nil
+    
+    local downConnection = DragFrame.MouseButton1Down:Connect(function()
+        startPosition = MainFrame.Position
+    end)
+    
+    local upConnection = DragFrame.MouseButton1Up:Connect(function()
+        if startPosition then
+            if MainFrame.Position == startPosition then
+                if CallbackTable and CallbackTable.OnClick then
+                    CallbackTable.OnClick()
+                end
+            end
+            startPosition = nil
+        end
+    end)
     
     local function updatePosition(input)
         if not dragging or not dragStart then return end
         
         local delta = input.Position - dragStart
-        dragDistance = math.sqrt(delta.X^2 + delta.Y^2)
         
         MainFrame.Position = UDim2.new(
             startPos.X.Scale, 
@@ -80,7 +68,7 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
         )
         
         if CallbackTable and CallbackTable.OnDragUpdate then
-            CallbackTable.OnDragUpdate(MainFrame.Position, dragDistance)
+            CallbackTable.OnDragUpdate(MainFrame.Position, 0)
         end
     end
     
@@ -88,36 +76,21 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
         dragging = false
         dragStart = nil
         startPos = nil
-        dragDistance = 0
         isDraggingStarted = false
         currentTouch = nil
     end
     
-    local mouseButton1Connection = nil
     local touchEndedConnection = nil
     local movementConnection = nil
     
     local function onInputEnded()
         if dragging then
-            local wasDragged = dragDistance > DRAG_THRESHOLD
-            
-            if not wasDragged and CallbackTable and CallbackTable.OnClick then
-                CallbackTable.OnClick()
-            end
-            
-            if wasDragged and isDraggingStarted then
-                MainFrame.ZIndex = originalZIndex
-                if CallbackTable and CallbackTable.OnDragEnd then
-                    CallbackTable.OnDragEnd(MainFrame.Position, wasDragged)
-                end
+            MainFrame.ZIndex = originalZIndex
+            if CallbackTable and CallbackTable.OnDragEnd then
+                CallbackTable.OnDragEnd(MainFrame.Position, true)
             end
             
             resetDragState()
-            
-            if mouseButton1Connection then
-                mouseButton1Connection:Disconnect()
-                mouseButton1Connection = nil
-            end
             
             if touchEndedConnection then
                 touchEndedConnection:Disconnect()
@@ -131,19 +104,9 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
         end
     end
     
-    local function onInputEndedHandler(endInput)
-        if dragging then
-            if endInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                onInputEnded()
-            elseif endInput.UserInputType == Enum.UserInputType.Touch and endInput == currentTouch then
-                onInputEnded()
-            end
-        end
-    end
-    
     local function onMovement(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input == currentTouch) then
-            if not isDraggingStarted and dragDistance > DRAG_THRESHOLD then
+            if not isDraggingStarted then
                 isDraggingStarted = true
                 
                 local maxZIndex = 0
@@ -176,7 +139,6 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
                 dragging = true
                 dragStart = input.Position
                 startPos = MainFrame.Position
-                dragDistance = 0
                 isDraggingStarted = false
                 
                 if input.UserInputType == Enum.UserInputType.Touch then
@@ -200,15 +162,11 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
                 MainFrame.ZIndex = maxZIndex + 1
                 originalZIndex = MainFrame.ZIndex
                 
-                mouseButton1Connection = UserInputService.InputEnded:Connect(function(endInput)
-                    if endInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                        onInputEndedHandler(endInput)
-                    end
-                end)
-                
                 touchEndedConnection = UserInputService.InputEnded:Connect(function(endInput)
-                    if endInput.UserInputType == Enum.UserInputType.Touch then
-                        onInputEndedHandler(endInput)
+                    if endInput.UserInputType == Enum.UserInputType.Touch and endInput == currentTouch then
+                        onInputEnded()
+                    elseif endInput.UserInputType == Enum.UserInputType.MouseButton1 then
+                        onInputEnded()
                     end
                 end)
                 
@@ -224,10 +182,9 @@ function DraggingSystem.MakeDraggable(MainFrame, DragFrame, CallbackTable)
     local inputBeganConnection = DragFrame.InputBegan:Connect(onInputBegan)
     
     local cleanupFunction = function()
+        downConnection:Disconnect()
+        upConnection:Disconnect()
         inputBeganConnection:Disconnect()
-        if mouseButton1Connection then
-            mouseButton1Connection:Disconnect()
-        end
         if touchEndedConnection then
             touchEndedConnection:Disconnect()
         end
@@ -241,21 +198,6 @@ end
 
 function getDPIScale()
     return camera.ViewportSize.Y / 1080
-end
-
-local floatingButtonInstance = nil
-
-function ButtonLib:OpenButton(visible)
-    if not UserInputService.KeyboardEnabled then
-        local darahubGui = CoreGui:FindFirstChild("Darahub")
-        if darahubGui then
-            local floatingButton = darahubGui:FindFirstChild("FloatingButton_Darahub")
-            if floatingButton then
-                floatingButton.Visible = visible
-                floatingButtonInstance = floatingButton
-            end
-        end
-    end
 end
 
 function ButtonLib:DestroyScreengui()
@@ -273,180 +215,33 @@ function ButtonLib:DestroyScreengui()
         ButtonLib._elements = {}
         ButtonLib._counters = {}
         darahubGui:Destroy()
+        getgenv().ButtonLib = nil
     end
 end
-
-if not UserInputService.KeyboardEnabled then
-    local darahubGui = CoreGui:FindFirstChild("Darahub") or Instance.new("ScreenGui", CoreGui)
-    darahubGui.Name = "Darahub"
-    darahubGui.DisplayOrder = 78
-    darahubGui.IgnoreGuiInset = true
-    darahubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    local floatingButton = Instance.new("ImageButton")
-    floatingButton.Name = "FloatingButton_Darahub"
-    floatingButton.Parent = darahubGui
-    floatingButton.Active = true
-    floatingButton.BorderSizePixel = 0
-    floatingButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    floatingButton.Size = UDim2.new(0, 80, 0, 80)
-    floatingButton.Position = UDim2.new(0.85, -336, 0.05, 20)
-    floatingButton.BackgroundTransparency = 1
-    floatingButton.Image = "rbxassetid://137330250139083"
-    floatingButton.Visible = false
-    floatingButtonInstance = floatingButton
-    
-    local aspectRatio = Instance.new("UIAspectRatioConstraint", floatingButton)
-    aspectRatio.DominantAxis = Enum.DominantAxis.Height
-    
-    local sizeConstraint = Instance.new("UISizeConstraint", floatingButton)
-    sizeConstraint.MinSize = Vector2.new(68, 68)
-    sizeConstraint.MaxSize = Vector2.new(100, 100)
-    
-    local corner = Instance.new("UICorner", floatingButton)
-    corner.CornerRadius = UDim.new(1, 0)
-    
-    local uiScale = Instance.new("UIScale", floatingButton)
-    uiScale.Scale = getDPIScale()
-    
-    local dragData = {
-        dragging = false,
-        dragStart = nil,
-        startPos = nil,
-        dragDistance = 0,
-        isDragging = false,
-        currentTouch = nil
-    }
-    
-    function updateFloatingPosition(input)
-        if not dragData.dragging or not dragData.dragStart then return end
-        
-        local delta = input.Position - dragData.dragStart
-        dragData.dragDistance = math.sqrt(delta.X^2 + delta.Y^2)
-        
-        floatingButton.Position = UDim2.new(
-            dragData.startPos.X.Scale, 
-            dragData.startPos.X.Offset + delta.X,
-            dragData.startPos.Y.Scale, 
-            dragData.startPos.Y.Offset + delta.Y
-        )
-    end
-    
-    function resetFloatingDrag()
-        dragData.dragging = false
-        dragData.dragStart = nil
-        dragData.startPos = nil
-        dragData.dragDistance = 0
-        dragData.isDragging = false
-        dragData.currentTouch = nil
-    end
-    
-    local mouseConnection = nil
-    local touchConnection = nil
-    local moveConnection = nil
-    
-    function onFloatingInputEnded(endInput)
-        if dragData.dragging then
-            if endInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                local wasDragged = dragData.dragDistance > 5
-                if not wasDragged then
-                    if Window and Window.Open then
-                        Window:Open()
-                    end
-                end
-                resetFloatingDrag()
-                
-                if mouseConnection then
-                    mouseConnection:Disconnect()
-                    mouseConnection = nil
-                end
-                if moveConnection then
-                    moveConnection:Disconnect()
-                    moveConnection = nil
-                end
-            elseif endInput.UserInputType == Enum.UserInputType.Touch and endInput == dragData.currentTouch then
-                local wasDragged = dragData.dragDistance > 5
-                if not wasDragged then
-                    if Window and Window.Open then
-                        Window:Open()
-                    end
-                end
-                resetFloatingDrag()
-                
-                if touchConnection then
-                    touchConnection:Disconnect()
-                    touchConnection = nil
-                end
-                if moveConnection then
-                    moveConnection:Disconnect()
-                    moveConnection = nil
-                end
-            end
-        end
-    end
-    
-    function onFloatingMovement(input)
-        if dragData.dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input == dragData.currentTouch) then
-            if not dragData.isDragging and dragData.dragDistance > 5 then
-                dragData.isDragging = true
-            end
-            updateFloatingPosition(input)
-        end
-    end
-    
-    function onFloatingInputBegan(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and input.UserInputState == Enum.UserInputState.Begin then
-            if DraggingSystem.IsMouseOverFrame(floatingButton, input.Position) then
-                dragData.dragging = true
-                dragData.dragStart = input.Position
-                dragData.startPos = floatingButton.Position
-                dragData.dragDistance = 0
-                dragData.isDragging = false
-                
-                if input.UserInputType == Enum.UserInputType.Touch then
-                    dragData.currentTouch = input
-                else
-                    dragData.currentTouch = nil
-                end
-                
-                if mouseConnection then
-                    mouseConnection:Disconnect()
-                end
-                if touchConnection then
-                    touchConnection:Disconnect()
-                end
-                if moveConnection then
-                    moveConnection:Disconnect()
-                end
-                
-                mouseConnection = UserInputService.InputEnded:Connect(function(endInput)
-                    if endInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                        onFloatingInputEnded(endInput)
-                    end
-                end)
-                
-                touchConnection = UserInputService.InputEnded:Connect(function(endInput)
-                    if endInput.UserInputType == Enum.UserInputType.Touch then
-                        onFloatingInputEnded(endInput)
-                    end
-                end)
-                
-                moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
-                    if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
-                        onFloatingMovement(moveInput)
-                    end
-                end)
-            end
-        end
-    end
-    
-    floatingButton.InputBegan:Connect(onFloatingInputBegan)
-end
-
 ButtonLib.Create = {}
 
 ButtonLib._elements = {}
 ButtonLib._counters = {}
+
+-- Config validation helper function
+local function validateConfig(config, elementType)
+    if type(config) ~= "table" then
+        error(string.format("ButtonLib.Create:%s expects a configuration table, got %s", elementType, type(config)), 3)
+    end
+    
+    local callback = config.Callback or config[1]
+    if callback and type(callback) ~= "function" then
+        error(string.format("ButtonLib.Create:%s - 'Callback' must be a function, got %s", elementType, type(callback)), 3)
+    end
+    
+    if config.Text and type(config.Text) ~= "string" then
+        error(string.format("ButtonLib.Create:%s - 'Text' must be a string, got %s", elementType, type(config.Text)), 3)
+    end
+    
+    if config.Flag and type(config.Flag) ~= "string" then
+        error(string.format("ButtonLib.Create:%s - 'Flag' must be a string, got %s", elementType, type(config.Flag)), 3)
+    end
+end
 
 function buildBaseFrame(config)
     local darahubGui = CoreGui:FindFirstChild("Darahub") or Instance.new("ScreenGui", CoreGui)
@@ -602,7 +397,7 @@ local ButtonLibMetatable = {
             return nil
         end
         
-        if key == "OpenButton" or key == "DestroyScreengui" then
+        if key == "DestroyScreengui" then
             return function(self, ...)
                 return ButtonLib[key](self, ...)
             end
@@ -699,6 +494,7 @@ local ButtonLibMetatable = {
 setmetatable(getgenv().ButtonLib, ButtonLibMetatable)
 
 function ButtonLib.Create:Button(config)
+    validateConfig(config, "Button")
     config.Type = "Button"
     local api, frame, textButton, label, flag = buildBaseFrame(config)
     local callback = config.Callback or config[1] or function() end
@@ -706,6 +502,9 @@ function ButtonLib.Create:Button(config)
     local originalOnClick = callback
     
     function api:SetCallback(newCallback)
+        if type(newCallback) ~= "function" then
+            error("ButtonLib: SetCallback expects a function, got " .. type(newCallback), 2)
+        end
         originalOnClick = newCallback
     end
     
@@ -721,6 +520,7 @@ function ButtonLib.Create:Button(config)
 end
 
 function ButtonLib.Create:Toggle(config)
+    validateConfig(config, "Toggle")
     config.Type = "Toggle"
     local api, frame, textButton, label, flag = buildBaseFrame(config)
     local callback = config.Callback or config[1] or function() end
@@ -748,6 +548,9 @@ function ButtonLib.Create:Toggle(config)
     end
     
     function api:SetText(newText)
+        if type(newText) ~= "string" then
+            error("ButtonLib: SetText expects a string, got " .. type(newText), 2)
+        end
         baseText = newText
         updateUI()
     end
@@ -757,6 +560,9 @@ function ButtonLib.Create:Toggle(config)
     end
     
     function api:SetCallback(newCallback)
+        if type(newCallback) ~= "function" then
+            error("ButtonLib: SetCallback expects a function, got " .. type(newCallback), 2)
+        end
         callback = newCallback
     end
     
