@@ -1,5 +1,5 @@
 --[[
-    Dara Hub | Evade 2.1 - VERSI RINGKAS
+    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru)
     Basis: DaraHubNext.txt (script asli) - hanya fitur yang diminta yang dipertahankan.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop
     Tab yang dihapus       : ESP, Misc, Settings, info, Others
@@ -15,7 +15,18 @@
                              Screen Button Size X/Y/Z untuk semua tombol layar (tab Settings),
                              Set Time (input HH:MM), Remove Textures, Clear MaterialService, Low Quality (tab Utility),
                              Auto Farm lengkap port dari DaraHub 2.2: Anti AFK, Auto Farm 2 mode
-                             (Auto Ticket + Token Farm, Offset & Delay, warning ban wave), Auto Complete Objective (tab Auto).
+                             (Auto Ticket + Token Farm, Offset & Delay, warning ban wave), Auto Complete Objective (tab Auto),
+                             VIP CMD Macro: auto-run macro chat command VIP (!time, !specialround,
+                             !MapScale) dengan config JSON ter-embed + editor + save ke file (tab Auto),
+                             UPDATE BETA (sinkron DaraHub BETA untuk game versi terbaru):
+                             - PlayerData: lapisan data baru ReplicatedStorage.Client.Services.UserData
+                               (Currency/Event/Progression/Codes/Inventory/Shops) pengganti
+                               Shared.UserData.ClientHooks yang dihapus game,
+                             - Show Player Stats ditulis ulang: mirror GUI stats asli game
+                               (PlayerGui.HomePage.Root.Bottom), realtime + auto-rebuild,
+                             - Shop Automation ditulis ulang: beli via service Shops baru
+                               (Daily/Token/Event Shop, Auto Buy All/Selected, refresh otomatis),
+                             - Auto Vote: auto vote Map & Game Mode saat voting terbuka (tab Auto).
 ]]
 
 function FireClient(path, ...)
@@ -89,7 +100,7 @@ else
 print("The injector does not support identifyexecutor()")
 end
 Window:Tag({
-Title = "v1.1.4",
+Title = "v1.1.5",
 Color = Color3.fromHex("#30ff6a")
 })
 Tabs = {
@@ -180,14 +191,184 @@ local CharacterService = safeRequire({"Services", "Asset", "CharacterService"}, 
 local InteractionTypes = safeRequire({"Services", "Asset", "InteractionService", "InteractionTypes"}, "InteractionTypes")
 local Movement = safeRequire({"Objects", "Game", "Character", "Client", "Movement"}, "Movement")
 local Portal = safeRequire({"Objects", "Game", "Tool", "Tasks", "Types", "Portal"}, "Portal")
-local useCurrency = safeRequire({"Shared", "UserData", "ClientHooks", "useCurrency"}, "useCurrency")
-local useProgression = safeRequire({"Shared", "UserData", "ClientHooks", "useProgression"}, "useProgression")
-local useEvent = safeRequire({"Shared", "UserData", "ClientHooks", "useEvent"}, "useEvent")
 local DeathFeed = safeRequire({"Services", "UI", "GameUIService", "Types", "DeathFeed"}, "DeathFeed")
-local UseInventory = safeRequire({"Shared", "UserData", "ClientHooks", "useInventory"}, "useInventory")
 local JumpPadModule = safeRequire({"Items", "BaseItems", "Loadout", "Deployables", "JumpPad", "Modules", "Client"}, "JumpPadModule")
-local Currency = safeRequire({"Shared", "UserData", "ClientHooks", "useCurrency"}, "Currency")
-local Config = safeRequire({"Shared", "UserData", "Battlepass", "Config"}, "Config")
+
+-- ============================================================
+-- ADD (UPDATE BETA): PlayerData - lapisan data baru pengganti Shared.UserData.ClientHooks.
+-- Game versi terbaru MEMINDAHKAN UserData dari ReplicatedStorage.Shared.UserData ke
+-- ReplicatedStorage.Client.Services.UserData (service: Currency, Event, Progression,
+-- Codes, Inventory, Shops) dan MENGHAPUS ClientHooks, sehingga fitur HUD/Shop lama yang
+-- memakai useCurrency/useProgression/useEvent/useInventory kehilangan sumber data.
+-- Port dari DaraHub BETA: semua akses lewat service baru ini, di-cache, dibungkus pcall
+-- -> service hilang/berubah hanya menghasilkan nilai kosong, tidak pernah crash.
+-- ============================================================
+local PlayerData = {}
+do
+local userDataServices = {}
+
+-- FIX: safeRequire versi Ringkas menerima daftar path, sedangkan module sudah berupa
+-- instance - beri wrapper pcall(require) sendiri + warn agar penyebab jelas.
+local function pcallRequire(module)
+local ok, result = pcall(require, module)
+if not ok then
+warn("[Dara Hub] Gagal require service UserData '" .. tostring(module.Name) .. "': " .. tostring(result))
+return nil
+end
+return result
+end
+
+local function loadUserDataService(name)
+-- FIX: pencarian bertahap FindFirstChild (path BARU: ReplicatedStorage.Client.Services.UserData)
+local root = game:GetService("ReplicatedStorage")
+local client = root:FindFirstChild("Client")
+local services = client and client:FindFirstChild("Services")
+local userData = services and services:FindFirstChild("UserData")
+local module = userData and userData:FindFirstChild(name)
+if not module then
+return nil
+end
+return pcallRequire(module)
+end
+
+local function serviceTable(name)
+local service = userDataServices[name]
+if service == nil then
+service = loadUserDataService(name)
+userDataServices[name] = service
+end
+return service
+end
+
+local function call(serviceName, method, ...)
+local service = userDataServices[serviceName]
+if service == nil then
+service = loadUserDataService(serviceName)
+userDataServices[serviceName] = service
+end
+if not service or type(service[method]) ~= "function" then
+return false, "missing " .. serviceName .. "." .. method
+end
+return pcall(service[method], ...)
+end
+
+function PlayerData.Balance(currencyName)
+local ok, value = call("Currency", "Balance", currencyName)
+return ok and tonumber(value) or 0
+end
+
+function PlayerData.Tickets()
+local ok, value = call("Event", "Balance")
+return ok and tonumber(value) or 0
+end
+
+function PlayerData.Progression()
+local ok, value = call("Progression", "Get")
+if ok and type(value) == "table" then
+return value
+end
+return { XP = 0, Level = 0 }
+end
+
+function PlayerData.IsRedeemed(code)
+local ok, value = call("Codes", "HasRedeemed", code)
+return ok and value == true
+end
+
+function PlayerData.RedeemCode(code)
+local ok, err = call("Codes", "Redeem", code)
+if not ok then
+warn("[Dara Hub] RedeemCode gagal untuk " .. tostring(code) .. ": " .. tostring(err))
+end
+return ok
+end
+
+function PlayerData.Owns(itemId)
+local ok, value = call("Inventory", "Owns", itemId)
+return ok and value == true
+end
+
+function PlayerData.OwnedIds()
+local ok, ids = call("Inventory", "OwnedIds")
+if ok and type(ids) == "table" then
+return ids
+end
+return {}
+end
+
+function PlayerData.Shop(name)
+local shops = serviceTable("Shops")
+return shops and shops[name] or nil
+end
+
+function PlayerData.Stock()
+local shops = serviceTable("Shops")
+if shops and shops.Stock then
+local ok, all = pcall(shops.Stock.All)
+if ok and type(all) == "table" then
+return all
+end
+end
+return {}
+end
+
+function PlayerData.StockRecord(key)
+local shops = serviceTable("Shops")
+if shops and shops.Stock then
+local ok, record = pcall(shops.Stock.Get, key)
+if ok then
+return record
+end
+end
+return nil
+end
+
+function PlayerData.PriceOf(key)
+local shops = serviceTable("Shops")
+if shops and shops.Pricing then
+local ok, price = pcall(shops.Pricing.PriceOf, key)
+if ok then
+return price
+end
+end
+return nil
+end
+
+function PlayerData.OwnsStock(key)
+local shops = serviceTable("Shops")
+if shops and shops.Ownership then
+local ok, owned = pcall(shops.Ownership.Owns, key)
+return ok and owned == true
+end
+return false
+end
+
+function PlayerData.Observe(serviceName, callback)
+local ok, disconnect = call(serviceName, "Observe", callback)
+if ok then
+return disconnect
+end
+return nil
+end
+
+function PlayerData.Buy(stockKey, amount)
+local ok, value = call("Shops", "Buy", stockKey, amount)
+return ok and value == true
+end
+
+function PlayerData.WaitUntilLoaded(timeout)
+local deadline = os.clock() + (timeout or 15)
+repeat
+local ok, loaded = call("Codes", "IsLoaded")
+if ok and loaded == true then
+return true
+end
+task.wait(0.25)
+until os.clock() > deadline
+return false
+end
+end
+
 
 -- Force Enable Lookback and zoom on mobile
 for _, n in {"LookBack", "ADS"} do
@@ -1783,6 +1964,576 @@ end
 })
 -- ================= AKHIR SECTION AUTO FARM =================
 
+-- ================= ADD: SECTION VIP CMD MACRO (auto-run config, skema config EvadeCMDMacroGUI asli) =================
+-- ADD: macro chat command VIP (!time / !specialround / !MapScale) berjalan otomatis; config default
+-- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke DaraHub/Games/Evade/VIPMacroConfig.json
+local HttpService = game:GetService("HttpService")
+local UIS = game:GetService("UserInputService")
+
+local VIP_MACRO_CONFIG_FILE = "DaraHub/Games/Evade/VIPMacroConfig.json"
+local VIP_MACRO_DEFAULT_CONFIG = '{"AutoFarm":[{"keybind":"F","delayValue":3,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro","command":"!time 1","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":1,"delayUnit":"Ms","startRoundType":"Intermission","name":"Macro","command":"!specialround Plushie Hell","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":30,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro_1790151459","command":"!MapScale 0","startTimeType":"Any Time","stopMode":"indefinitely"}]}'
+
+local VIPMacros = {}
+local VIPMacroRawConfig = ""
+local VIPMacroAutoRunState = true
+local VIPAutoRunThread = nil
+local VIPWarnedNoRoundStatus = false
+
+-- FIX: RoundStatus dibaca lewat pcall; 2 = Round Active, 0/1 = Intermission (sesuai pemakaian asli).
+-- Bila registry tidak tersedia, kembalikan nil agar macro tetap jalan (fail-open) + warn sekali.
+local function VIPMacroIsRoundActive()
+if not ServerStateRegistryService then
+return nil
+end
+local ok, status = pcall(function()
+return tonumber(ServerStateRegistryService.Registry and ServerStateRegistryService.Registry.RoundStatus)
+end)
+if not ok then
+return nil
+end
+if status == nil and not VIPWarnedNoRoundStatus then
+VIPWarnedNoRoundStatus = true
+warn("[Dara Hub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
+end
+if status == nil then
+return nil
+end
+return status == 2
+end
+
+local function VIPMacroDelaySeconds(macro)
+local n = tonumber(macro.delayValue) or 1
+local unit = tostring(macro.delayUnit or "Second")
+if unit == "Ms" then
+return math.max(n / 1000, 0)
+end
+return n
+end
+
+-- FIX: pengiriman chat dicoba lewat TextChatService (RBXGeneral:SendAsync) lalu fallback
+-- DefaultChatSystemChatEvents.SayMessageRequest (chat legacy); keduanya pcall + warn.
+local function VIPMacroSendChat(message)
+local sent = false
+local ok = pcall(function()
+local tcs = game:GetService("TextChatService")
+local channels = tcs and tcs:FindFirstChild("TextChannels")
+local general = channels and channels:FindFirstChild("RBXGeneral")
+if not general then
+error("RBXGeneral tidak ditemukan")
+end
+general:SendAsync(message)
+sent = true
+end)
+if not ok or not sent then
+pcall(function()
+local ev = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+local req = ev and ev:FindFirstChild("SayMessageRequest")
+if not req then
+error("SayMessageRequest tidak ditemukan")
+end
+req:FireServer(message, "All")
+sent = true
+end)
+end
+if not sent then
+warn("[Dara Hub] Gagal mengirim chat macro: " .. tostring(message))
+end
+end
+
+local function VIPMacroRunLoop(macro)
+while macro.Running do
+local mode = tostring(macro.startRoundType or "Any Time")
+if mode == "Intermission" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+elseif mode == "Round" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == false do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+if tostring(macro.startTimeType or "Any Time") == "Round Start" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active ~= true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+VIPMacroSendChat(tostring(macro.command or ""))
+if tostring(macro.stopMode or "indefinitely") == "Once" then
+macro.Running = false
+break
+end
+task.wait(VIPMacroDelaySeconds(macro))
+end
+end
+
+local function VIPMacroStopAll()
+for _, m in ipairs(VIPMacros) do
+m.Running = false
+end
+end
+
+local function VIPMacroStartAll()
+for _, m in ipairs(VIPMacros) do
+if not m.Running then
+m.Running = true
+task.spawn(VIPMacroRunLoop, m)
+end
+end
+end
+
+local function VIPMacroIsVIP()
+local ok, isVIP = pcall(function()
+return LocalPlayer:GetAttribute("VIPCommandsAccess") == true
+end)
+return ok and isVIP == true
+end
+
+local function VIPMacroAutoStart()
+if VIPAutoRunThread then
+pcall(task.cancel, VIPAutoRunThread)
+VIPAutoRunThread = nil
+end
+VIPAutoRunThread = task.spawn(function()
+-- FIX: attribute VIPCommandsAccess bisa terisi lambat setelah load; polling 15 detik
+-- (versi asli hanya cek sekali saat load sehingga macro kadang tidak jalan)
+local waited = 0
+while waited < 15 do
+if VIPMacroIsVIP() then
+VIPMacroStartAll()
+pcall(function()
+WindUI:Notify({
+Title = "VIP CMD Macro",
+Content = "VIP terdeteksi - " .. #VIPMacros .. " macro mulai berjalan otomatis",
+Duration = 4
+})
+end)
+return
+end
+task.wait(1)
+waited = waited + 1
+end
+warn("[Dara Hub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
+end)
+end
+
+local function VIPMacroBuildStatus()
+if #VIPMacros == 0 then
+return "Tidak ada macro terload."
+end
+local lines = {}
+for i, m in ipairs(VIPMacros) do
+table.insert(lines, i .. ") " .. m.name .. ": " .. m.command .. " | tiap " .. tostring(m.delayValue) .. " " .. tostring(m.delayUnit) .. " | " .. tostring(m.startRoundType) .. " | keybind " .. (m.keybind ~= "" and m.keybind or "-"))
+end
+return table.concat(lines, "\n")
+end
+
+local function VIPMacroLoadFromTable(data)
+VIPMacroStopAll()
+VIPMacros = {}
+local list = data
+if type(data) == "table" and type(data.AutoFarm) == "table" then
+list = data.AutoFarm
+end
+if type(list) == "table" then
+for _, m in ipairs(list) do
+if type(m) == "table" and m.command then
+table.insert(VIPMacros, {
+name = tostring(m.name or "Macro"),
+command = tostring(m.command),
+keybind = tostring(m.keybind or ""),
+delayValue = tonumber(m.delayValue) or 1,
+delayUnit = tostring(m.delayUnit or "Second"),
+startRoundType = tostring(m.startRoundType or "Any Time"),
+startTimeType = tostring(m.startTimeType or "Any Time"),
+stopMode = tostring(m.stopMode or "indefinitely"),
+Running = false,
+Thread = nil,
+})
+end
+end
+end
+end
+
+local function VIPMacroApplyRaw(raw)
+if not raw or raw == "" then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config JSON masih kosong.", Duration = 3 })
+end)
+return false
+end
+local ok, data = pcall(function()
+return HttpService:JSONDecode(raw)
+end)
+if not ok or type(data) ~= "table" then
+warn("[Dara Hub] Config VIP Macro bukan JSON valid")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "JSON tidak valid!", Duration = 3 })
+end)
+return false
+end
+VIPMacroLoadFromTable(data)
+if #VIPMacros == 0 then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Tidak ada macro valid di config (butuh field command).", Duration = 3 })
+end)
+return false
+end
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = #VIPMacros .. " macro diterapkan.", Duration = 3 })
+end)
+return true
+end
+
+-- ADD: load config dari file (kalau pernah di-save), kalau tidak pakai config default ter-embed
+local VIPMacroLoadedFromDisk = false
+if isfile and readfile then
+local okFile, exists = pcall(isfile, VIP_MACRO_CONFIG_FILE)
+if okFile and exists then
+local ok, content = pcall(readfile, VIP_MACRO_CONFIG_FILE)
+if ok and type(content) == "string" and content ~= "" then
+local ok2, data = pcall(function()
+return HttpService:JSONDecode(content)
+end)
+if ok2 and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+VIPMacroLoadedFromDisk = true
+end
+end
+end
+end
+if not VIPMacroLoadedFromDisk then
+local ok, data = pcall(function()
+return HttpService:JSONDecode(VIP_MACRO_DEFAULT_CONFIG)
+end)
+if ok and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+end
+end
+
+Tabs.Auto:Section({ Title = "VIP CMD Macro" })
+
+Tabs.Auto:Paragraph({
+Title = "Macro Terload" .. (#VIPMacros > 0 and " (" .. #VIPMacros .. ")" or ""),
+Content = VIPMacroBuildStatus()
+})
+
+VIPMacroAutoRunToggle = Tabs.Auto:Toggle({
+Title = "Auto Run VIP Macro",
+Flag = "VIPMacroAutoRun",
+Desc = "Jalankan semua macro otomatis begitu VIP Commands aktif",
+Value = true,
+Callback = function(state)
+VIPMacroAutoRunState = state
+if state then
+VIPMacroAutoStart()
+else
+VIPMacroStopAll()
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Run All Macros Now",
+Icon = "play",
+Callback = function()
+if not VIPMacroIsVIP() then
+warn("[Dara Hub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Kamu belum punya VIP Commands (coba di private server sendiri).", Duration = 4 })
+end)
+end
+VIPMacroStartAll()
+end
+})
+
+Tabs.Auto:Button({
+Title = "Stop All Macros",
+Icon = "square",
+Callback = function()
+VIPMacroStopAll()
+end
+})
+
+Tabs.Auto:Space()
+
+VIPMacroConfigInput = Tabs.Auto:Input({
+Title = "Macro Config (JSON)",
+Flag = "VIPMacroConfigInput",
+Placeholder = "Paste config JSON di sini",
+Callback = function(value)
+VIPMacroRawConfig = value or ""
+end
+})
+
+Tabs.Auto:Button({
+Title = "Apply Config JSON",
+Icon = "check",
+Callback = function()
+if VIPMacroApplyRaw(VIPMacroRawConfig) then
+VIPMacroStopAll()
+if VIPMacroAutoRunState then
+VIPMacroAutoStart()
+end
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Save Config ke File",
+Desc = "Simpan config macro aktif ke DaraHub/Games/Evade/VIPMacroConfig.json",
+Icon = "save",
+Callback = function()
+if not writefile then
+warn("[Dara Hub] Executor tidak mendukung writefile - config tidak bisa disimpan")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Executor tidak mendukung writefile.", Duration = 3 })
+end)
+return
+end
+local ok = pcall(function()
+if isfolder and makefolder then
+if not isfolder("DaraHub") then makefolder("DaraHub") end
+if not isfolder("DaraHub/Games") then makefolder("DaraHub/Games") end
+if not isfolder("DaraHub/Games/Evade") then makefolder("DaraHub/Games/Evade") end
+end
+local list = {}
+for _, m in ipairs(VIPMacros) do
+table.insert(list, {
+keybind = m.keybind,
+delayValue = m.delayValue,
+delayUnit = m.delayUnit,
+startRoundType = m.startRoundType,
+name = m.name,
+command = m.command,
+startTimeType = m.startTimeType,
+stopMode = m.stopMode,
+})
+end
+writefile(VIP_MACRO_CONFIG_FILE, HttpService:JSONEncode({ AutoFarm = list }))
+end)
+if ok then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config tersimpan: " .. VIP_MACRO_CONFIG_FILE, Duration = 3 })
+end)
+else
+warn("[Dara Hub] Gagal menyimpan config VIP Macro")
+end
+end
+})
+
+-- ADD: keybind manual tiap macro (field keybind di config; semuanya "F" di config user)
+UIS.InputBegan:Connect(function(input, processed)
+if processed then
+return
+end
+local key = input.KeyCode and input.KeyCode.Name
+if not key then
+return
+end
+for _, m in ipairs(VIPMacros) do
+if m.keybind ~= "" and m.keybind == key then
+task.spawn(VIPMacroSendChat, m.command)
+end
+end
+end)
+
+-- ADD: mulai otomatis saat load (toggle Auto Run default ON); dipanggil eksplisit agar tidak
+-- bergantung pada apakah WindUI memanggil callback untuk Value awal.
+VIPMacroAutoStart()
+-- ================= AKHIR SECTION VIP CMD MACRO =================
+
+-- ============================================================
+-- ADD (UPDATE BETA): AUTO VOTE - port dari DaraHub BETA (tab Auto).
+-- Otomatis memilih map / game mode saat voting terbuka: selama popup Vote
+-- (PlayerGui.Shared.Popups.VoteActive / Vote) terlihat, kirim Events.Vote:FireServer.
+-- Map & Mode dipilih dari dropdown (Map 1-4 / Mode 1-4).
+-- ============================================================
+Tabs.Auto:Section({ Title = "Auto Vote" })
+Tabs.Auto:Divider()
+
+do
+local AutoVote = {
+Enabled = false,
+Map = 1,
+Mode = 1,
+Connections = {
+Map = nil,
+Mode = nil
+}
+}
+
+-- FIX: akses ServerStateRegistry dibungkus pcall + fail-open (registry tidak tersedia
+-- = tetap coba lewat popup, jangan matikan fitur hanya karena struktur service berubah)
+local function isVotingActive()
+local ok, voting = pcall(function()
+return ServerStateRegistryService
+and ServerStateRegistryService.Registry
+and ServerStateRegistryService.Registry.Voting
+end)
+if ok and voting == false then
+return false
+end
+return true
+end
+
+local function getVotePopup()
+if not isVotingActive() then
+return nil
+end
+local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+if not playerGui then
+return nil
+end
+local shared = playerGui:FindFirstChild("Shared")
+if shared then
+local popups = shared:FindFirstChild("Popups")
+if popups then
+local voteActive = popups:FindFirstChild("VoteActive")
+if voteActive and voteActive.Visible then
+return voteActive
+end
+local vote = popups:FindFirstChild("Vote")
+if vote and vote.Visible then
+return vote
+end
+end
+end
+return nil
+end
+
+-- FIX: pencarian event + FireServer dibungkus pcall (anti spam error di Heartbeat)
+local function fireVoteServer(mapNumber)
+local votePopup = getVotePopup()
+if not votePopup then
+return
+end
+local voteEvent = ReplicatedStorage:FindFirstChild("Events")
+if voteEvent then
+voteEvent = voteEvent:FindFirstChild("Vote")
+if voteEvent and voteEvent:IsA("RemoteEvent") then
+pcall(voteEvent.FireServer, voteEvent, mapNumber)
+end
+end
+end
+
+local function fireVoteMode(modeNumber)
+local votePopup = getVotePopup()
+if not votePopup then
+return
+end
+local voteEvent = ReplicatedStorage:FindFirstChild("Events")
+if voteEvent then
+voteEvent = voteEvent:FindFirstChild("Vote")
+if voteEvent and voteEvent:IsA("RemoteEvent") then
+-- argumen kedua true = vote game mode (bukan map)
+pcall(voteEvent.FireServer, voteEvent, modeNumber, true)
+end
+end
+end
+
+-- FIX: forward declaration agar pemanggilan silang antar fungsi lokal valid
+local StartAutoVoteMap, StopAutoVoteMap, StartAutoVoteMode, StopAutoVoteMode
+
+function StartAutoVoteMap()
+StopAutoVoteMap()
+AutoVote.Enabled = true
+AutoVote.Connections.Map = RunService.Heartbeat:Connect(function()
+pcall(fireVoteServer, AutoVote.Map)
+end)
+end
+
+function StopAutoVoteMap()
+AutoVote.Enabled = false
+if AutoVote.Connections.Map then
+AutoVote.Connections.Map:Disconnect()
+AutoVote.Connections.Map = nil
+end
+end
+
+function StartAutoVoteMode()
+StopAutoVoteMode()
+AutoVote.Enabled = true
+AutoVote.Connections.Mode = RunService.Heartbeat:Connect(function()
+pcall(fireVoteMode, AutoVote.Mode)
+end)
+end
+
+function StopAutoVoteMode()
+if AutoVote.Connections.Mode then
+AutoVote.Connections.Mode:Disconnect()
+AutoVote.Connections.Mode = nil
+end
+end
+
+local mapDropdownValues = {}
+for i = 1, 4 do
+table.insert(mapDropdownValues, "Map " .. i)
+end
+AutoVoteDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Vote Map",
+Flag = "AutoVoteDropdown",
+Values = mapDropdownValues,
+Value = "Map 1",
+Callback = function(value)
+-- FIX: guard tonumber (nilai dropdown bisa bukan string / tanpa angka)
+local n = tonumber(type(value) == "string" and value:match("%d+") or nil)
+if n then
+AutoVote.Map = n
+end
+end
+})
+AutoVoteToggle = Tabs.Auto:Toggle({
+Title = "Auto Vote Map",
+Flag = "AutoVoteToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoVoteMap()
+else
+StopAutoVoteMap()
+end
+end
+})
+Tabs.Auto:Space()
+local modeDropdownValues = {}
+for i = 1, 4 do
+table.insert(modeDropdownValues, "Mode " .. i)
+end
+AutoVoteModeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Vote Mode",
+Flag = "AutoVoteModeDropdown",
+Values = modeDropdownValues,
+Value = "Mode 1",
+Callback = function(value)
+local n = tonumber(type(value) == "string" and value:match("%d+") or nil)
+if n then
+AutoVote.Mode = n
+end
+end
+})
+AutoVoteModeToggle = Tabs.Auto:Toggle({
+Title = "Auto Vote Game Mode",
+Flag = "AutoVoteModeToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoVoteMode()
+else
+StopAutoVoteMode()
+end
+end
+})
+end
+
+
 -- ================= TAB VISUALS =================
 Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
 Tabs.Visuals:Divider()
@@ -2292,395 +3043,269 @@ handleTimerToggles()
 end
 })
 Tabs.Visuals:Space()
-local PlayerStatsEnabled = false
-local PlayerStats = nil
-local textLabels = {}
-local frontFrames = {}
-local observeConnections = {}
-function formatNumber(num)
-local str = tostring(math.floor(num))
-local formatted = ""
-local length = #str
-for i = 1, length do
-formatted = formatted .. str:sub(i, i)
-if (length - i) % 3 == 0 and i ~= length then
-formatted = formatted .. ","
-end
-end
-return formatted
-end
-
-function updateFrontFrameXSize(frame, textLabel)
-if not frame or not textLabel then return end
-local textBounds = textLabel.TextBounds
-frame.Size = UDim2.new(0, textBounds.X + 20, 1, 0)
-end
-
-function createResourceRow(name, defaultValue, textColor, iconAssetId, iconColor, layoutOrder, leftColumn)
-local container = Instance.new("Frame")
-container.Name = name
-container.BackgroundTransparency = 1
-container.Size = UDim2.fromScale(1, 1)
-container.LayoutOrder = layoutOrder
-container.Parent = leftColumn
-
-local background = Instance.new("ImageLabel")
-background.Name = "Background"
-background.BackgroundTransparency = 1
-background.Image = "rbxassetid://196969716"
-background.ImageColor3 = Color3.fromRGB(21, 21, 21)
-background.ImageTransparency = 0.4
-background.AnchorPoint = Vector2.new(0.5, 0.5)
-background.Position = UDim2.fromScale(0.5, 0.5)
-background.Size = UDim2.fromScale(1.25, 1.25)
-background.ZIndex = 1
-background.Parent = container
-
-local bgCorner = Instance.new("UICorner")
-bgCorner.CornerRadius = UDim.new(0, 4)
-bgCorner.Parent = background
-
-local icon = Instance.new("ImageLabel")
-icon.BackgroundTransparency = 1
-icon.Image = "rbxassetid://" .. iconAssetId
-if iconColor then
-icon.ImageColor3 = iconColor
-end
-icon.AnchorPoint = Vector2.new(0.5, 0.5)
-icon.Position = UDim2.fromScale(0.5, 0.5)
-icon.Size = UDim2.fromScale(0.8, 0.8)
-icon.ZIndex = 3
-icon.Parent = container
-
-local iconAspect = Instance.new("UIAspectRatioConstraint")
-iconAspect.Parent = icon
-
-local textLabel = Instance.new("TextLabel")
-textLabel.Name = "Value"
-textLabel.BackgroundTransparency = 1
-textLabel.Font = Enum.Font.GothamBold
-textLabel.Text = tostring(defaultValue)
-textLabel.TextColor3 = textColor
-textLabel.TextScaled = true
-textLabel.TextSize = 14
-textLabel.TextStrokeTransparency = 0.9
-textLabel.TextWrapped = true
-textLabel.TextXAlignment = Enum.TextXAlignment.Left
-textLabel.AnchorPoint = Vector2.new(0, 0.5)
-textLabel.Position = UDim2.new(1.3, 0, 0.5, 0)
-textLabel.Size = UDim2.new(6, 0, 0.8, 0)
-textLabel.ZIndex = 3
-textLabel.Parent = container
-
-textLabels[name] = textLabel
-
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Transparency = 0.5
-stroke.Parent = textLabel
-
-local clipLeft = Instance.new("Frame")
-clipLeft.BackgroundTransparency = 1
-clipLeft.ClipsDescendants = true
-clipLeft.Size = UDim2.fromScale(1, 1)
-clipLeft.ZIndex = 2
-clipLeft.Parent = container
-
-local leftEffect = Instance.new("Frame")
-leftEffect.BackgroundColor3 = Color3.new(0, 0, 0)
-leftEffect.BackgroundTransparency = 0.45
-leftEffect.Size = UDim2.new(2, 0, 1, 0)
-leftEffect.ZIndex = 2
-leftEffect.Parent = clipLeft
-
-local leftCorner = Instance.new("UICorner")
-leftCorner.CornerRadius = UDim.new(0, 4)
-leftCorner.Parent = leftEffect
-
-local clipFront = Instance.new("Frame")
-clipFront.Name = "Front"
-clipFront.BackgroundTransparency = 1
-clipFront.ClipsDescendants = true
-clipFront.Position = UDim2.new(1, 0, 0, 0)
-clipFront.Size = UDim2.new(0.5, 33, 1, 0)
-clipFront.ZIndex = 2
-clipFront.Parent = container
-
-local frontEffect = Instance.new("Frame")
-frontEffect.BackgroundColor3 = Color3.new(0, 0, 0)
-frontEffect.BackgroundTransparency = 0.9
-frontEffect.Position = UDim2.new(-1, 0, 0, 0)
-frontEffect.Size = UDim2.new(2, 0, 1, 0)
-frontEffect.ZIndex = 2
-frontEffect.Parent = clipFront
-
-local frontCorner = Instance.new("UICorner")
-frontCorner.CornerRadius = UDim.new(0, 4)
-frontCorner.Parent = frontEffect
-
-frontFrames[name] = {
-frame = clipFront,
-effect = frontEffect,
-textLabel = textLabel
+-- ============================================================
+-- SHOW PLAYER STATS (UPDATE BETA) - ditulis ulang mengikuti DaraHub BETA.
+-- Game versi terbaru memindahkan UserData ke Client.Services.UserData dan menghapus
+-- ClientHooks, sehingga HUD stats custom lama (useCurrency/useProgression/useEvent)
+-- kehilangan sumber data. Pendekatan baru: MIRROR (klon + sinkron realtime) dari GUI
+-- stats asli game di PlayerGui.HomePage.Root.Bottom - datanya selalu persis seperti
+-- yang ditampilkan game, apa pun struktur datanya, dan tetap terlihat saat HomePage
+-- tertutup maupun sedang bermain.
+-- ============================================================
+do
+local SYNC_PROPERTIES = {
+"Text", "TextColor3", "TextTransparency", "TextStrokeColor3", "TextStrokeTransparency",
+"Image", "ImageColor3", "ImageTransparency", "ImageRectOffset", "ImageRectSize",
+"BackgroundColor3", "BackgroundTransparency",
+"Visible", "Size", "Position", "AnchorPoint", "Rotation", "ZIndex", "LayoutOrder",
 }
+
+local mirrorEnabled = false
+local mirrorGui = nil
+local sourceScope = nil
+local mirrorScope = nil
+local connections = {}
+local watched = setmetatable({}, { __mode = "k" })
+local mirrorToken = 0
+
+-- FIX: WaitForChild diberi timeout + cek nil agar tidak ada thread menggantung
+-- selamanya bila GUI HomePage belum ada (map lambat load / struktur berubah lagi)
+local function waitForChild(parent, name, timeout)
+local existing = parent:FindFirstChild(name)
+if existing then
+return existing
+end
+local ok, result = pcall(function()
+return parent:WaitForChild(name, timeout or 15)
+end)
+return ok and result or nil
+end
+
+local function getPath(instance, scope)
+local names = {}
+local current = instance
+while current and current ~= scope do
+table.insert(names, 1, current.Name)
+current = current.Parent
+end
+if current ~= scope then
+return nil
+end
+return names
+end
+
+local function findMirror(instance)
+if not instance or not sourceScope or not mirrorScope then
+return nil
+end
+local path = getPath(instance, sourceScope)
+if not path then
+return nil
+end
+local node = mirrorScope
+for _, name in ipairs(path) do
+node = node:FindFirstChild(name)
+if not node then
+return nil
+end
+end
+return node
+end
+
+local function syncProperty(source, property)
+local target = findMirror(source)
+if target then
+pcall(function()
+local value = source[property]
+-- elemen yang disembunyikan game tetap ditampilkan di mirror
+if property == "Visible" and value == false then
+value = true
+end
+target[property] = value
+end)
+end
+end
+
+local function watchInstance(instance)
+if watched[instance] or not instance:IsA("GuiObject") then
+return
+end
+watched[instance] = true
+for _, property in ipairs(SYNC_PROPERTIES) do
+local ok, signal = pcall(function()
+return instance:GetPropertyChangedSignal(property)
+end)
+if ok and signal then
+table.insert(connections, signal:Connect(function()
+syncProperty(instance, property)
+end))
+end
+end
+end
+
+local function watchTree(root)
+watchInstance(root)
+for _, descendant in ipairs(root:GetDescendants()) do
+watchInstance(descendant)
+end
+end
+
+local function cleanMirror(root)
+local function clean(instance)
+if instance.Name == "Plus" then
+instance:Destroy()
+return
+end
+if instance:IsA("GuiObject") and not instance.Visible then
+instance.Visible = true
+end
+end
+clean(root)
+for _, descendant in ipairs(root:GetDescendants()) do
+clean(descendant)
+end
+end
+
+local function reconcileVisibility()
+if not mirrorGui then
+return
+end
+for _, descendant in ipairs(mirrorGui:GetDescendants()) do
+if descendant:IsA("GuiObject") and not descendant.Visible then
+descendant.Visible = true
+end
+end
+end
+
+local function stopMirror()
+mirrorToken = mirrorToken + 1
+for _, connection in ipairs(connections) do
+pcall(function() connection:Disconnect() end)
+end
+table.clear(connections)
+if mirrorGui then
+pcall(function() mirrorGui:Destroy() end)
+end
+mirrorGui, sourceScope, mirrorScope = nil, nil, nil
+end
+
+local startMirror
+local function enableMirror()
+mirrorEnabled = true
+task.spawn(function()
+local ok, err = pcall(startMirror)
+if not ok then
+warn("[Dara Hub] Player stats mirror gagal: " .. tostring(err))
+end
+end)
+end
+
+function startMirror()
+stopMirror()
+mirrorToken = mirrorToken + 1
+local myToken = mirrorToken
+local playerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+local homePage = waitForChild(playerGui, "HomePage", 20)
+if not homePage then
+warn("[Dara Hub] PlayerGui.HomePage tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+local root = waitForChild(homePage, "Root", 15)
+if not root then
+warn("[Dara Hub] HomePage.Root tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+local bottom = waitForChild(root, "Bottom", 15)
+if not bottom then
+warn("[Dara Hub] HomePage.Root.Bottom tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+
+mirrorGui = Instance.new("ScreenGui")
+mirrorGui.Name = "PlayerStats"
+mirrorGui.ResetOnSpawn = false
+mirrorGui.IgnoreGuiInset = false
+mirrorGui.Parent = playerGui
+
+table.insert(connections, mirrorGui.AncestryChanged:Connect(function(_, parent)
+if not parent and mirrorEnabled then
+-- mirror dihapus game/died -> bangun ulang otomatis
+task.defer(enableMirror)
+end
+end))
+
+local container = Instance.new("Frame")
+container.Name = "BottomContainer"
+container.Size = UDim2.new(1, 0, 1, 0)
+container.BackgroundTransparency = 1
+container.BorderSizePixel = 0
+container.Parent = mirrorGui
+
+local bottomClone = bottom:Clone()
+bottomClone.Parent = container
+
+sourceScope = bottom
+mirrorScope = bottomClone
+
+watchTree(sourceScope)
+cleanMirror(bottomClone)
+
+table.insert(connections, sourceScope.DescendantAdded:Connect(function(descendant)
+watchTree(descendant)
+if descendant.Name == "Plus" then
+return
+end
+if findMirror(descendant) then
+return
+end
+local parentMirror = findMirror(descendant.Parent)
+if parentMirror then
+local ok, copy = pcall(function()
+return descendant:Clone()
+end)
+if ok and copy then
+copy.Parent = parentMirror
+cleanMirror(copy)
+end
+end
+end))
+
+table.insert(connections, sourceScope.DescendantRemoving:Connect(function(descendant)
+local target = findMirror(descendant)
+if target then
+pcall(function() target:Destroy() end)
+end
+end))
+
+table.insert(connections, sourceScope.AncestryChanged:Connect(function(_, parent)
+if not parent and mirrorEnabled then
+task.defer(enableMirror)
+end
+end))
 
 task.spawn(function()
-task.wait()
-updateFrontFrameXSize(clipFront, textLabel)
-end)
-
-return textLabel
-end
-
-function updateCurrencyUI()
-if not useCurrency then return end
-local allCurrencies = useCurrency.All()
-if textLabels["Tokens"] and allCurrencies["Tokens"] then
-textLabels["Tokens"].Text = formatNumber(allCurrencies["Tokens"])
-end
-if textLabels["Points"] and allCurrencies["Points"] then
-textLabels["Points"].Text = formatNumber(allCurrencies["Points"])
-end
-if textLabels["Survivals"] and allCurrencies["Survivals"] then
-textLabels["Survivals"].Text = formatNumber(allCurrencies["Survivals"])
-end
-if textLabels["Streak"] and allCurrencies["Streak"] then
-textLabels["Streak"].Text = formatNumber(allCurrencies["Streak"])
-end
-for _, data in pairs(frontFrames) do
-if data.frame and data.textLabel then
-updateFrontFrameXSize(data.frame, data.textLabel)
-end
-end
-end
-
-function updateProgressionUI()
-if not PlayerStats or not useProgression then return end
-local level = useProgression.Level()
-local xp = useProgression.XP()
-local requiredXP = useProgression.RequiredXP() or (level * 100)
-local progress = useProgression.Progress() or 0
-
-PlayerStats.levelText.Text = "LEVEL " .. tostring(level)
-PlayerStats.expText.Text = formatNumber(xp) .. "/" .. formatNumber(requiredXP)
-PlayerStats.fill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
-end
-
-function updateEventUI()
-if not useEvent then return end
-if textLabels["Tickets"] then
-textLabels["Tickets"].Text = formatNumber(useEvent.Balance())
-local data = frontFrames["Tickets"]
-if data and data.frame and data.textLabel then
-updateFrontFrameXSize(data.frame, data.textLabel)
-end
-end
-end
-
-function DisableScanData()
-PlayerStatsEnabled = false
-for _, disconnect in pairs(observeConnections) do
-if type(disconnect) == "function" then disconnect() end
-end
-observeConnections = {}
-if PlayerStats then
-PlayerStats.ScreenGui:Destroy()
-PlayerStats = nil
-end
-textLabels = {}
-frontFrames = {}
-end
-
-function EnableScanData()
-if PlayerStats then
-DisableScanData()
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "PlayerStats"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 333
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local views = Instance.new("Frame")
-views.Name = "Views"
-views.BackgroundTransparency = 1
-views.Size = UDim2.fromScale(1, 1)
-views.Position = UDim2.fromScale(0.5, 0.5)
-views.AnchorPoint = Vector2.new(0.5, 0.5)
-views.Parent = ScreenGui
-
-local defaultView = Instance.new("Frame")
-defaultView.Name = "Default"
-defaultView.BackgroundTransparency = 1
-defaultView.Size = UDim2.fromScale(1, 1)
-defaultView.Parent = views
-
-local bottom = Instance.new("Frame")
-bottom.Name = "Bottom"
-bottom.BackgroundTransparency = 1
-bottom.Position = UDim2.fromScale(0.01, 0.01)
-bottom.Size = UDim2.fromScale(0.98, 0.98)
-bottom.Parent = defaultView
-
-local aspectRatio = Instance.new("UIAspectRatioConstraint")
-aspectRatio.Parent = bottom
-
-local sizeConstraint = Instance.new("UISizeConstraint")
-sizeConstraint.MinSize = Vector2.new(450, 450)
-sizeConstraint.MaxSize = Vector2.new(700, 700)
-sizeConstraint.Parent = bottom
-
-local leftColumn = Instance.new("Frame")
-leftColumn.Name = "Left"
-leftColumn.BackgroundTransparency = 1
-leftColumn.Position = UDim2.new(0.004, 0, 0.06, 0)
-leftColumn.Size = UDim2.new(0.05, 0, 0.05, 0)
-leftColumn.Parent = bottom
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0.175, 0)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Parent = leftColumn
-
-createResourceRow("Tokens", "0", Color3.fromRGB(163, 255, 87), "7149239101", Color3.fromRGB(163, 255, 87), 1, leftColumn)
-createResourceRow("Points", "0", Color3.new(1, 1, 1), "4648327306", nil, 2, leftColumn)
-createResourceRow("Survivals", "0", Color3.fromRGB(255, 188, 110), "88681516628510", Color3.fromRGB(255, 201, 162), 3, leftColumn)
-createResourceRow("Tickets", "0", Color3.fromRGB(255, 121, 121), "14478137255", Color3.fromRGB(255, 115, 115), 4, leftColumn)
-createResourceRow("Streak", "0", Color3.fromRGB(255, 217, 78), "13518130183", Color3.fromRGB(255, 217, 78), 5, leftColumn)
-
-local levelBar = Instance.new("Frame")
-levelBar.Name = "Level"
-levelBar.BackgroundColor3 = Color3.fromRGB(105, 138, 255)
-levelBar.BackgroundTransparency = 0.9
-levelBar.Position = UDim2.new(0, 4, 0, 4)
-levelBar.Size = UDim2.new(0.7, 0, 0.016, 0)
-levelBar.Parent = bottom
-
-local levelCorner = Instance.new("UICorner")
-levelCorner.CornerRadius = UDim.new(0.5, 0)
-levelCorner.Parent = levelBar
-
-local levelStroke = Instance.new("UIStroke")
-levelStroke.Thickness = 2
-levelStroke.Transparency = 0.5
-levelStroke.Parent = levelBar
-
-local barContainer = Instance.new("Frame")
-barContainer.Name = "Bar"
-barContainer.BackgroundTransparency = 1
-barContainer.ClipsDescendants = true
-barContainer.Size = UDim2.new(1, 0, 1, 0)
-barContainer.Parent = levelBar
-
-local fill = Instance.new("Frame")
-fill.BackgroundColor3 = Color3.fromRGB(105, 138, 255)
-fill.BackgroundTransparency = 0.2
-fill.Size = UDim2.new(0, 0, 1, 0)
-fill.ZIndex = 2
-fill.Parent = barContainer
-
-local fillCorner = Instance.new("UICorner")
-fillCorner.CornerRadius = UDim.new(0.5, 0)
-fillCorner.Parent = fill
-
-local gradient = Instance.new("UIGradient")
-gradient.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-ColorSequenceKeypoint.new(0.3149, Color3.fromRGB(241, 246, 249)),
-ColorSequenceKeypoint.new(1, Color3.fromRGB(168, 201, 222))
-})
-gradient.Rotation = 90
-gradient.Parent = fill
-
-local levelText = Instance.new("TextLabel")
-levelText.Name = "Level"
-levelText.BackgroundTransparency = 1
-levelText.Font = Enum.Font.GothamBold
-levelText.Text = "LEVEL 1"
-levelText.TextColor3 = Color3.fromRGB(105, 138, 255)
-levelText.TextScaled = true
-levelText.TextWrapped = true
-levelText.TextXAlignment = Enum.TextXAlignment.Left
-levelText.TextYAlignment = Enum.TextYAlignment.Bottom
-levelText.Position = UDim2.new(0, 0, 1.25, 0)
-levelText.Size = UDim2.new(0.5, 0, 1.5, 0)
-levelText.Parent = levelBar
-
-local levelTextStroke = Instance.new("UIStroke")
-levelTextStroke.Thickness = 2
-levelTextStroke.Transparency = 0.5
-levelTextStroke.Parent = levelText
-
-local expText = Instance.new("TextLabel")
-expText.Name = "Experience"
-expText.BackgroundTransparency = 1
-expText.Font = Enum.Font.GothamBold
-expText.Text = "0/100"
-expText.TextColor3 = Color3.fromRGB(105, 138, 255)
-expText.TextScaled = true
-expText.TextWrapped = true
-expText.TextXAlignment = Enum.TextXAlignment.Right
-expText.TextYAlignment = Enum.TextYAlignment.Bottom
-expText.AnchorPoint = Vector2.new(1, 0)
-expText.Position = UDim2.new(1, 0, 1.25, 0)
-expText.Size = UDim2.new(0.5, 0, 1.25, 0)
-expText.Parent = levelBar
-
-local expTextStroke = Instance.new("UIStroke")
-expTextStroke.Thickness = 2
-expTextStroke.Transparency = 0.5
-expTextStroke.Parent = expText
-
-PlayerStats = {
-ScreenGui = ScreenGui,
-levelText = levelText,
-expText = expText,
-fill = fill
-}
-
-PlayerStatsEnabled = true
-
--- FIX: guard module nil (UserData dihapus game) agar HUD tetap dibangun tanpa data
-if useCurrency then
-local currencyDisconnect = useCurrency.Observe(updateCurrencyUI)
-table.insert(observeConnections, currencyDisconnect)
-end
-if useProgression then
-local progressionDisconnect = useProgression.Observe(updateProgressionUI)
-table.insert(observeConnections, progressionDisconnect)
-end
-if useEvent then
-local eventDisconnect = useEvent.Observe(updateEventUI)
-table.insert(observeConnections, eventDisconnect)
-end
-
-updateCurrencyUI()
-updateProgressionUI()
-updateEventUI()
-for name, data in pairs(frontFrames) do
-if data.textLabel then
-local conn = data.textLabel:GetPropertyChangedSignal("Text"):Connect(function()
-if PlayerStatsEnabled then
-updateFrontFrameXSize(data.frame, data.textLabel)
+while mirrorEnabled and myToken == mirrorToken do
+pcall(reconcileVisibility)
+task.wait(0.25)
 end
 end)
-table.insert(observeConnections, function() conn:Disconnect() end)
 end
-end
-end
+
 PlayerStatsToggle = Tabs.Visuals:Toggle({
 Title = "Show Player Stats",
 Flag = "PlayerStatsToggle",
 Value = false,
 Callback = function(state)
 if state then
-EnableScanData()
+enableMirror()
 else
-DisableScanData()
+mirrorEnabled = false
+stopMirror()
 end
 end
 })
+end
+
 
 do
 Tabs.Visuals:Space()
@@ -4345,7 +4970,13 @@ end
 })
 
 -- ================= TAB SHOP =================
--- FIX: pencarian bertahap + warn agar script tidak crash bila folder Items/Registry berubah
+-- UPDATE BETA: shop automation ditulis ulang mengikuti DaraHub BETA. Game versi terbaru
+-- MENGHAPUS remote shop lama (Shared.UserData.Events.Requests.Purchase / GetDailyShop /
+-- PurchaseBattlepassItem) dan menggantinya dengan service Shops di
+-- ReplicatedStorage.Client.Services.UserData - diakses via PlayerData di atas file ini.
+-- ItemRegistry (ReplicatedStorage.Items.Registry) masih ada untuk konfigurasi item
+-- (GetConfig / Query / TryGetById).
+-- FIX: pencarian folder Items tetap bertahap + warn agar tidak crash bila berubah lagi.
 local ItemsFolder = ReplicatedStorage:FindFirstChild("Items")
 local ItemRegistry = ItemsFolder and ItemsFolder:FindFirstChild("Registry")
 if not ItemRegistry then
@@ -4357,862 +4988,313 @@ Title = "Load Shop Automation",
 Callback = function()
 local success, err = pcall(function()
 LoadAutoShop:Destroy()
--- FIX: akses langsung UserData diganti pencarian bertahap (FindFirstChild); bila UserData
--- dihapus dari game, auto shop tetap bisa dibuka tanpa crash dan hanya memberi peringatan.
-local function findDeep(parts)
-local node = ReplicatedStorage
-for _, p in ipairs(parts) do
-node = node:FindFirstChild(p)
-if not node then return nil end
-end
-return node
-end
-local Purchase = findDeep({"Shared", "UserData", "Events", "Requests", "Purchase"})
-local PurchaseBattlepassItem = findDeep({"Shared", "UserData", "Events", "Requests", "PurchaseBattlepassItem"})
-local GetDailyShop = findDeep({"Shared", "UserData", "Events", "Functions", "GetDailyShop"})
-local function tryPurchase(remote, ...)
-if remote then
-safeCall(remote.FireServer, remote, ...)
-end
-end
+
 if not ItemRegistry then
 warn("[Dara Hub] ItemRegistry tidak ditemukan - Load Shop Automation dibatalkan")
 return
 end
-if not Purchase or not GetDailyShop then
-warn("[Dara Hub] UserData.Events tidak lengkap - harga/pembelian shop mungkin tidak tersedia")
-end
-
-function safeCall(fn, ...)
-local ok, result = pcall(fn, ...)
-if not ok then
-if not string.find(result, "cannot access 'Instance'") then
-warn("Error in safeCall:", result)
-end
-return nil
-end
-return result
-end
-
-function getOwnershipType(itemId)
-local config = safeCall(ItemRegistry.GetConfig, ItemRegistry, itemId)
-if config and config.PurchaseInfo and config.PurchaseInfo.OwnershipType then
-return config.PurchaseInfo.OwnershipType
-end
-return "Single"
-end
-
-function checkOwnership(itemId)
-local ownershipType = getOwnershipType(itemId)
-if ownershipType == "Multiple" then
-return "multiple"
-end
-local ownedIds = safeCall(UseInventory and UseInventory.OwnedIds, UseInventory) or {}
-for _, ownedId in ipairs(ownedIds) do
-if ownedId == itemId then
-return "owned"
-end
-end
-return "notowned"
-end
-
-function getBattlepassItemPrice(itemId)
-for seasonId, seasonData in pairs(Config or {}) do
-if seasonData.Tiers then
-for tierIndex, tierData in pairs(seasonData.Tiers) do
-if tierData.items then
-for _, item in ipairs(tierData.items) do
-local id = item.itemId or item.id
-if id == itemId then
-return item.price or item.cost or 0
-end
-end
-end
-end
-end
-end
-return 0
-end
-
-function getBattlepassItemTierInfo(itemId)
-for seasonId, seasonData in pairs(Config or {}) do
-if seasonData.Tiers then
-for tierIndex, tierData in pairs(seasonData.Tiers) do
-if tierData.items then
-for _, item in ipairs(tierData.items) do
-local id = item.itemId or item.id
-if id == itemId then
-return tierIndex, tierData.unlocked, tierData.timeOpen
-end
-end
-end
-end
-end
-end
-return nil, nil, nil
+-- FIX: service Shops baru dicek lebih dulu; belum tersedia = warn (GUI tetap dibangun)
+if not PlayerData.Shop("Daily") and not PlayerData.Shop("Event") then
+warn("[Dara Hub] Service Shops (Client.Services.UserData) belum tersedia - slot shop mungkin kosong")
 end
 
 local loops = {}
-function startLoop(key, purchaseFunc)
+
+local function startLoop(key, action)
 if loops[key] then
 loops[key]()
 loops[key] = nil
 end
 local running = true
-loops[key] = function() running = false end
+loops[key] = function()
+running = false
+end
 task.spawn(function()
 while running do
-local ok, err = pcall(purchaseFunc)
+local ok, loopErr = pcall(action)
 if not ok then
-if not string.find(err, "cannot access 'Instance'") then
-warn("Error in loop " .. key .. ":", err)
-end
+warn("[Dara Hub] Shop loop " .. key .. ":", loopErr)
 end
 task.wait(0.4)
 end
 end)
 end
 
-function stopLoop(key)
+local function stopLoop(key)
 if loops[key] then
 loops[key]()
 loops[key] = nil
 end
 end
 
-local ShopTab = Tabs.Shop
-
-local DailyShopSection = ShopTab:Section({ Title = "Daily Shop", Side = "Left" })
-
-local dailySlotData = {}
-local selectedDailyItemIds = {}
-local dailyItemsCache = {}
-
-function fetchDailyShopItems()
-if not GetDailyShop or not GetDailyShop:IsA("RemoteFunction") then
-warn("GetDailyShop is not available")
-return {}
+local function configOf(key)
+local id = tonumber(key)
+if not id then
+return nil
 end
-local result = safeCall(function() return GetDailyShop:InvokeServer() end)
-if not result or not result.slots then
-warn("Daily shop fetch returned no data")
-dailySlotData = {}
-return {}
+local ok, config = pcall(ItemRegistry.GetConfig, ItemRegistry, id)
+if ok then
+return config
 end
-dailySlotData = {}
-local itemIds = {}
-for slotNum, slotData in pairs(result.slots) do
-local itemId = slotData.itemId
-if itemId then
-dailySlotData[itemId] = {
-slot = slotNum,
-endsAt = slotData.endsAt,
-remaining = slotData.endsAt and (slotData.endsAt - os.time()) or 0
-}
-if not table.find(itemIds, itemId) then
-table.insert(itemIds, itemId)
-end
-end
-end
-dailyItemsCache = itemIds
-return itemIds
+return nil
 end
 
-function getDailyShopItems()
-return dailyItemsCache
+-- FIX: TryGetById juga dibungkus pcall (API registry bisa berubah)
+local function nameOf(key)
+local config = configOf(key)
+if config and config.AppearanceInfo and config.AppearanceInfo.Name then
+return config.AppearanceInfo.Name
+end
+local ok, entry = pcall(function()
+return ItemRegistry.TryGetById(tonumber(key))
+end)
+if ok and entry and entry.Module then
+return entry.Module.Name
+end
+return "Item " .. key
 end
 
-function buildDailyItemOptions()
-local items = getDailyShopItems()
-if #items == 0 then
-return {{
-Title = "No daily items available",
+local function isMultiple(key)
+local config = configOf(key)
+return config ~= nil and config.PurchaseInfo ~= nil and config.PurchaseInfo.OwnershipType == "Multiple"
+end
+
+-- pembelian 1 unit via service Shops baru (bukan remote lama yang sudah dihapus game)
+local function buyUnit(key)
+local record = PlayerData.StockRecord(key)
+if not record or record.Currency == "Robux" then
+return false
+end
+if PlayerData.OwnsStock(key) and not isMultiple(key) then
+return false
+end
+local price = PlayerData.PriceOf(key)
+if not price then
+return false
+end
+local increment = record.Increment or 1
+local units = record.MinAmount or 1
+if PlayerData.Balance(record.Currency) < price * units then
+return false
+end
+return PlayerData.Buy(key, increment * units)
+end
+
+local function slotItemKeys(shopName)
+local keys, seen = {}, {}
+local shop = PlayerData.Shop(shopName)
+if not shop or type(shop.Slots) ~= "function" then
+return keys
+end
+local ok, slots = pcall(shop.Slots)
+if not ok or type(slots) ~= "table" then
+return keys
+end
+local slotNumbers = {}
+for slotNum in pairs(slots) do
+table.insert(slotNumbers, slotNum)
+end
+table.sort(slotNumbers)
+for _, slotNum in ipairs(slotNumbers) do
+local slot = slots[slotNum]
+local itemId = slot and slot.itemId
+if itemId ~= nil then
+local key = tostring(itemId)
+if not seen[key] then
+seen[key] = true
+table.insert(keys, key)
+end
+end
+end
+return keys
+end
+
+local function tokenItemKeys()
+local keys = {}
+local ok, ids = pcall(function()
+return ItemRegistry.Query():Include(function(entry)
+local config = ItemRegistry.GetConfig(entry.Id)
+return config ~= nil and config.PurchaseInfo ~= nil
+and config.PurchaseInfo.Currency == "Tokens"
+and config.PurchaseInfo.AppearsIn == "Shop"
+end):Ids()
+end)
+if not ok or type(ids) ~= "table" then
+return keys
+end
+for _, id in ipairs(ids) do
+local key = tostring(id)
+if PlayerData.StockRecord(key) then
+table.insert(keys, key)
+end
+end
+return keys
+end
+
+local function buildOptions(keys)
+if #keys == 0 then
+return {
+{
+Title = "No items available",
 Desc = "Check back later or refresh",
 Value = "none"
-}}
+}
+}
 end
 local options = {}
-for _, itemId in ipairs(items) do
-local config = ItemRegistry.GetConfig(itemId)
-if not config then
-warn("Daily shop item not found in registry:", itemId)
+for _, key in ipairs(keys) do
+local record = PlayerData.StockRecord(key) or {}
+local purchase = (configOf(key) or {}).PurchaseInfo or {}
+local price = PlayerData.PriceOf(key) or purchase.Price or "?"
+local currency = record.Currency or purchase.Currency or ""
+local status = PlayerData.OwnsStock(key) and "OWNED" or "NOT OWNED"
 table.insert(options, {
-Title = "Unknown Item " .. tostring(itemId),
-Desc = "Missing config",
-Value = tostring(itemId)
-})
-continue
-end
-local name = "Unknown"
-if config.AppearanceInfo and config.AppearanceInfo.Name then
-name = config.AppearanceInfo.Name
-elseif config.Name then
-name = config.Name
-end
-local price = "?"
-local currencyType = ""
-if config.PurchaseInfo then
-price = config.PurchaseInfo.Price or "?"
-currencyType = config.PurchaseInfo.Currency or ""
-end
-local desc = "No description"
-if config.AppearanceInfo and config.AppearanceInfo.Desc then
-desc = config.AppearanceInfo.Desc
-end
-local ownershipType = "Single"
-if config and config.PurchaseInfo and config.PurchaseInfo.OwnershipType then
-ownershipType = config.PurchaseInfo.OwnershipType
-end
-local statusText
-if ownershipType == "Multiple" then
-statusText = "MULTIPLE"
-else
-local status = checkOwnership(itemId)
-statusText = status == "owned" and "OWNED" or (status == "multiple" and "MULTIPLE" or "NOT OWNED")
-end
-
-local slotInfo = dailySlotData[itemId]
-local timeStr = ""
-if slotInfo and slotInfo.remaining and slotInfo.remaining > 0 then
-local h = math.floor(slotInfo.remaining / 3600)
-local m = math.floor((slotInfo.remaining % 3600) / 60)
-local s = slotInfo.remaining % 60
-timeStr = string.format(" | %02dh %02dm %02ds", h, m, s)
-else
-timeStr = " | REFRESHED"
-end
-
-table.insert(options, {
-Title = name,
-Desc = string.format("Price: %s %s | Status: %s | %s%s",
-price, currencyType, statusText, desc, timeStr),
-Value = tostring(itemId)
+Title = nameOf(key),
+Desc = string.format("Price: %s %s | Status: %s", tostring(price), tostring(currency), status),
+Value = key
 })
 end
 return options
 end
 
-local DailyItemDropdown
-local RefreshDailyBtn
-local DailyAutoBuyAll
-local DailyAutoBuySelected
+local function makeShopSection(title, side, getKeys)
+local section = Tabs.Shop:Section({
+Title = title,
+Side = side
+})
+local selected = {}
+local dropdown
+local lastSignature = nil
 
-function buildDailyUI()
-DailyItemDropdown = DailyShopSection:Dropdown({
-Title = "Select Daily Items",
+local function signatureOf(options)
+local parts = {}
+for _, option in ipairs(options) do
+table.insert(parts, option.Value .. "|" .. option.Desc)
+end
+return table.concat(parts, "\n")
+end
+
+local function refresh()
+local options = buildOptions(getKeys())
+local signature = signatureOf(options)
+if signature == lastSignature then
+return
+end
+lastSignature = signature
+local valueSet = {}
+for _, option in ipairs(options) do
+valueSet[option.Value] = true
+end
+local valid = {}
+for _, value in ipairs(selected) do
+if valueSet[value] then
+table.insert(valid, value)
+end
+end
+selected = valid
+if dropdown then
+pcall(dropdown.Refresh, dropdown, options, valid)
+end
+end
+
+local initialOptions = buildOptions(getKeys())
+lastSignature = signatureOf(initialOptions)
+dropdown = section:Dropdown({
+Title = "Select " .. title .. " Items",
 SearchBarEnabled = true,
-Values = buildDailyItemOptions(),
+Values = initialOptions,
 Multi = true,
 AllowNone = true,
-Callback = function(selected)
-selectedDailyItemIds = {}
-if selected then
-for _, v in ipairs(selected) do
-if v.Value and v.Value ~= "none" then
-table.insert(selectedDailyItemIds, v.Value)
-end
+Callback = function(choices)
+selected = {}
+-- FIX: kompatibel 2 format callback lib WindUI (objek {Value=...} era 2.1 / string era 2.2)
+for _, choice in ipairs(choices or {}) do
+local v = type(choice) == "table" and choice.Value or choice
+if v and v ~= "none" then
+table.insert(selected, v)
 end
 end
 end
 })
 
-RefreshDailyBtn = DailyShopSection:Button({
-Title = "Refresh Daily Shop",
-Callback = function()
-fetchDailyShopItems()
-refreshDailyDropdown()
-end
+section:Button({
+Title = "Refresh " .. title,
+Callback = refresh
 })
 
-DailyAutoBuyAll = DailyShopSection:Toggle({
-Title = "Auto Buy All Daily Items",
+section:Toggle({
+Title = "Auto Buy All " .. title .. " Items",
 Value = false,
 Callback = function(state)
 if state then
-startLoop("daily_all", function()
-local items = getDailyShopItems()
-for _, id in ipairs(items) do
-local config = ItemRegistry.GetConfig(id)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= price then
-local ownership = checkOwnership(id)
-if ownership ~= "owned" or getOwnershipType(id) == "Multiple" then
-tryPurchase(Purchase, id, 1)
-end
-end
-end
-end
+startLoop(title .. "_all", function()
+for _, key in ipairs(getKeys()) do
+buyUnit(key)
 end
 end)
-else stopLoop("daily_all") end
-end
-})
-
-DailyAutoBuySelected = DailyShopSection:Toggle({
-Title = "Auto Buy Selected",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("daily_selected", function()
-for _, id in ipairs(selectedDailyItemIds) do
-local numId = tonumber(id)
-if numId then
-local config = ItemRegistry.GetConfig(numId)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= price then
-local ownership = checkOwnership(numId)
-if ownership ~= "owned" or getOwnershipType(numId) == "Multiple" then
-tryPurchase(Purchase, numId, 1)
-end
-end
-end
-end
-end
-end
-end)
-else stopLoop("daily_selected") end
-end
-})
-end
-
-local uiOk, uiErr = pcall(buildDailyUI)
-if not uiOk then
-warn("Failed to create Daily Shop UI:", uiErr)
-DailyShopSection:Label({
-Title = "Error loading Daily Shop UI",
-Desc = "Check console for details"
-})
-end
-
-function refreshDailyDropdown()
-local newOptions = buildDailyItemOptions()
-local validSelected = {}
-local valueSet = {}
-for _, opt in ipairs(newOptions) do
-valueSet[opt.Value] = true
-end
-for _, val in ipairs(selectedDailyItemIds) do
-if valueSet[val] then
-table.insert(validSelected, val)
-end
-end
-if DailyItemDropdown then
-safeCall(DailyItemDropdown.Refresh, DailyItemDropdown, newOptions, validSelected)
-end
-end
-
-local TokenShopSection = ShopTab:Section({ Title = "Token Shop", Side = "Right" })
-local tokenSections = {}
-local multipleSections = {}
-
-function buildTokenShopData()
-local byType = {}
-local multiByType = {}
-local allIds = ItemRegistry.GetAll()
-for id, _ in pairs(allIds) do
-local config = ItemRegistry.GetConfig(id)
-if config and config.PurchaseInfo then
-local purchase = config.PurchaseInfo
-if purchase.Currency == "Tokens" and purchase.AppearsIn == "Shop" then
-local slotType = "Misc"
-if config.EquipInfo and config.EquipInfo.SlotType then
-slotType = config.EquipInfo.SlotType
-end
-local ownership = purchase.OwnershipType or "Single"
-if ownership == "Multiple" then
-if not multiByType[slotType] then multiByType[slotType] = {} end
-table.insert(multiByType[slotType], id)
 else
-if not byType[slotType] then byType[slotType] = {} end
-table.insert(byType[slotType], id)
+stopLoop(title .. "_all")
 end
 end
-end
-end
-return byType, multiByType
-end
+})
 
-function buildTokenItemOptions(items, amount)
-amount = amount or 1
-if #items == 0 then
-return {{
-Title = "No token items",
-Desc = "No items available in this category",
-Value = "none"
-}}
+section:Toggle({
+Title = "Auto Buy Selected " .. title .. " Items",
+Value = false,
+Callback = function(state)
+if state then
+startLoop(title .. "_selected", function()
+for _, key in ipairs(selected) do
+buyUnit(key)
 end
-local opts = {}
-for _, itemId in ipairs(items) do
-local config = ItemRegistry.GetConfig(itemId)
-local name = "Unknown"
-if config and config.AppearanceInfo and config.AppearanceInfo.Name then
-name = config.AppearanceInfo.Name
-elseif config and config.Name then
-name = config.Name
-end
-local price = 0
-local currencyType = ""
-if config and config.PurchaseInfo then
-price = config.PurchaseInfo.Price or 0
-currencyType = config.PurchaseInfo.Currency or ""
-end
-local desc = "No description"
-if config and config.AppearanceInfo and config.AppearanceInfo.Desc then
-desc = config.AppearanceInfo.Desc
-end
-local ownershipType = "Single"
-if config and config.PurchaseInfo and config.PurchaseInfo.OwnershipType then
-ownershipType = config.PurchaseInfo.OwnershipType
-end
-local statusText
-if ownershipType == "Multiple" then
-statusText = "MULTIPLE"
+end)
 else
-local status = checkOwnership(itemId)
-statusText = status == "owned" and "OWNED" or (status == "multiple" and "MULTIPLE" or "NOT OWNED")
-end
-local displayPrice = price and (price * amount) or "?"
-local displayCurrency = currencyType or ""
-table.insert(opts, {
-Title = name,
-Desc = string.format("Price: %s %s | Status: %s | %s", displayPrice, displayCurrency, statusText, desc),
-Value = tostring(itemId)
-})
-end
-return opts
-end
-
-function createTokenDropdown(section, items, selectedStorage, amount)
-amount = amount or 1
-local dropdown = section:Dropdown({
-Title = "Select Item",
-SearchBarEnabled = true,
-Values = buildTokenItemOptions(items, amount),
-Multi = true,
-AllowNone = true,
-Callback = function(selected)
-for i = #selectedStorage, 1, -1 do
-selectedStorage[i] = nil
-end
-if selected then
-for _, v in ipairs(selected) do
-if v.Value and v.Value ~= "none" then
-table.insert(selectedStorage, v.Value)
-end
-end
+stopLoop(title .. "_selected")
 end
 end
 })
-return dropdown
+
+return { refresh = refresh }
 end
 
-function refreshTokenDropdown(dropdown, items, selectedValues, amount)
-amount = amount or 1
-local newOptions = buildTokenItemOptions(items, amount)
-local validSelected = {}
-local valueSet = {}
-for _, opt in ipairs(newOptions) do
-valueSet[opt.Value] = true
-end
-for _, val in ipairs(selectedValues) do
-if valueSet[val] then
-table.insert(validSelected, val)
-end
-end
-safeCall(dropdown.Refresh, dropdown, newOptions, validSelected)
-end
-
-local normalTypes, multiTypes = buildTokenShopData()
-
-for typeName, itemIds in pairs(normalTypes) do
-local section = TokenShopSection:Section({
-Title = typeName .. " (" .. #itemIds .. " items)",
-Side = "Left",
-TextSize = 16
-})
-local selectedItems = {}
-local itemDropdown = createTokenDropdown(section, itemIds, selectedItems)
-
-local autoBuySelected = section:Toggle({
-Title = "Auto Buy Selected Item",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("token_" .. typeName .. "_selected", function()
-for _, id in ipairs(selectedItems) do
-local numId = tonumber(id)
-if numId then
-local config = ItemRegistry.GetConfig(numId)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= price then
-local ownership = checkOwnership(numId)
-if ownership ~= "owned" or getOwnershipType(numId) == "Multiple" then
-tryPurchase(Purchase, numId, 1)
-end
-end
-end
-end
-end
-end
+local daily = makeShopSection("Daily Shop", "Left", function()
+return slotItemKeys("Daily")
 end)
-else stopLoop("token_" .. typeName .. "_selected") end
-end
-})
-
-local autoBuyAll = section:Toggle({
-Title = "Auto Buy All Items",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("token_" .. typeName .. "_all", function()
-for _, id in ipairs(itemIds) do
-local config = ItemRegistry.GetConfig(id)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= price then
-local ownership = checkOwnership(id)
-if ownership ~= "owned" or getOwnershipType(id) == "Multiple" then
-tryPurchase(Purchase, id, 1)
-end
-end
-end
-end
-end
+task.wait()
+local tokens = makeShopSection("Token Shop", "Right", tokenItemKeys)
+task.wait()
+local eventShop = makeShopSection("Event Shop", "Left", function()
+return slotItemKeys("Event")
 end)
-else stopLoop("token_" .. typeName .. "_all") end
-end
-})
+task.wait()
 
-tokenSections[typeName] = {
-dropdown = itemDropdown,
-autoBuySelected = autoBuySelected,
-autoBuyAll = autoBuyAll,
-items = itemIds,
-selected = selectedItems
-}
+-- refresh semua section saat stok/harga/berubah (Observe service Daily & Event + Currency)
+local refreshQueued = false
+local function refreshAll()
+if refreshQueued then
+return
 end
-
-if next(multiTypes) then
-local MultiSection = TokenShopSection:Section({
-Title = "Multiple Type Items",
-Side = "Right",
-TextSize = 16
-})
-for typeName, itemIds in pairs(multiTypes) do
-local typeSec = MultiSection:Section({
-Title = typeName .. " (" .. #itemIds .. " items)",
-Side = "Left",
-TextSize = 14
-})
-local selectedItems = {}
-local currentAmount = 1
-local itemDropdown = createTokenDropdown(typeSec, itemIds, selectedItems, currentAmount)
-
-local amountInput = typeSec:Input({
-Title = "Auto Buy Amount",
-Desc = "Number of times to buy",
-Placeholder = "1",
-Value = "1",
-Callback = function(text)
-local newAmount = tonumber(text) or 1
-if newAmount < 1 then newAmount = 1 end
-currentAmount = newAmount
-refreshTokenDropdown(itemDropdown, itemIds, selectedItems, currentAmount)
-end
-})
-
-local autoBuySelected = typeSec:Toggle({
-Title = "Auto Buy Selected Item",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("multi_" .. typeName .. "_selected", function()
-for _, id in ipairs(selectedItems) do
-local numId = tonumber(id)
-local lookupId = numId or id
-local config = ItemRegistry.GetConfig(lookupId)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local totalCost = price * currentAmount
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= totalCost then
-tryPurchase(Purchase, lookupId, currentAmount)
-end
-end
-end
-end
-end)
-else stopLoop("multi_" .. typeName .. "_selected") end
-end
-})
-
-local autoBuyAll = typeSec:Toggle({
-Title = "Auto Buy All Items",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("multi_" .. typeName .. "_all", function()
-for _, id in ipairs(itemIds) do
-local config = ItemRegistry.GetConfig(id)
-if config and config.PurchaseInfo then
-local price = config.PurchaseInfo.Price
-local currencyType = config.PurchaseInfo.Currency
-if currencyType and price then
-local totalCost = price * currentAmount
-local allCurrencies = Currency and Currency.All() or {}
-local balance = allCurrencies and allCurrencies[currencyType]
-if balance and balance >= totalCost then
-tryPurchase(Purchase, id, currentAmount)
-end
-end
-end
-end
-end)
-else stopLoop("multi_" .. typeName .. "_all") end
-end
-})
-
-multipleSections[typeName] = {
-dropdown = itemDropdown,
-amountInput = amountInput,
-autoBuySelected = autoBuySelected,
-autoBuyAll = autoBuyAll,
-items = itemIds,
-selected = selectedItems,
-getAmount = function() return currentAmount end
-}
-end
-end
-
-local EventShopSection = ShopTab:Section({ Title = "Event Shop", Side = "Left" })
-local selectedEventItemIds = {}
-
-function buildEventItemOptions()
-local options = {}
-local tiers = safeCall(useEvent and useEvent.GetTiers, useEvent) or {}
-for _, tier in ipairs(tiers) do
-if tier.items then
-for _, item in ipairs(tier.items) do
-local itemId
-if type(item) == "table" then
-itemId = item.itemId or item.id
-else
-itemId = item
-end
-if itemId then
-local config = ItemRegistry.GetConfig(itemId)
-local name = "Unknown"
-if config and config.AppearanceInfo and config.AppearanceInfo.Name then
-name = config.AppearanceInfo.Name
-elseif config and config.Name then
-name = config.Name
-end
-local desc = "No description"
-if config and config.AppearanceInfo and config.AppearanceInfo.Desc then
-desc = config.AppearanceInfo.Desc
-end
-local status = checkOwnership(itemId)
-local statusText = status == "owned" and "OWNED" or (status == "multiple" and "MULTIPLE" or "NOT OWNED")
-local tierInfo = "Tier " .. tier.index
-local opens = tier.timeOpen and "Open" or "Locked"
-local price = getBattlepassItemPrice(itemId)
-local priceText = price > 0 and ("Tickets: " .. price) or "Free"
-table.insert(options, {
-Title = name,
-Desc = string.format("%s | %s | Status: %s | %s", tierInfo, priceText, statusText, opens),
-Value = tostring(itemId)
-})
-end
-end
-end
-end
-return options
-end
-
-local EventItemDropdown = EventShopSection:Dropdown({
-Title = "Select Battle Pass Item",
-Values = buildEventItemOptions(),
-SearchBarEnabled = true,
-Multi = true,
-AllowNone = true,
-Callback = function(selected)
-selectedEventItemIds = {}
-if selected then
-for _, v in ipairs(selected) do
-if v.Value then
-table.insert(selectedEventItemIds, v.Value)
-end
-end
-end
-end
-})
-
-local EventAutoBuySelected = EventShopSection:Toggle({
-Title = "Auto Buy Selected Item",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("event_selected", function()
-for _, id in ipairs(selectedEventItemIds) do
-local numId = tonumber(id)
-if numId then
-local price = getBattlepassItemPrice(numId)
-local balance = safeCall(Currency and Currency.Balance, Currency, "Tickets")
-if balance and balance >= price then
-local ownership = checkOwnership(numId)
-if ownership ~= "owned" or getOwnershipType(numId) == "Multiple" then
-local tierIndex, unlocked, timeOpen = getBattlepassItemTierInfo(numId)
-if unlocked and timeOpen then
-tryPurchase(PurchaseBattlepassItem, numId)
-end
-end
-end
-end
-end
-end)
-else stopLoop("event_selected") end
-end
-})
-
-local EventAutoBuyAll = EventShopSection:Toggle({
-Title = "Auto Buy All Items",
-Value = false,
-Callback = function(state)
-if state then
-startLoop("event_all", function()
-local allIds = {}
-local tiers = safeCall(useEvent and useEvent.GetTiers, useEvent) or {}
-for _, tier in ipairs(tiers) do
-if tier.items then
-for _, item in ipairs(tier.items) do
-local itemId
-if type(item) == "table" then
-itemId = item.itemId or item.id
-else
-itemId = item
-end
-if itemId then
-table.insert(allIds, itemId)
-end
-end
-end
-end
-for _, id in ipairs(allIds) do
-local price = getBattlepassItemPrice(id)
-local balance = safeCall(Currency and Currency.Balance, Currency, "Tickets")
-if balance and balance >= price then
-local ownership = checkOwnership(id)
-if ownership ~= "owned" or getOwnershipType(id) == "Multiple" then
-local tierIndex, unlocked, timeOpen = getBattlepassItemTierInfo(id)
-if unlocked and timeOpen then
-tryPurchase(PurchaseBattlepassItem, id)
-end
-end
-end
-end
-end)
-else stopLoop("event_all") end
-end
-})
-
-function refreshTokenDropdowns()
-for typeName, data in pairs(tokenSections) do
-local newOptions = buildTokenItemOptions(data.items)
-local validSelected = {}
-local valueSet = {}
-for _, opt in ipairs(newOptions) do
-valueSet[opt.Value] = true
-end
-for _, val in ipairs(data.selected) do
-if valueSet[val] then
-table.insert(validSelected, val)
-end
-end
-safeCall(data.dropdown.Refresh, data.dropdown, newOptions, validSelected)
-end
-for typeName, data in pairs(multipleSections) do
-local amt = data.getAmount()
-local newOptions = buildTokenItemOptions(data.items, amt)
-local validSelected = {}
-local valueSet = {}
-for _, opt in ipairs(newOptions) do
-valueSet[opt.Value] = true
-end
-for _, val in ipairs(data.selected) do
-if valueSet[val] then
-table.insert(validSelected, val)
-end
-end
-safeCall(data.dropdown.Refresh, data.dropdown, newOptions, validSelected)
-end
-end
-
-function refreshEventDropdown()
-local newOptions = buildEventItemOptions()
-local validSelected = {}
-local valueSet = {}
-for _, opt in ipairs(newOptions) do
-valueSet[opt.Value] = true
-end
-for _, val in ipairs(selectedEventItemIds) do
-if valueSet[val] then
-table.insert(validSelected, val)
-end
-end
-safeCall(EventItemDropdown.Refresh, EventItemDropdown, newOptions, validSelected)
-end
-
-function refreshAll()
-task.spawn(function()
-safeCall(refreshDailyDropdown)
-safeCall(refreshTokenDropdowns)
-safeCall(refreshEventDropdown)
+refreshQueued = true
+task.defer(function()
+refreshQueued = false
+pcall(daily.refresh)
+pcall(tokens.refresh)
+pcall(eventShop.refresh)
 end)
 end
 
-fetchDailyShopItems()
+for _, shopName in ipairs({ "Daily", "Event" }) do
+local shop = PlayerData.Shop(shopName)
+if shop and type(shop.Observe) == "function" then
+pcall(shop.Observe, refreshAll)
+end
+end
+PlayerData.Observe("Currency", refreshAll)
 
--- FIX: guard module nil (UserData dihapus game) supaya auto shop tetap aktif tanpa observer
-if UseInventory then
-UseInventory.Observe(function()
 refreshAll()
-end)
-end
-if useEvent then
-useEvent.Changed:Connect(function()
-refreshAll()
-end)
-end
-if Currency then
-Currency.Changed:Connect(function()
-refreshAll()
-end)
-end
 end)
 if not success then
-warn("LoadAutoShop callback error:", err)
+warn("[Dara Hub] LoadAutoShop callback error:", err)
 end
 end
 })
