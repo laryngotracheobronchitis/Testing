@@ -13,7 +13,9 @@
                              hitbox auto-reset + anti nempel dinding), FastFlag (tab Utility),
                              Demon Settings: Power (Multiplier), Delay (ms), Launch Time (tab Utility),
                              Screen Button Size X/Y/Z untuk semua tombol layar (tab Settings),
-                             Set Time (input HH:MM), Remove Textures, Clear MaterialService, Low Quality (tab Utility).
+                             Set Time (input HH:MM), Remove Textures, Clear MaterialService, Low Quality (tab Utility),
+                             Auto Farm lengkap port dari DaraHub 2.2: Anti AFK, Auto Farm 2 mode
+                             (Auto Ticket + Token Farm, Offset & Delay, warning ban wave), Auto Complete Objective (tab Auto).
 ]]
 
 function FireClient(path, ...)
@@ -1399,6 +1401,387 @@ Callback = function()
 changePlayerMode:FireServer(true)
 end
 })
+
+-- ================= ADD: SECTION AUTO FARM (port dari DaraHub 2.2, fitur auto farm lengkap) =================
+-- ADD: Anti AFK (tab Misc versi asli tidak dibawa ke Ringkas; Auto Farm menyalakannya otomatis saat mulai)
+local AntiAFKConnection = nil
+local VirtualUser = game:GetService("VirtualUser")
+
+-- FIX: akses Events.Interact memakai FindFirstChild bertingkat + warn agar tidak error saat load
+-- jika game mengubah struktur Events (pola sama dengan fix UserData di bagian Shop)
+local Interact = ReplicatedStorage:FindFirstChild("Events")
+Interact = Interact and Interact:FindFirstChild("Interact")
+if not Interact then
+warn("[Dara Hub] ReplicatedStorage.Events.Interact tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
+end
+
+Tabs.Auto:Section({ Title = "Auto Farm" })
+
+AntiAfkToggle = Tabs.Auto:Toggle({
+Title = "Anti AFK",
+Desc = "Wajib aktif agar Auto Farm tidak berhenti karena AFK",
+Flag = "AntiAfkToggle",
+Value = false,
+Callback = function(state)
+if state then
+if AntiAFKConnection then
+AntiAFKConnection:Disconnect()
+end
+AntiAFKConnection = LocalPlayer.Idled:Connect(function()
+VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+task.wait(1)
+VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+else
+if AntiAFKConnection then
+AntiAFKConnection:Disconnect()
+AntiAFKConnection = nil
+end
+end
+end
+})
+
+Tabs.Auto:Space()
+
+-- ADD: state Auto Farm (2 mode: Auto Ticket + Token Farm) & Auto Objective - port dari DaraHub 2.2
+AutoFarmType = { "Auto Ticket", "Token Farm" }
+local TicketsFolder = workspace:FindFirstChild("Effects") and workspace.Effects:FindFirstChild("Tickets")
+local AutoFarm = {
+Enabled = false,
+Modes = {},
+Connection = nil,
+WarningShown = false,
+ReviveTarget = nil,
+LastTokenFire = 0,
+TokenDelay = 2,
+TokenOffset = Vector3.new(0, -11, 0),
+}
+local AutoObjective = {
+Enabled = false,
+Thread = nil,
+Delay = 0.2,
+}
+
+function isTokenFarmLocalPlayerModel(model)
+if not model then
+return true
+end
+if model == LocalPlayer.Character then
+return true
+end
+if model.Name == LocalPlayer.Name then
+return true
+end
+if model.Name == tostring(LocalPlayer.UserId) then
+return true
+end
+local attrName = model:GetAttribute("Name")
+if attrName == LocalPlayer.Name or attrName == LocalPlayer.DisplayName then
+return true
+end
+local attrTag = model:GetAttribute("Tag")
+if attrTag == LocalPlayer.Name or attrTag == LocalPlayer.DisplayName then
+return true
+end
+local userId = model:GetAttribute("UserId") or model:GetAttribute("PlayerUserId")
+if typeof(userId) == "number" and userId == LocalPlayer.UserId then
+return true
+end
+return false
+end
+
+function isValidTokenFarmTarget(model)
+if not model or not model.Parent or not model:IsA("Model") then
+return false
+end
+if model.Parent.Name ~= "Players" then
+return false
+end
+if isTokenFarmLocalPlayerModel(model) then
+return false
+end
+if not model:FindFirstChild("HumanoidRootPart") then
+return false
+end
+if model:GetAttribute("Tag") == nil then
+return false
+end
+return true
+end
+
+function pickRandomTokenFarmTarget()
+local playersFolder = workspace:FindFirstChild("Players")
+if not playersFolder then
+return nil
+end
+local valid = {}
+for _, model in ipairs(playersFolder:GetChildren()) do
+if isValidTokenFarmTarget(model) then
+table.insert(valid, model)
+end
+end
+if #valid == 0 then
+return nil
+end
+return valid[math.random(1, #valid)]
+end
+
+function StartAutoObjective()
+if AutoObjective.Enabled then
+return
+end
+AutoObjective.Enabled = true
+AutoObjective.Thread = task.spawn(function()
+while AutoObjective.Enabled do
+local objectivesContainer = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parts") and workspace.Map.Parts:FindFirstChild("Objectives")
+if objectivesContainer then
+local anyCompleted = false
+for _, obj in pairs(objectivesContainer:GetChildren()) do
+if obj:GetAttribute("Completed") == true then
+anyCompleted = true
+break
+end
+end
+if not anyCompleted then
+for _, objective in pairs(objectivesContainer:GetChildren()) do
+if not AutoObjective.Enabled then
+break
+end
+if objective:FindFirstChild("WhenActivated") then
+local tagValue = objective:GetAttribute("Tag")
+if tagValue and Interact then
+pcall(function()
+Interact:FireServer("Dynamic", tagValue)
+end)
+task.wait(AutoObjective.Delay)
+end
+end
+end
+end
+end
+task.wait(0.2)
+end
+end)
+end
+
+function StopAutoObjective()
+AutoObjective.Enabled = false
+if AutoObjective.Thread then
+pcall(task.cancel, AutoObjective.Thread)
+AutoObjective.Thread = nil
+end
+end
+
+function StartAutoFarm()
+if AutoFarm.Connection then
+AutoFarm.Connection:Disconnect()
+AutoFarm.Connection = nil
+end
+AutoFarm.Enabled = true
+AutoFarm.Connection = RunService.Heartbeat:Connect(function()
+local char = LocalPlayer.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if not hrp then
+return
+end
+local hasTicket = table.find(AutoFarm.Modes, AutoFarmType[1])
+local hasTokenFarm = table.find(AutoFarm.Modes, AutoFarmType[2])
+if not hasTokenFarm then
+teleportToSecurityPart(Vector3.new(0, 3, 0))
+end
+if hasTicket then
+-- FIX: folder Tickets dicari ulang saat loop bila belum ada saat load (map bisa dimuat belakangan)
+if not TicketsFolder then
+local effects = workspace:FindFirstChild("Effects")
+TicketsFolder = effects and effects:FindFirstChild("Tickets")
+end
+local ticket = TicketsFolder and TicketsFolder:GetChildren()[1]
+if ticket then
+local target = ticket:FindFirstChild("HumanoidRootPart") or ticket:FindFirstChildWhichIsA("BasePart")
+if target then
+hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+end
+end
+end
+if hasTokenFarm then
+if not isValidTokenFarmTarget(AutoFarm.ReviveTarget) then
+AutoFarm.ReviveTarget = pickRandomTokenFarmTarget()
+end
+local target = AutoFarm.ReviveTarget
+if target then
+local targetHrp = target:FindFirstChild("HumanoidRootPart")
+if targetHrp then
+hrp.CFrame = targetHrp.CFrame + AutoFarm.TokenOffset
+local tag = target:GetAttribute("Tag")
+if tag and Interact then
+local now = tick()
+if now - AutoFarm.LastTokenFire >= AutoFarm.TokenDelay then
+AutoFarm.LastTokenFire = now
+pcall(function()
+Interact:FireServer("Revive", tag)
+Interact:FireServer("Revive", tag, true)
+end)
+end
+end
+end
+else
+teleportToSecurityPart(Vector3.new(0, 3, 0))
+end
+end
+end)
+end
+
+function StopAutoFarm()
+AutoFarm.Enabled = false
+if AutoFarm.Connection then
+AutoFarm.Connection:Disconnect()
+AutoFarm.Connection = nil
+end
+AutoFarm.ReviveTarget = nil
+AutoFarm.LastTokenFire = 0
+end
+
+Tabs.Auto:Space()
+
+AutoFarmModeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Farm Mode",
+Flag = "AutoFarmDropdown",
+Values = AutoFarmType,
+Multi = true,
+AllowNone = true,
+Value = {},
+Callback = function(selected)
+-- FIX: hasil Multi dropdown dibuat kompatibel dua format (array string / array objek {Value=...})
+AutoFarm.Modes = {}
+if type(selected) == "table" then
+if #selected > 0 then
+for _, v in ipairs(selected) do
+local val = v
+if type(v) == "table" and type(v.Value) == "string" then
+val = v.Value
+end
+if type(val) == "string" then
+table.insert(AutoFarm.Modes, val)
+end
+end
+else
+for key, isOn in pairs(selected) do
+if isOn and type(key) == "string" then
+table.insert(AutoFarm.Modes, key)
+end
+end
+end
+end
+end
+})
+
+TokenFarmOffsetInput = Tabs.Auto:Input({
+Title = "Token Farm Offset",
+Flag = "TokenFarmOffsetInput",
+Placeholder = "X Y Z",
+Value = "0 -11 0",
+Callback = function(value)
+local x, y, z = value:match("^%s*([%-%d%.]+)%s+([%-%d%.]+)%s+([%-%d%.]+)%s*$")
+if x and y and z then
+AutoFarm.TokenOffset = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+end
+end
+})
+
+TokenFarmDelaySlider = Tabs.Auto:Slider({
+Title = "Token Farm Delay",
+Flag = "TokenFarmDelaySlider",
+Desc = "Jeda fire revive dalam detik",
+Step = 0.01,
+Value = { Min = 0.4, Max = 4, Default = 2 },
+Callback = function(value)
+AutoFarm.TokenDelay = value
+end
+})
+
+AutoFarmToggle = Tabs.Auto:Toggle({
+Title = "Auto Farm",
+Flag = "AutoFarmToggle",
+Value = false,
+Callback = function(state)
+if state then
+if AntiAfkToggle then
+AntiAfkToggle:Set(true)
+end
+if AutoSelfReviveToggle then
+AutoSelfReviveToggle:Set(true)
+end
+local isVIP = false
+pcall(function()
+isVIP = LocalPlayer:GetAttribute("VIPCommandsAccess") == true
+end)
+if isVIP or AutoFarm.WarningShown then
+StartAutoFarm()
+else
+-- FIX: WindUI:Popup dibungkus pcall; bila versi WindUI tidak punya Popup,
+-- fallback ke Notify + langsung mulai agar toggle tidak mati sia-sia
+local okPopup = pcall(function()
+WindUI:Popup({
+Title = "<b><font color='#FF5555'>WARNING! BAN WAVE!</font></b>",
+Icon = "shield-x",
+Content = [[<b><font color='#FFAA00'>DO NOT USE AUTO FARM ON PUBLIC SERVER OR UNTRUSTED PRIVATE SERVER! IF YOU DON'T WANNA GET BAN!</font></b>
+<font color='#4fe000'> - Be Sure Use It On Your Own Private Server To Avoid BAN!</font>
+<b><font color='#FF5555'> - IF YOU KEEP CONTINUE DOING THIS YOU WILL GET BAN ANYTIME SOON!</font></b>
+<b><font color='#FF5555'> - WHEN YOU GET BANNED, THERE'S NO UNBAN APPEAL!</font></b>
+<font color='#FF5555'> Remember: Staff will not giving you second chance!</font>]],
+Buttons = {
+{
+Title = "Cancel",
+Callback = function()
+AutoFarmToggle:Set(false)
+end,
+Variant = "Destructive"
+},
+{
+Title = "Continue Anyway",
+Icon = "shield-check",
+Callback = function()
+AutoFarm.WarningShown = true
+StartAutoFarm()
+end,
+Variant = "Primary"
+}
+}
+})
+end)
+if not okPopup then
+pcall(function()
+WindUI:Notify({
+Title = "Auto Farm",
+Content = "WARNING: Jangan pakai Auto Farm di server publik! Risiko ban tanpa appeal.",
+Duration = 6
+})
+end)
+AutoFarm.WarningShown = true
+StartAutoFarm()
+end
+end
+else
+StopAutoFarm()
+end
+end
+})
+
+Tabs.Auto:Space()
+
+AutoCompleteObjectiveToggle = Tabs.Auto:Toggle({
+Title = "Auto Complete Objective",
+Flag = "AutoCompleteObjectiveToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoObjective()
+else
+StopAutoObjective()
+end
+end
+})
+-- ================= AKHIR SECTION AUTO FARM =================
 
 -- ================= TAB VISUALS =================
 Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
