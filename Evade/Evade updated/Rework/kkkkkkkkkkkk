@@ -16,8 +16,6 @@
                              Set Time (input HH:MM), Remove Textures, Clear MaterialService, Low Quality (tab Utility),
                              Auto Farm lengkap port dari DaraHub 2.2: Anti AFK, Auto Farm 2 mode
                              (Auto Ticket + Token Farm, Offset & Delay, warning ban wave), Auto Complete Objective (tab Auto),
-                             VIP CMD Macro: auto-run macro chat command VIP (!time, !specialround,
-                             !MapScale) dengan config JSON ter-embed + editor + save ke file (tab Auto),
                              UPDATE BETA (sinkron DaraHub BETA untuk game versi terbaru):
                              - PlayerData: lapisan data baru ReplicatedStorage.Client.Services.UserData
                                (Currency/Event/Progression/Codes/Inventory/Shops) pengganti
@@ -69,6 +67,21 @@
                                agar fallback jalur langsung tetap bisa menulis saat
                                data sesaat nil (lobby/mati), dan panggilan service di
                                hook dibungkus pcall agar tidak error tiap frame.
+                             UPDATE MATIKAN VIP MACRO + FIX TRIGGER PC:
+                             - VIP CMD Macro dimatikan seluruhnya (permintaan
+                               user): section UI di tab Auto, auto-run saat
+                               load, listener keybind F, dan config JSON
+                               dihapus semua - script tidak lagi mengirim
+                               command chat VIP (!time / !specialround /
+                               !MapScale) secara otomatis,
+                             - FIX "Lag Switch tidak bekerja di PC untuk
+                               triggernya": keybind "Trigger Lag Switch"
+                               (L) kini langsung memicu lag tanpa bergantung
+                               toggle "Lag Switch" (toggle hanya menampilkan
+                               tombol layar mobile; di PC toggle OFF membuat
+                               tekan L diam saja), dan lag() dibungkus pcall
+                               + isLagActive selalu direset agar error satu
+                               mode tidak mematikan semua trigger.
 ]]
 
 -- FIX (Task 19): FireClient kini kompatibel dengan varian API getconnections antar
@@ -250,7 +263,7 @@ else
 print("The injector does not support identifyexecutor()")
 end
 Window:Tag({
-Title = "v1.2.5",
+Title = "v1.2.6",
 Color = Color3.fromHex("#30ff6a")
 })
 Tabs = {
@@ -2267,392 +2280,6 @@ end
 end
 })
 -- ================= AKHIR SECTION AUTO FARM =================
-
--- ================= ADD: SECTION VIP CMD MACRO (auto-run config, skema config EvadeCMDMacroGUI asli) =================
--- ADD: macro chat command VIP (!time / !specialround / !MapScale) berjalan otomatis; config default
--- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke DaraHub/Games/Evade/VIPMacroConfig.json
-local HttpService = game:GetService("HttpService")
-local UIS = game:GetService("UserInputService")
-
-local VIP_MACRO_CONFIG_FILE = "DaraHub/Games/Evade/VIPMacroConfig.json"
-local VIP_MACRO_DEFAULT_CONFIG = '{"AutoFarm":[{"keybind":"F","delayValue":3,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro","command":"!time 1","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":1,"delayUnit":"Ms","startRoundType":"Intermission","name":"Macro","command":"!specialround Plushie Hell","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":30,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro_1790151459","command":"!MapScale 0","startTimeType":"Any Time","stopMode":"indefinitely"}]}'
-
-local VIPMacros = {}
-local VIPMacroRawConfig = ""
-local VIPMacroAutoRunState = true
-local VIPAutoRunThread = nil
-local VIPWarnedNoRoundStatus = false
-
--- FIX: RoundStatus dibaca lewat pcall; 2 = Round Active, 0/1 = Intermission (sesuai pemakaian asli).
--- Bila registry tidak tersedia, kembalikan nil agar macro tetap jalan (fail-open) + warn sekali.
-local function VIPMacroIsRoundActive()
-if not ServerStateRegistryService then
-return nil
-end
-local ok, status = pcall(function()
-return tonumber(ServerStateRegistryService.Registry and ServerStateRegistryService.Registry.RoundStatus)
-end)
-if not ok then
-return nil
-end
-if status == nil and not VIPWarnedNoRoundStatus then
-VIPWarnedNoRoundStatus = true
-warn("[Dara Hub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
-end
-if status == nil then
-return nil
-end
-return status == 2
-end
-
-local function VIPMacroDelaySeconds(macro)
-local n = tonumber(macro.delayValue) or 1
-local unit = tostring(macro.delayUnit or "Second")
-if unit == "Ms" then
-return math.max(n / 1000, 0)
-end
-return n
-end
-
--- FIX: pengiriman chat dicoba lewat TextChatService (RBXGeneral:SendAsync) lalu fallback
--- DefaultChatSystemChatEvents.SayMessageRequest (chat legacy); keduanya pcall + warn.
-local function VIPMacroSendChat(message)
-local sent = false
-local ok = pcall(function()
-local tcs = game:GetService("TextChatService")
-local channels = tcs and tcs:FindFirstChild("TextChannels")
-local general = channels and channels:FindFirstChild("RBXGeneral")
-if not general then
-error("RBXGeneral tidak ditemukan")
-end
-general:SendAsync(message)
-sent = true
-end)
-if not ok or not sent then
-pcall(function()
-local ev = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-local req = ev and ev:FindFirstChild("SayMessageRequest")
-if not req then
-error("SayMessageRequest tidak ditemukan")
-end
-req:FireServer(message, "All")
-sent = true
-end)
-end
-if not sent then
-warn("[Dara Hub] Gagal mengirim chat macro: " .. tostring(message))
-end
-end
-
-local function VIPMacroRunLoop(macro)
-while macro.Running do
-local mode = tostring(macro.startRoundType or "Any Time")
-if mode == "Intermission" then
-local active = VIPMacroIsRoundActive()
-while macro.Running and active == true do
-task.wait(0.5)
-active = VIPMacroIsRoundActive()
-end
-elseif mode == "Round" then
-local active = VIPMacroIsRoundActive()
-while macro.Running and active == false do
-task.wait(0.5)
-active = VIPMacroIsRoundActive()
-end
-end
-if not macro.Running then break end
-if tostring(macro.startTimeType or "Any Time") == "Round Start" then
-local active = VIPMacroIsRoundActive()
-while macro.Running and active ~= true do
-task.wait(0.5)
-active = VIPMacroIsRoundActive()
-end
-end
-if not macro.Running then break end
-VIPMacroSendChat(tostring(macro.command or ""))
-if tostring(macro.stopMode or "indefinitely") == "Once" then
-macro.Running = false
-break
-end
-task.wait(VIPMacroDelaySeconds(macro))
-end
-end
-
-local function VIPMacroStopAll()
-for _, m in ipairs(VIPMacros) do
-m.Running = false
-end
-end
-
-local function VIPMacroStartAll()
-for _, m in ipairs(VIPMacros) do
-if not m.Running then
-m.Running = true
-task.spawn(VIPMacroRunLoop, m)
-end
-end
-end
-
-local function VIPMacroIsVIP()
-local ok, isVIP = pcall(function()
-return LocalPlayer:GetAttribute("VIPCommandsAccess") == true
-end)
-return ok and isVIP == true
-end
-
-local function VIPMacroAutoStart()
-if VIPAutoRunThread then
-pcall(task.cancel, VIPAutoRunThread)
-VIPAutoRunThread = nil
-end
-VIPAutoRunThread = task.spawn(function()
--- FIX: attribute VIPCommandsAccess bisa terisi lambat setelah load; polling 15 detik
--- (versi asli hanya cek sekali saat load sehingga macro kadang tidak jalan)
-local waited = 0
-while waited < 15 do
-if VIPMacroIsVIP() then
-VIPMacroStartAll()
-pcall(function()
-WindUI:Notify({
-Title = "VIP CMD Macro",
-Content = "VIP terdeteksi - " .. #VIPMacros .. " macro mulai berjalan otomatis",
-Duration = 4
-})
-end)
-return
-end
-task.wait(1)
-waited = waited + 1
-end
-warn("[Dara Hub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
-end)
-end
-
-local function VIPMacroBuildStatus()
-if #VIPMacros == 0 then
-return "Tidak ada macro terload."
-end
-local lines = {}
-for i, m in ipairs(VIPMacros) do
-table.insert(lines, i .. ") " .. m.name .. ": " .. m.command .. " | tiap " .. tostring(m.delayValue) .. " " .. tostring(m.delayUnit) .. " | " .. tostring(m.startRoundType) .. " | keybind " .. (m.keybind ~= "" and m.keybind or "-"))
-end
-return table.concat(lines, "\n")
-end
-
-local function VIPMacroLoadFromTable(data)
-VIPMacroStopAll()
-VIPMacros = {}
-local list = data
-if type(data) == "table" and type(data.AutoFarm) == "table" then
-list = data.AutoFarm
-end
-if type(list) == "table" then
-for _, m in ipairs(list) do
-if type(m) == "table" and m.command then
-table.insert(VIPMacros, {
-name = tostring(m.name or "Macro"),
-command = tostring(m.command),
-keybind = tostring(m.keybind or ""),
-delayValue = tonumber(m.delayValue) or 1,
-delayUnit = tostring(m.delayUnit or "Second"),
-startRoundType = tostring(m.startRoundType or "Any Time"),
-startTimeType = tostring(m.startTimeType or "Any Time"),
-stopMode = tostring(m.stopMode or "indefinitely"),
-Running = false,
-Thread = nil,
-})
-end
-end
-end
-end
-
-local function VIPMacroApplyRaw(raw)
-if not raw or raw == "" then
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config JSON masih kosong.", Duration = 3 })
-end)
-return false
-end
-local ok, data = pcall(function()
-return HttpService:JSONDecode(raw)
-end)
-if not ok or type(data) ~= "table" then
-warn("[Dara Hub] Config VIP Macro bukan JSON valid")
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "JSON tidak valid!", Duration = 3 })
-end)
-return false
-end
-VIPMacroLoadFromTable(data)
-if #VIPMacros == 0 then
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Tidak ada macro valid di config (butuh field command).", Duration = 3 })
-end)
-return false
-end
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = #VIPMacros .. " macro diterapkan.", Duration = 3 })
-end)
-return true
-end
-
--- ADD: load config dari file (kalau pernah di-save), kalau tidak pakai config default ter-embed
-local VIPMacroLoadedFromDisk = false
-if isfile and readfile then
-local okFile, exists = pcall(isfile, VIP_MACRO_CONFIG_FILE)
-if okFile and exists then
-local ok, content = pcall(readfile, VIP_MACRO_CONFIG_FILE)
-if ok and type(content) == "string" and content ~= "" then
-local ok2, data = pcall(function()
-return HttpService:JSONDecode(content)
-end)
-if ok2 and type(data) == "table" then
-VIPMacroLoadFromTable(data)
-VIPMacroLoadedFromDisk = true
-end
-end
-end
-end
-if not VIPMacroLoadedFromDisk then
-local ok, data = pcall(function()
-return HttpService:JSONDecode(VIP_MACRO_DEFAULT_CONFIG)
-end)
-if ok and type(data) == "table" then
-VIPMacroLoadFromTable(data)
-end
-end
-
-Tabs.Auto:Section({ Title = "VIP CMD Macro" })
-
-Tabs.Auto:Paragraph({
-Title = "Macro Terload" .. (#VIPMacros > 0 and " (" .. #VIPMacros .. ")" or ""),
-Content = VIPMacroBuildStatus()
-})
-
-VIPMacroAutoRunToggle = Tabs.Auto:Toggle({
-Title = "Auto Run VIP Macro",
-Flag = "VIPMacroAutoRun",
-Desc = "Jalankan semua macro otomatis begitu VIP Commands aktif",
-Value = true,
-Callback = function(state)
-VIPMacroAutoRunState = state
-if state then
-VIPMacroAutoStart()
-else
-VIPMacroStopAll()
-end
-end
-})
-
-Tabs.Auto:Button({
-Title = "Run All Macros Now",
-Icon = "play",
-Callback = function()
-if not VIPMacroIsVIP() then
-warn("[Dara Hub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Kamu belum punya VIP Commands (coba di private server sendiri).", Duration = 4 })
-end)
-end
-VIPMacroStartAll()
-end
-})
-
-Tabs.Auto:Button({
-Title = "Stop All Macros",
-Icon = "square",
-Callback = function()
-VIPMacroStopAll()
-end
-})
-
-Tabs.Auto:Space()
-
-VIPMacroConfigInput = Tabs.Auto:Input({
-Title = "Macro Config (JSON)",
-Flag = "VIPMacroConfigInput",
-Placeholder = "Paste config JSON di sini",
-Callback = function(value)
-VIPMacroRawConfig = value or ""
-end
-})
-
-Tabs.Auto:Button({
-Title = "Apply Config JSON",
-Icon = "check",
-Callback = function()
-if VIPMacroApplyRaw(VIPMacroRawConfig) then
-VIPMacroStopAll()
-if VIPMacroAutoRunState then
-VIPMacroAutoStart()
-end
-end
-end
-})
-
-Tabs.Auto:Button({
-Title = "Save Config ke File",
-Desc = "Simpan config macro aktif ke DaraHub/Games/Evade/VIPMacroConfig.json",
-Icon = "save",
-Callback = function()
-if not writefile then
-warn("[Dara Hub] Executor tidak mendukung writefile - config tidak bisa disimpan")
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Executor tidak mendukung writefile.", Duration = 3 })
-end)
-return
-end
-local ok = pcall(function()
-if isfolder and makefolder then
-if not isfolder("DaraHub") then makefolder("DaraHub") end
-if not isfolder("DaraHub/Games") then makefolder("DaraHub/Games") end
-if not isfolder("DaraHub/Games/Evade") then makefolder("DaraHub/Games/Evade") end
-end
-local list = {}
-for _, m in ipairs(VIPMacros) do
-table.insert(list, {
-keybind = m.keybind,
-delayValue = m.delayValue,
-delayUnit = m.delayUnit,
-startRoundType = m.startRoundType,
-name = m.name,
-command = m.command,
-startTimeType = m.startTimeType,
-stopMode = m.stopMode,
-})
-end
-writefile(VIP_MACRO_CONFIG_FILE, HttpService:JSONEncode({ AutoFarm = list }))
-end)
-if ok then
-pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config tersimpan: " .. VIP_MACRO_CONFIG_FILE, Duration = 3 })
-end)
-else
-warn("[Dara Hub] Gagal menyimpan config VIP Macro")
-end
-end
-})
-
--- ADD: keybind manual tiap macro (field keybind di config; semuanya "F" di config user)
-UIS.InputBegan:Connect(function(input, processed)
-if processed then
-return
-end
-local key = input.KeyCode and input.KeyCode.Name
-if not key then
-return
-end
-for _, m in ipairs(VIPMacros) do
-if m.keybind ~= "" and m.keybind == key then
-task.spawn(VIPMacroSendChat, m.command)
-end
-end
-end)
-
--- ADD: mulai otomatis saat load (toggle Auto Run default ON); dipanggil eksplisit agar tidak
--- bergantung pada apakah WindUI memanggil callback untuk Value awal.
-VIPMacroAutoStart()
--- ================= AKHIR SECTION VIP CMD MACRO =================
 
 -- ============================================================
 -- ADD (UPDATE BETA): AUTO VOTE - port dari DaraHub BETA (tab Auto).
@@ -5923,11 +5550,21 @@ Title = "Trigger Lag Switch",
 Desc = "Keybind to trigger lag switch",
 Value = "L",
 Flag = "LagSwitchKeybind",
+-- FIX (Task 21): trigger keybind Lag Switch mati total di PC. Callback lama
+-- hanya jalan bila toggle "Lag Switch" (tab Utility) aktif (lagSwitchEnabled)
+-- padahal toggle itu fungsinya hanya menampilkan/menyembunyikan tombol layar
+-- versi mobile. Di PC tombol layar tidak dipakai sehingga toggle sering OFF
+-- -> tekan L diam saja tanpa pesan apa pun. Keybind kini langsung memicu lag
+-- tanpa bergantung toggle (perilaku sama seperti tombol layar). Sekalian:
+-- lag() dibungkus pcall dan isLagActive selalu direset - versi lama bisa
+-- meninggalkan isLagActive = true selamanya bila satu mode error (jalur tombol
+-- layar sudah pcall, jalur keybind belum), membuat SEMUA trigger (keybind +
+-- tombol layar) mati permanen sampai rejoin.
 Callback = function(v)
-if lagSwitchEnabled and not isLagActive then
+if not isLagActive then
 isLagActive = true
 task.spawn(function()
-lag()
+pcall(lag)
 isLagActive = false
 end)
 end
