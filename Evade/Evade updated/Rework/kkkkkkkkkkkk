@@ -51,15 +51,64 @@
                                scan tiap frame (throttle + pcall + guard), Auto Vote & Auto
                                Farm dibatasi 10x/detik, Anti Stuck hanya memanggil service
                                saat nyaris stuck.
+                             UPDATE FIX PC MOVEMENT:
+                             - FIX "Air Strafe Acceleration & Jump Cap tidak bekerja di PC":
+                               FireClient kini mendukung semua varian API getconnections
+                               (c.Function / c:Fire, akses properti di-pcall) dan
+                               MovementValueSet punya fallback tulis langsung ke tabel
+                               Movement game via CharacterService (tanpa getconnections),
+                             - Nilai input yang bukan angka tidak dikirim diam-diam lagi
+                               (muncul notifikasi).
 ]]
 
+-- FIX (Task 19): FireClient kini kompatibel dengan varian API getconnections antar
+-- executor PC (c.Function bisa nil / akses properti bisa melempar error / sebagian
+-- executor hanya menyediakan c:Fire). Sebelumnya c.Function(...) dipanggil mentah,
+-- sehingga di banyak executor PC error terjadi diam-diam di dalam task.spawn dan nilai
+-- tidak pernah terkirim: itulah sebabnya Jump Cap & Air Strafe Acceleration (yang 100%
+-- bergantung jalur ini) tidak bekerja di PC, sementara Bhop/Super Bounce tetap jalan
+-- karena murni client-side. Mengembalikan true bila minimal satu koneksi berhasil
+-- dipicu (dipakai MovementValueSet untuk memutuskan fallback jalur langsung).
+-- FIX (Task 19): helper VARARG - '...' tidak boleh dipakai di dalam closure non-vararg
+-- (varian pertama patch ini memicu parse error "cannot use '...' outside a vararg function"
+-- yang membuat seluruh script gagal dimuat; ditangkap oleh simulator runtime).
+local function tryFireConnection(c, ...)
+local okFn, fn = pcall(function() return c.Function end)
+if okFn and type(fn) == "function" then
+return pcall(fn, ...)
+end
+local okFire, fireMethod = pcall(function() return c.Fire end)
+if okFire and type(fireMethod) == "function" then
+return pcall(fireMethod, c, ...)
+end
+return false
+end
+
+local fireClientWarned = false
 function FireClient(path, ...)
-if getconnections then
-for _,c in getconnections(path.OnClientEvent) do 
-c.Function(...) 
+if not getconnections then
+if not fireClientWarned then
+fireClientWarned = true
+warn("[Dara Hub] Executor tidak mendukung 'getconnections' - nilai movement dikirim via jalur langsung")
 end
-else warn("Your Executor failed to run 'getconnections'")
+return false
 end
+local okConns, conns = pcall(getconnections, path.OnClientEvent)
+if not okConns or type(conns) ~= "table" or #conns == 0 then
+if not fireClientWarned then
+fireClientWarned = true
+warn("[Dara Hub] getconnections tidak menemukan koneksi OnClientEvent - memakai jalur langsung")
+end
+return false
+end
+local fired = false
+for _, c in ipairs(conns) do
+-- percobaan per koneksi dilakukan di helper vararg tryFireConnection (lihat atas)
+if tryFireConnection(c, ...) then
+fired = true
+end
+end
+return fired
 end
 -- HAPUS (permintaan user): sistem "Script Is Already Loaded" dihapus supaya script
 -- bisa dieksekusi ulang kapan saja tanpa harus rejoin (tidak ada lagi blokir eksekusi kedua).
@@ -151,7 +200,7 @@ else
 print("The injector does not support identifyexecutor()")
 end
 Window:Tag({
-Title = "v1.2.3",
+Title = "v1.2.4",
 Color = Color3.fromHex("#30ff6a")
 })
 Tabs = {
@@ -702,17 +751,49 @@ end
 local velocity = hrp.AssemblyLinearVelocity
 return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
 end
+local movementFallbackNotified = false
 function MovementValueSet(MovementType, value)
+-- FIX (Task 19): guard nilai nil (mis. input bukan angka) - versi lama mengirim nil
+-- diam-diam ke game sehingga tidak ada efek sama sekali tanpa pesan apa pun.
+if value == nil then
+warn("[Dara Hub] MovementValueSet('" .. tostring(MovementType) .. "'): nilai tidak valid (nil) - dilewati")
+return
+end
 if not CharacterTag then
 CharacterTag = GetCharacterTag(LocalPlayer.Character)
 end
-if CharacterTag then
 -- FIX (audit UI): FireClient memanggil connection OnClientEvent secara sinkron di thread
 -- pemanggil. Dibungkus task.spawn agar handler movement game yang bisa yield tidak menahan
 -- thread pemanggil (input UI / loop Auto Refresh / hook Movement.Update milik game).
-task.spawn(FireClient, ReplicatedStorage.Events.CharacterTask, CharacterTag, "ModifyMovement", {MovementType, value})
-else task.spawn(error, "Failed to Overwrite Movement Data! Or maybe your executor dose not support getconnections", 0)
+task.spawn(function()
+local sent = false
+if CharacterTag then
+sent = FireClient(ReplicatedStorage.Events.CharacterTask, CharacterTag, "ModifyMovement", {MovementType, value})
 end
+if sent then return end
+-- FIX (Task 19): FALLBACK TANPA getconnections - tulis langsung ke tabel Movement milik
+-- game via CharacterService (script sudah membaca tabel yang sama untuk state/mirror).
+-- Jalur ini membuat Jump Cap & Air Strafe Acceleration tetap bekerja di PC walau executor
+-- tidak mendukung getconnections, dan sekaligus menutup kasus CharacterTag nil (jalur lama
+-- hanya melempar error 'Failed to Overwrite Movement Data' tanpa mencoba cara lain).
+local okFall, errFall = pcall(function()
+local data = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local movement = data and data.Movement
+if not movement then
+error("tabel Movement game tidak ditemukan")
+end
+movement[MovementType] = value
+end)
+if not okFall and not movementFallbackNotified then
+movementFallbackNotified = true
+warn("[Dara Hub] Gagal mengubah movement '" .. tostring(MovementType) .. "': " .. tostring(errFall))
+pcall(WindUI.Notify, WindUI, {
+Title = "Dara Hub",
+Content = "Gagal mengubah " .. tostring(MovementType) .. ": executor tidak mendukung getconnections dan jalur langsung juga gagal.",
+Duration = 5
+})
+end
+end)
 end
 local originalMovementUpdate = Movement.Update
 local lastFriction = nil
@@ -1008,8 +1089,15 @@ NumbersOnly=true,
 Value=tostring(defaultMovementValues.JumpCap)
 })
 JumpCapInput.Callback = function(value)
-lastJumpCapValue = tonumber(value)
-MovementValueSet("JumpCap", lastJumpCapValue)
+-- FIX (Task 19): input bukan angka tidak dikirim diam-diam (dulu tonumber gagal -> nil
+-- terkirim -> tidak ada efek). Sekarang divalidasi + notifikasi.
+local num = tonumber(value)
+if num == nil then
+pcall(WindUI.Notify, WindUI, {Title = "Jump Cap", Content = "Masukkan angka yang valid.", Duration = 3})
+return
+end
+lastJumpCapValue = num
+MovementValueSet("JumpCap", num)
 end
 
 -- ADD: toggle Auto Refresh Jump Cap (kirim ulang otomatis tiap 2 detik)
@@ -1037,8 +1125,14 @@ NumbersOnly=true,
 Value=tostring(defaultMovementValues.AirStrafeAcceleration)
 })
 AirStrafeAccelerationInput.Callback = function(value)
-lastAirStrafeValue = tonumber(value)
-MovementValueSet("AirStrafeAcceleration", lastAirStrafeValue)
+-- FIX (Task 19): validasi angka yang sama seperti Jump Cap.
+local num = tonumber(value)
+if num == nil then
+pcall(WindUI.Notify, WindUI, {Title = "Air Strafe Acceleration", Content = "Masukkan angka yang valid.", Duration = 3})
+return
+end
+lastAirStrafeValue = num
+MovementValueSet("AirStrafeAcceleration", num)
 end
 
 -- ADD: toggle Auto Refresh Air Strafe (kirim ulang otomatis tiap 2 detik)
