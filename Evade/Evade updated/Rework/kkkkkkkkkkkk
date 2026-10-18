@@ -58,7 +58,17 @@
                                MovementValueSet punya fallback tulis langsung ke tabel
                                Movement game via CharacterService (tanpa getconnections),
                              - Nilai input yang bukan angka tidak dikirim diam-diam lagi
-                               (muncul notifikasi).
+                               (muncul notifikasi),
+                             UPDATE FIX PC BHOP + KAMERA:
+                             - FIX "bhop tidak ditemukan (BhopEnabled) + kamera kaku
+                               sejak update": hasil getconnections yang bukan table
+                               murni TIDAK ditolak lagi (3 strategi iterasi + retry
+                               c:Fire) sehingga BhopEnabled/Friction kembali terkirim
+                               seperti v1.2.3,
+                             - Tabel Movement game di-cache dari hook Movement.Update
+                               agar fallback jalur langsung tetap bisa menulis saat
+                               data sesaat nil (lobby/mati), dan panggilan service di
+                               hook dibungkus pcall agar tidak error tiap frame.
 ]]
 
 -- FIX (Task 19): FireClient kini kompatibel dengan varian API getconnections antar
@@ -75,7 +85,12 @@
 local function tryFireConnection(c, ...)
 local okFn, fn = pcall(function() return c.Function end)
 if okFn and type(fn) == "function" then
-return pcall(fn, ...)
+if pcall(fn, ...) then
+return true
+end
+-- FIX (Task 20): kalau pemanggilan Function gagal (mis. handler game yield tetapi
+-- pcall executor tidak mendukung yield), coba c:Fire yang menjalankan callback
+-- di thread tersendiri.
 end
 local okFire, fireMethod = pcall(function() return c.Fire end)
 if okFire and type(fireMethod) == "function" then
@@ -94,19 +109,54 @@ end
 return false
 end
 local okConns, conns = pcall(getconnections, path.OnClientEvent)
-if not okConns or type(conns) ~= "table" or #conns == 0 then
-if not fireClientWarned then
-fireClientWarned = true
-warn("[Dara Hub] getconnections tidak menemukan koneksi OnClientEvent - memakai jalur langsung")
-end
+if not okConns or conns == nil then
 return false
 end
+-- FIX (Task 20): JANGAN menolak hasil getconnections berdasarkan type/isi. Versi
+-- sebelumnya menolak type ~= "table" dan #conns == 0 - di sebagian executor PC
+-- getconnections mengembalikan wrapper (bukan table murni) sehingga seluruh jalur
+-- ini mati: BhopEnabled/Friction tidak pernah terkirim (bhop mati, gerakan & kamera
+-- terasa kaku), padahal di v1.2.3 dan sebelumnya jalur yang sama bekerja normal.
+-- Argumen dibungkus table agar loop boleh berada di dalam pcall (closure non-vararg
+-- tidak boleh memakai '...').
+local nargs = select("#", ...)
+local args = {}
+for k = 1, nargs do
+args[k] = select(k, ...)
+end
+local unpackFn = table.unpack or unpack
 local fired = false
+local iterated = false
+-- Strategi 1: table / userdata dengan __index (ipairs)
+pcall(function()
 for _, c in ipairs(conns) do
--- percobaan per koneksi dilakukan di helper vararg tryFireConnection (lihat atas)
-if tryFireConnection(c, ...) then
+iterated = true
+if tryFireConnection(c, unpackFn(args, 1, nargs)) then
 fired = true
 end
+end
+end)
+-- Strategi 2: fungsi iterator / userdata callable (varian executor PC)
+if not iterated and type(conns) ~= "table" then
+pcall(function()
+for _, c in conns, nil, nil do
+iterated = true
+if tryFireConnection(c, unpackFn(args, 1, nargs)) then
+fired = true
+end
+end
+end)
+end
+-- Strategi 3: pairs (varian tersisa); flag 'iterated' mencegah fire ganda
+if not iterated then
+pcall(function()
+for _, c in pairs(conns) do
+iterated = true
+if tryFireConnection(c, unpackFn(args, 1, nargs)) then
+fired = true
+end
+end
+end)
 end
 return fired
 end
@@ -200,7 +250,7 @@ else
 print("The injector does not support identifyexecutor()")
 end
 Window:Tag({
-Title = "v1.2.4",
+Title = "v1.2.5",
 Color = Color3.fromHex("#30ff6a")
 })
 Tabs = {
@@ -752,6 +802,9 @@ local velocity = hrp.AssemblyLinearVelocity
 return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
 end
 local movementFallbackNotified = false
+-- FIX (Task 20): cache tabel Movement game yang valid; diisi hook Movement.Update
+-- tiap frame saat data tersedia, dipakai fallback MovementValueSet di atas.
+local cachedMovementData = nil
 function MovementValueSet(MovementType, value)
 -- FIX (Task 19): guard nilai nil (mis. input bukan angka) - versi lama mengirim nil
 -- diam-diam ke game sehingga tidak ada efek sama sekali tanpa pesan apa pun.
@@ -777,12 +830,17 @@ if sent then return end
 -- tidak mendukung getconnections, dan sekaligus menutup kasus CharacterTag nil (jalur lama
 -- hanya melempar error 'Failed to Overwrite Movement Data' tanpa mencoba cara lain).
 local okFall, errFall = pcall(function()
-local data = CharacterService:GetCharacterFromPlayer(LocalPlayer)
-local movement = data and data.Movement
+-- FIX (Task 20): CharacterService dilindungi 'and' (tidak melempar bila nil) dan
+-- dipakai cache tabel Movement dari hook Movement.Update, sehingga fallback tetap
+-- bisa menulis saat GetCharacterFromPlayer sesaat nil (lobby/mati/respawn) - dulu
+-- error ':783: tabel Movement game tidak ditemukan' muncul di situasi itu.
+local data = CharacterService and CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local movement = (data and data.Movement) or cachedMovementData
 if not movement then
 error("tabel Movement game tidak ditemukan")
 end
 movement[MovementType] = value
+cachedMovementData = movement
 end)
 if not okFall and not movementFallbackNotified then
 movementFallbackNotified = true
@@ -802,8 +860,16 @@ originalMovementUpdate(self, ...)
 local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
 if not humanoid then return end
 local LocalPlayer = game:GetService("Players").LocalPlayer
-local LocalPlayerData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
-local movementData = LocalPlayerData and LocalPlayerData.Movement
+-- FIX (Task 20): GetCharacterFromPlayer dibungkus pcall - kalau service call
+-- melempar error di executor tertentu, hook tidak lagi error TIAP FRAME (sumber
+-- gerakan/kamera tersendat). Data Movement yang valid di-cache untuk fallback.
+local okHookData, hookData = pcall(function()
+return CharacterService:GetCharacterFromPlayer(LocalPlayer)
+end)
+local movementData = (okHookData and hookData) and hookData.Movement or nil
+if movementData then
+cachedMovementData = movementData
+end
 local state = movementData and movementData.State
 if not state then
 state = self.State
