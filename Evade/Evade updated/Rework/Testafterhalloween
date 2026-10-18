@@ -29,21 +29,6 @@
                              - Auto Vote: auto vote Map & Game Mode saat voting terbuka (tab Auto).
 ]]
 
-function FireClient(path, ...)
-if getconnections then
-for _,c in getconnections(path.OnClientEvent) do 
-c.Function(...) 
-end
-else warn("Your Executor failed to run 'getconnections'")
-end
-end
-if getgenv().DaraHubExecuted then
-FireClient(game:GetService("ReplicatedStorage").Events.SharedUISetType, "Notification", "Message", "Script Is Already Loaded, rejoin if you want to re-execute", "Error")
-return
-end
-getgenv().DaraHubExecuted = true
-local BaseURL = "https://darahub.pages.dev"
-
 -- FIX: pemuatan library dibungkus pcall + warn agar penyebab gagal terlihat jelas di console
 local okLib = pcall(function()
 loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
