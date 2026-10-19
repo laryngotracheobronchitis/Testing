@@ -55,7 +55,7 @@
 -- 2) Klik tombol "Raw" di file tersebut di GitHub, salin link-nya.
 -- 3) Ganti tulisan RAW_LINK_GITHUB di bawah dengan link raw tersebut.
 local okWhitelist, errWhitelist = pcall(function()
-	loadstring(game:HttpGet("RAW_LINK_GITHUB"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/Evade/Evade%20updated/Rework/Give%20me%20money/Whitelist"))()
 end)
 if not okWhitelist then
 	warn("[Dara Hub] Whitelist gagal dimuat: " .. tostring(errWhitelist) .. " - eksekusi dihentikan (fail-closed)")
