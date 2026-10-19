@@ -1,0 +1,26 @@
+local ALLOWED_USERIDS = {
+	[1371189933] = true, -- <== UserID pemilik script (wajib terdaftar)
+	-- [1234567890] = true, -- contoh: tambahkan UserId temanmu di sini
+	-- [987654321]  = true, -- contoh lagi
+}
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local userId = nil
+if LocalPlayer then
+	pcall(function()
+		userId = LocalPlayer.UserId
+	end)
+end
+
+if userId == nil or not ALLOWED_USERIDS[userId] then
+	getgenv().DaraHubWhitelisted = false
+	pcall(function()
+		if LocalPlayer then
+			LocalPlayer:Kick("[Dara Hub] UserId " .. tostring(userId) .. " tidak terdaftar di whitelist. Hubungi pemilik script.")
+		end
+	end)
+	return
+end
+
+getgenv().DaraHubWhitelisted = true
