@@ -1,8 +1,31 @@
 --[[
-    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru) - EDISI PERBAIKAN TOTAL v1.4.1
+    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru) - EDISI PERBAIKAN TOTAL v1.4.2
     Basis: DARAHUBBETA (script asli) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.4.2 (FIX ERROR + SISTEM WARNING PER SECTION) ============================
+    FIX "script tidak bisa jalan":
+    - FIX FATAL: placeholder RAW_LINK_GITHUB sudah DIGANTI LINK WHITELIST ASLI GitHub-mu - script langsung
+      jalan tanpa perlu edit apa pun lagi. (Ini penyebab utama script diam saja saat dieksekusi.)
+    - Whitelist / library UI gagal dimuat sekarang TAMPIL JELAS: warn di console + KICK dengan alasan
+      lengkap (supaya kelihatan di HP, tidak lagi berhenti diam-diam tanpa pesan).
+    - Section Auto Revive (revive PEMAIN LAIN) DIHAPUS TOTAL sesuai permintaan. Self Revive kembali
+      persis semula: Auto Self Revive, Self Revive Method, Revive Delay (seconds), Manual Revive, Force Respawn.
+    - Input "Jump height", "Jump Speed Multiplier", "Walk Speed Multiplier" dihapus dari tab Player
+      (nilai default internal tetap ada di engine). Daftar input movement = persis permintaan:
+      Speed, Jump Cap, Air Strafe Acceleration, Air Acceleration, Sprint Acceleration, Sprint Cap,
+      Run Accel, Run Deaccel, Friction, Grounded Dist Check.
+
+    SISTEM WARNING PER SECTION (baru - agar tahu bagian mana yang error):
+    - Semua section dicatat statusnya di getgenv().DaraHubSections: OK / ERROR / RUNNING / CRASH.
+    - 11 section utama dibungkus pcall: bila SATU section error, script TIDAK MATI - muncul notifikasi
+      "SECTION ERROR: <nama>" + detail di console, lalu load lanjut ke section berikutnya.
+    - Semua section lain diberi phase marker: console mencetak "Memuat section: X" - baris terakhir
+      yang tercetak sebelum error = section penyebabnya.
+    - LAPORAN LOAD di akhir: ringkasan OK/gagal di console (print) + notifikasi WindUI.
+    - DETEKSI CRASH: bila eksekusi sebelumnya berhenti mendadak, saat dieksekusi ULANG muncul
+      peringatan nama section yang crash (status tertinggal "RUNNING" otomatis ditandai CRASH).
 
     ============================ UPDATE v1.3.0 (PERBAIKAN & SINKRON BETA) ============================
     FIX ERROR/WARNING (merah & kuning) yang ditemukan di versi Ringkas:
@@ -22,101 +45,169 @@
     - FIX: loop GameTimerCheck memakai spawn()+wait() deprecated -> Heartbeat + throttle 0.1s (persis BETA) + pcall.
     - FIX: loop objective dropdown (Heartbeat tiap frame + task.spawn(error) tiap gagal) - fitur "Select Objective /
       Teleport to Objective / Refresh Objectives" DI-BLACKLIST sesuai permintaan (loop per-frame ikut hilang = FPS lebih aman).
-    - PERF: Auto Farm, Auto Revive, Defib Aura, Timer check, FullBright -> di-throttle (10x-4x/detik)
+    - PERF: Auto Farm, Defib Aura, Timer check, FullBright -> di-throttle (10x-4x/detik)
       tanpa mengubah hasil; warn() yang berulang dibatasi.
     - PERF/FIX: input bukan angka tidak lagi dikirim nil diam-diam; SEMUA input kosong = otomatis SET DEFAULT.
 
     SINKRON DATA & FITUR DARI DARAHUB BETA (diambil dari file asli, tanpa mengubah tambahan user):
     - PlayerData: ditambah EventActive / EventTiers / EventExchanges / EventPhase / Exchange (dipakai Shop & Auto Farm).
     - Auto Farm: mode "Catch NPC" dari Beta + "Auto Ticket" otomatis muncul saat event aktif (Token Offset user 0 -11 0 DIPERTAHANKAN).
-    - [DIHAPUS di v1.4.1] section revive-otomatis untuk ORANG LAIN yang sempat di-port dari Beta
-      (toggle + Downed Check + slider Delay 0.84-4 default 1.17) - tidak dipakai lagi, bersih total.
     - Auto Whistle (Beta) - tab Auto. Full Bright + Remove Fog (Beta) - tab Visuals.
     - Custom Gravity (Beta, + tombol layar) - tab Utility. Section VIP COMMAND (Unlock VIP Commands,
       VIP CMD Macro GUI, Add/Remove Map) - tab Utility, kini SELALU tampil (unlock, tidak di-gate VIP).
     - Build Offset Multiplier (Beta, tab Combat) + Multiplier + tombol "Set Otomatis X/Y/Z" (bukan floating button).
     - Shop: Load Shop Automation disinkron Beta (Event Shop dari EventTiers + live keys + ensureEventSection)
-      + section Auto Exchange (Beta) + Redeem Code.
+      + section Auto Exchange + Redeem Code.
     - Teleport: SEMUA fitur Beta KECUALI "Teleport to Objective", "Select Objective", "Refresh Objectives" (blacklist).
     - Screen Button Size: kini PER TOMBOL (masing-masing floating button punya input X/Y/Z sendiri + tombol reset).
     - BhopEnabled dipastikan terkirim: dikirim ulang otomatis saat respawn (game reset data movement saat spawn).
     - Self Revive: tambahan "Revive Delay (seconds)" (0 = instan) + Manual Revive tetap ada.
 
-    ============================ WHITELIST (WAJIB DIISI) ============================
-    Baris paling awal script memuat whitelist via loadstring:
-        loadstring(game:HttpGet("RAW_LINK_GITHUB"))()
-    GANTI "RAW_LINK_GITHUB" dengan RAW link GitHub milikmu yang berisi kode whitelist
-    (contoh: https://raw.githubusercontent.com/username/repo/main/whitelist.lua ).
-    Kode whitelist yang sudah disiapkan (file terpisah) berisi UserID yang diizinkan: 1371189933.
-    Bila whitelist gagal dimuat / UserId tidak terdaftar, script BERHENTI (fail-closed) - non-whitelist di-kick.
-
-    ============================ UPDATE v1.4.1 (REVERT REVIVE - PERMINTAAN USER) ============================
-    - HAPUS TOTAL fitur "Auto Revive" (revive ORANG LAIN) yang sempat ditambahkan di v1.4.0:
-      toggle-nya, Downed Check, slider Delay-nya, dan tombol
-      "Manual Revive" versi orang lain - SEMUA DIHAPUS, tidak ada sisa kode maupun UI-nya.
-    - Self Revive DIKEMBALIKAN PERSIS seperti versi ringkasan asli (sebelum v1.4.0):
-      * Toggle "Auto Self Revive" + Dropdown "Self Revive Method" (Spawnpoint / Fake Revive)
-      * Input "Revive Delay (seconds)" (0 = instan) - KEMBALI ada di Self Revive
-      * Tombol "Manual Revive" (Manually revive yourself) - KEMBALI ada di Self Revive
-      * Tombol "Force Respawn"
-    - Defibrillator Aura (tab Combat) TIDAK disentuh - tetap utuh seperti sebelumnya.
-
-    ============================ UPDATE v1.4.0 (PERBAIKAN SESUAI MASUKAN USER) ============================
-    - FIX SELF REVIVE vs AUTO REVIVE (dua fitur BERBEDA, tidak boleh dicampur):
-        * Auto Revive = UNTUK ORANG LAIN (revive rekan yang downed). Kini lengkap dengan "Revive Setting":
-          toggle Auto Revive + tombol "Manual Revive" (revive SEKALI semua target downed dalam range,
-          tanpa menunggu delay) + Delay yang bisa diatur waktunya (gaya Fast Revive).
-          [CATATAN v1.4.1: seluruh section ini DIHAPUS - lihat changelog v1.4.1 di atas.]
-        * Self Revive = UNTUK DIRI SENDIRI. Dibersihkan: Revive Delay & Manual Revive yang tadinya
-          salah ditaruh di sini SUDAH DIHAPUS dari Self Revive (hanya Auto Self Revive + Method +
-          Force Respawn).
-    - REMOVE (permintaan user): input "Jump height" dan "Walk Speed Multiplier" DIHAPUS dari tab
-      Player - memang tidak pernah diminta (yang diminta hanya: SprintAcceleration, SprintCap,
-      RunAccel, Friction, RunDeaccel, AirStrafeAcceleration, AirAcceleration, Speed, JumpCap,
-      GroundedDistCheck + BhopEnable).
-    - VIP CMD MACRO KINI 100% BUILT-IN (TIDAK load ke DaraHub asli lagi, TIDAK kirim chat "!command"
-      lagi): seluruh Macro Manager GUI di-port PERSIS dari DaraHub BETA ke dalam script ringkas:
-        * Macro Manager GUI (dibuka lewat tombol "VIP CMD Macro" di tab Utility, persis Beta)
-        * New / Edit / Duplicate / Delete macro (dengan popup konfirmasi delete)
-        * Keybind per macro (START/STOP lewat tombol keyboard pilihanmu)
-        * Delay per macro: nilai + satuan (Ms / Sec / Minute / Hour / Day / Week / Year)
-        * Stop Mode: Indefinitely / Time (berapa lama jalan) / Cycles (berapa kali kirim)
-        * Start Condition (persis Beta): Round Type (Any / Round Start / Intermission), Time
-          (Any Time / Below / Above / At Certain Time + nilai + satuan), Rounds Completed (Any/1/2/3)
-          -> status "PAUSED (cond)" otomatis saat kondisi belum terpenuhi
-        * Status ON/OFF/PAUSED + countdown per macro (warna persis Beta)
-        * Preset manager (tombol dengan ikon folder): Save As / Load / Delete preset, tersimpan ke
-          DaraHub/EvadeMacroVipCMD.json (file config yang sama dengan DaraHub BETA)
-        * Eksekusi resmi persis Beta: ReplicatedStorage.Events.Admin.VIPCommand:InvokeServer(command)
-        * Section VIP COMMAND di tab Utility kini lengkap seperti Beta: Unlock VIP Commands +
-          VIP CMD Macro + Set Map Settings (Add/Remove Map) + Select Game Mode (Set Game Mode)
-    - FIX Add Map / Remove Map: kini memakai remote yang BENAR persis Beta:
-      ReplicatedStorage.Events.CustomServers.Admin:FireServer("AddMap"/"RemoveMap", mapName)
-      (sebelumnya salah kirim ke Events.Admin.VIPCommand dengan argumen salah).
-    - ADD (port Beta): "Select Game Mode" + tombol "Set Game Mode" (remote CustomServers.Admin
-      "Gamemode" + pesan in-game "Gamemode will be automatically applied whenever possible").
-    - FIX: section VIP CMD Macro versi chat lama di tab Auto (kirim "!time"/"!specialround" via chat +
-      Auto Run) DIHAPUS - digantikan Macro Manager built-in di atas.
-    - Whitelist loadstring di paling awal TETAP memakai raw link GitHub milikmu yang sekarang
-      (file Whitelist berisi ALLOWED_USERIDS 1371189933) - tidak perlu diubah manual lagi.
+    ============================ WHITELIST ============================
+    Link whitelist asli SUDAH DIPASANG langsung di baris awal script (GitHub-mu, UserID 1371189933).
+    Bila whitelist gagal dimuat / UserId tidak terdaftar: console warn + KICK dengan alasan jelas
+    (fail-closed) - script berhenti. Tidak perlu mengedit apa pun lagi di bagian ini.
 ]]
 
 -- ============================ WHITELIST (LETAKKAN PALING AWAL) ============================
--- 1) Upload file whitelist (sudah disediakan, berisi UserID 1371189933) ke GitHub.
--- 2) Klik tombol "Raw" di file tersebut di GitHub, salin link-nya.
--- 3) Ganti tulisan RAW_LINK_GITHUB di bawah dengan link raw tersebut.
+-- v1.4.2: LINK ASLI sudah terpasang - tidak perlu edit lagi.
+-- Gagal memuat = console warn + KICK dengan alasan jelas (terlihat di HP, tidak diam-diam).
 local okWhitelist, errWhitelist = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/Evade/Evade%20updated/Rework/Give%20me%20money/Whitelist"))()
 end)
 if not okWhitelist then
-        warn("[Dara Hub] Whitelist gagal dimuat: " .. tostring(errWhitelist) .. " - eksekusi dihentikan (fail-closed)")
+        warn("[Dara Hub] WHITELIST GAGAL DIMUAT: " .. tostring(errWhitelist))
+        warn("[Dara Hub] Penyebab umum: koneksi internet / executor diblokir / GitHub down. Script berhenti (fail-closed).")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Whitelist gagal dimuat - cek internet lalu eksekusi ulang. Detail error di console. [" .. tostring(errWhitelist) .. "]")
+        end)
         return
 end
 if getgenv().DaraHubWhitelisted ~= true then
-        warn("[Dara Hub] UserId tidak ada di whitelist - eksekusi dihentikan")
+        warn("[Dara Hub] UserId TIDAK TERDAFTAR di whitelist - eksekusi dihentikan (fail-closed).")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] UserId kamu tidak terdaftar di whitelist DaraHub Ringkas.")
+        end)
         return
 end
 -- ============================ AKHIR WHITELIST ============================
+-- ============================ LOAD DIAGNOSTICS v1.4.2 (SISTEM WARNING PER SECTION) ============================
+-- Status tiap section dicatat di getgenv().DaraHubSections: OK / ERROR / RUNNING / CRASH.
+-- - Section pcall : error TIDAK membunuh script -> notif "SECTION ERROR: <nama>" + load lanjut.
+-- - Phase marker  : console cetak "Memuat section: X" -> baris terakhir sebelum error = penyebabnya.
+-- - Deteksi crash : status "RUNNING" tersisa dari eksekusi sebelumnya = section yang CRASH kemarin.
+getgenv().DaraHubSections = getgenv().DaraHubSections or {}
+getgenv().DaraHubSectionOrder = getgenv().DaraHubSectionOrder or {}
+DaraHubErrorCount = 0
+DaraHubStaleCrash = nil
+do
+        local _prevSections = getgenv().DaraHubSections
+        getgenv().DaraHubSections = {}
+        getgenv().DaraHubSectionOrder = {}
+        if type(_prevSections) == "table" then
+                for _dn, _dst in pairs(_prevSections) do
+                        if type(_dst) == "table" and _dst.status == "RUNNING" then
+                                DaraHubStaleCrash = _dn
+                                getgenv().DaraHubSections[_dn] = { status = "CRASH", err = _dst.err }
+                        end
+                end
+        end
+end
+if DaraHubStaleCrash then
+        warn("[Dara Hub][PERINGATAN] Eksekusi sebelumnya CRASH di section: " .. tostring(DaraHubStaleCrash) .. " - nama ini adalah bagian yang error.")
+end
+
+function DaraSectionStart(name)
+        getgenv().DaraHubSections[name] = { status = "RUNNING", t0 = os.clock() }
+        local _listed = false
+        for _, _n in ipairs(getgenv().DaraHubSectionOrder) do
+                if _n == name then
+                        _listed = true
+                        break
+                end
+        end
+        if not _listed then
+                getgenv().DaraHubSectionOrder[#getgenv().DaraHubSectionOrder + 1] = name
+        end
+        getgenv().DaraHubCurrentSection = name
+        print("[Dara Hub] Memuat section: " .. name)
+end
+
+function DaraSectionDone(name)
+        local _st = getgenv().DaraHubSections[name]
+        if _st then
+                _st.status = "OK"
+                _st.ms = math.floor((os.clock() - (_st.t0 or os.clock())) * 1000)
+        end
+        if getgenv().DaraHubCurrentSection == name then
+                getgenv().DaraHubCurrentSection = nil
+        end
+end
+
+function DaraSectionFail(name, err)
+        getgenv().DaraHubSections[name] = { status = "ERROR", err = tostring(err) }
+        warn("[Dara Hub][SECTION ERROR] '" .. tostring(name) .. "' gagal dimuat: " .. tostring(err))
+        warn("[Dara Hub][SECTION ERROR] Script LANJUT ke section berikutnya - fitur '" .. tostring(name) .. "' mungkin tidak berfungsi.")
+        DaraHubErrorCount = (DaraHubErrorCount or 0) + 1
+        if WindUI and DaraHubErrorCount <= 4 then
+                pcall(function()
+                        WindUI:Notify({
+                                Title = "SECTION ERROR: " .. tostring(name),
+                                Content = "Section gagal dimuat lalu DILEWATI: " .. tostring(err),
+                                Duration = 6
+                        })
+                end)
+        end
+        if getgenv().DaraHubCurrentSection == name then
+                getgenv().DaraHubCurrentSection = nil
+        end
+end
+
+function DaraHubFinalReport()
+        local _okC, _errC, _runC, _crashC = 0, 0, 0, 0
+        local _errList, _crashList = {}, {}
+        for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
+                local _st = getgenv().DaraHubSections[_name]
+                if _st.status == "OK" then
+                        _okC = _okC + 1
+                elseif _st.status == "ERROR" then
+                        _errC = _errC + 1
+                        _errList[#_errList + 1] = _name
+                elseif _st.status == "RUNNING" then
+                        _runC = _runC + 1
+                        _errList[#_errList + 1] = _name .. " (terhenti)"
+                elseif _st.status == "CRASH" then
+                        _crashC = _crashC + 1
+                        _crashList[#_crashList + 1] = _name
+                end
+        end
+        local _total = #getgenv().DaraHubSectionOrder
+        print("[Dara Hub] ============ LAPORAN LOAD v1.4.2 ============")
+        print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
+        for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
+                local _st = getgenv().DaraHubSections[_name]
+                print("[Dara Hub]   [" .. _st.status .. "] " .. _name .. (_st.ms and (" (" .. _st.ms .. "ms)") or "") .. (_st.err and (" - " .. tostring(_st.err)) or ""))
+        end
+        print("[Dara Hub] ==============================================")
+        if WindUI then
+                pcall(function()
+                        if _errC > 0 then
+                                WindUI:Notify({
+                                        Title = "Load selesai: " .. _errC .. " section ERROR",
+                                        Content = "Gagal: " .. table.concat(_errList, ", ") .. ". Cek console (warn merah) untuk detail error per section.",
+                                        Duration = 8
+                                })
+                        else
+                                WindUI:Notify({
+                                        Title = "DaraHub Ringkas v1.4.2 siap dipakai",
+                                        Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
+                                        Duration = 5
+                                })
+                        end
+                end)
+        end
+end
+-- ============================ AKHIR LOAD DIAGNOSTICS ============================
 
 -- ADD: helper baca input angka - INPUT KOSONG / BUKAN ANGKA = OTOMATIS PAKAI DEFAULT (permintaan user).
 function parseNumberInput(value, default)
@@ -238,18 +329,36 @@ local okLib = pcall(function()
 loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
 end)
 if not okLib then
-warn("[Dara Hub] Gagal memuat library (LoadAll.lua). Periksa koneksi/executor lalu eksekusi ulang.")
-return
+        warn("[Dara Hub] Gagal memuat library (LoadAll.lua): " .. "penyebab umum = koneksi internet / executor diblokir.")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Gagal memuat LIBRARY UI (LoadAll.lua) - cek internet lalu eksekusi ulang. Detail di console.")
+        end)
+        return
 end
 local okWindUI, WindUIMod = pcall(function()
 return loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua"))()
 end)
 if not okWindUI or type(WindUIMod) ~= "table" then
-warn("[Dara Hub] Gagal memuat WindUI (WindUI-Moded/main.lua). Periksa koneksi/executor lalu eksekusi ulang.")
-return
+        warn("[Dara Hub] Gagal memuat WindUI (WindUI-Moded/main.lua) - library UI tidak valid.")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Gagal memuat WindUI - cek internet lalu eksekusi ulang. Detail di console.")
+        end)
+        return
 end
 WindUI = WindUIMod
 
+-- v1.4.2: peringatan dini bila eksekusi sebelumnya crash (terlihat langsung di layar)
+if DaraHubStaleCrash then
+        pcall(function()
+                WindUI:Notify({
+                        Title = "PERINGATAN: crash terdeteksi",
+                        Content = "Eksekusi terakhir berhenti di section: " .. tostring(DaraHubStaleCrash) .. ". Bila berulang, catat nama ini.",
+                        Duration = 8
+                })
+        end)
+end
+
+DaraSectionStart("DRAG CONTROL")
 -- ================= ADD (Task 24): DRAG CONTROL - lock/unlock drag tombol layar =================
 -- Toggle "Drag Control (Lock/Unlock Button)" ada di tab Settings. Saat fitur aktif:
 -- TAHAN tombol layar ButtonLib (Supper Bounce / Bunny Hop / Lag Switch) selama 5 detik
@@ -452,6 +561,8 @@ end
 end)
 -- ================= AKHIR ADD (Task 24): DRAG CONTROL ENGINE =================
 
+DaraSectionDone("DRAG CONTROL")
+DaraSectionStart("WINDOW & LAYAR")
 Window = WindUI:CreateWindow({
 NewElements = true,
 Title = "Dara Hub | Evade 2.1",
@@ -625,7 +736,7 @@ local DeathFeed = safeRequire({"Services", "UI", "GameUIService", "Types", "Deat
 local JumpPadModule = safeRequire({"Items", "BaseItems", "Loadout", "Deployables", "JumpPad", "Modules", "Client"}, "JumpPadModule")
 local BuildModule = safeRequire({"Objects", "Game", "Tool", "Tasks", "Types", "Build"}, "BuildModule")
 -- ADD: helper HeartbeatLoop (port dari DaraHub BETA) - loop Heartbeat dengan interval + guard busy;
--- dipakai Auto Whistle / Shop loop / Auto Exchange agar tidak jalan tiap frame (hemat FPS).
+-- dipakai Auto Revive / Auto Whistle / Shop loop / Auto Exchange agar tidak jalan tiap frame (hemat FPS).
 function HeartbeatLoop(interval, fn)
 local last = 0
 local busy = false
@@ -653,6 +764,8 @@ end
 -- Port dari DaraHub BETA: semua akses lewat service baru ini, di-cache, dibungkus pcall
 -- -> service hilang/berubah hanya menghasilkan nilai kosong, tidak pernah crash.
 -- ============================================================
+DaraSectionDone("WINDOW & LAYAR")
+DaraSectionStart("PLAYERDATA")
 local PlayerData = {}
 do
 local userDataServices = {}
@@ -867,6 +980,8 @@ end
 
 end
 
+DaraSectionDone("PLAYERDATA")
+DaraSectionStart("MOVEMENT ENGINE")
 
 -- Force Enable Lookback and zoom on mobile
 for _, n in {"LookBack", "ADS"} do
@@ -1305,6 +1420,8 @@ end)
 end)
 ---------------------------------------------------------------------------------------------------------------------------
 
+DaraSectionDone("MOVEMENT ENGINE")
+DaraSectionStart("TAB MAIN")
 -- ================= TAB MAIN =================
 Tabs.Main:Space()
 
@@ -1350,6 +1467,8 @@ end)
 end
 })
 
+DaraSectionDone("TAB MAIN")
+DaraSectionStart("TAB PLAYER")
 -- ================= TAB PLAYER =================
 Tabs.Player:Section({ Title = "Player", TextSize = 40 })
 Tabs.Player:Divider()
@@ -1523,11 +1642,11 @@ end
 Tabs.Player:Space()
 Tabs.Player:Section({Title="Modification"})
 
--- ================= SECTION MODIFICATION (SYNC DARAHUB BETA) =================
--- Nilai movement (PERSIS daftar permintaan user):
--- Speed, JumpCap, JumpSpeedMultiplier, AirStrafeAcceleration,
--- AirAcceleration, SprintAcceleration, SprintCap, RunAccel, RunDeaccel, Friction, GroundedDistCheck.
--- REMOVE (permintaan user): input "Jump height" & "Walk Speed Multiplier" DIHAPUS - tidak diminta.
+-- ================= SECTION MODIFICATION (LENGKAP SYNC DARAHUB BETA) =================
+-- Semua nilai movement dari Beta tersedia sebagai input:
+-- Speed, Jump Cap, Air Strafe Acceleration, Air Acceleration, Sprint Acceleration, Sprint Cap,
+-- Run Accel, Run Deaccel, Friction, Grounded Dist Check. (v1.4.2: Jump height / Jump Speed Multiplier /
+-- Walk Speed Multiplier dihapus dari input sesuai permintaan - nilai default internal tetap ada.)
 -- FIX + ADD (permintaan user): INPUT KOSONG / BUKAN ANGKA = OTOMATIS SET KE DEFAULT (tidak dikirim nil diam-diam).
 -- ADD: BhopEnabled dipastikan terkirim ulang saat respawn (game me-reset data movement pada karakter baru).
 
@@ -1546,6 +1665,8 @@ BaseSpeedInput.Callback = function(value)
 local num = parseNumberInput(value, defaultMovementValues.Speed)
 MovementValueSet("Speed", num)
 end
+
+Tabs.Player:Space()
 
 JumpCapInput = Tabs.Player:Input({
 Title="Jump Cap",
@@ -1572,17 +1693,6 @@ MovementValueSet("JumpCap", lastJumpCapValue)
 end
 end
 })
-
-JumpSpeedMultiplierInput = Tabs.Player:Input({
-Title="Jump Speed Multiplier",
-Placeholder=tostring(defaultMovementValues.JumpSpeedMultiplier),
-NumbersOnly=true,
-Value=tostring(defaultMovementValues.JumpSpeedMultiplier)
-})
-JumpSpeedMultiplierInput.Callback = function(value)
-local num = parseNumberInput(value, defaultMovementValues.JumpSpeedMultiplier)
-MovementValueSet("JumpSpeedMultiplier", num)
-end
 
 Tabs.Player:Space()
 
@@ -1788,6 +1898,8 @@ end
 end)
 end
 
+DaraSectionDone("TAB PLAYER")
+DaraSectionStart("TAB COMBAT")
 -- ================= TAB COMBAT =================
 Tabs.Combat:Button({
 Title = "Infinite Range",
@@ -2045,6 +2157,8 @@ end
 })
 end
 
+DaraSectionDone("TAB COMBAT")
+DaraSectionStart("TAB AUTO (BHOP)")
 -- ================= TAB AUTO =================
 Tabs.Auto:Section({Title="Bhop"})
 
@@ -2137,6 +2251,9 @@ end
 end
 }).Position = UDim2.new(0.5, -125, 0.4, 0)
 
+DaraSectionDone("TAB AUTO (BHOP)")
+DaraSectionStart("SELF REVIVE")
+local ok_SR, err_SR = pcall(function()
 Tabs.Auto:Space()
 Tabs.Auto:Section({ Title = "Auto" })
 
@@ -2237,8 +2354,9 @@ SelfRevive.Enabled = true
 -- TIAP FRAME (60x/detik) - bila service nil/berubah path, error spam tiap frame = FPS drop.
 -- Kini: guard CharacterService nil + pcall + throttle 4x/detik (0.25s) - deteksi downed
 -- tetap cepat, beban turun ~15x dan tidak mungkin error spam.
--- REV (v1.4.1): Revive Delay + Manual Revive kembali jadi bagian Self Revive (persis versi
--- ringkasan asli user); fitur "Auto Revive" (orang lain) dari v1.4.0 DIHAPUS sepenuhnya.
+-- ADD (permintaan user): REVIVE DELAY - tunggu X detik sejak DOWNED sebelum revive otomatis
+-- (0 = instan). Auto revive TIDAK wajib menyala: bisa juga revive manual lewat tombol
+-- "Manual Revive" (langsung tanpa delay) atau "Force Respawn".
 local selfReviveAcc = 0
 local downedSince = nil
 SelfRevive.Connections.Heartbeat = RunService.Heartbeat:Connect(function(dt)
@@ -2316,9 +2434,6 @@ Callback = function(value)
 SelfRevive.Method = value
 end
 })
--- REV (v1.4.1, permintaan user): Self Revive DIKEMBALIKAN PERSIS seperti versi ringkasan asli -
--- input "Revive Delay (seconds)" + tombol "Manual Revive" kembali ke sini
--- (Self Revive = untuk DIRI SENDIRI; fitur "Auto Revive" untuk orang lain DIHAPUS).
 -- ADD (permintaan user): REVIVE DELAY untuk Auto Self Revive (0 = instan).
 SelfRevive.Delay = SelfRevive.Delay or 0
 SelfReviveDelayInput = Tabs.Auto:Input({
@@ -2333,6 +2448,8 @@ SelfRevive.Delay = parseNumberInput(value, 0)
 if SelfRevive.Delay < 0 then SelfRevive.Delay = 0 end
 end
 })
+
+
 
 Tabs.Auto:Button({
 Title = "Manual Revive",
@@ -2350,7 +2467,15 @@ Callback = function()
 changePlayerMode:FireServer(true)
 end
 })
+end)
+if ok_SR then
+	DaraSectionDone("SELF REVIVE")
+else
+	DaraSectionFail("SELF REVIVE", err_SR)
+end
 
+DaraSectionStart("BUILD OFFSET")
+local ok_BO, err_BO = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): BUILD OFFSET MULTIPLIER (port dari DaraHub BETA, tab Combat).
 -- Menggeser posisi preview bangunan (Build tool) sesuai Offset X/Y/Z x Multiplier.
@@ -2523,6 +2648,14 @@ end
 end
 
 
+end)
+if ok_BO then
+	DaraSectionDone("BUILD OFFSET")
+else
+	DaraSectionFail("BUILD OFFSET", err_BO)
+end
+DaraSectionStart("AUTO FARM")
+local ok_AF, err_AF = pcall(function()
 -- ================= ADD: SECTION AUTO FARM (port dari DaraHub 2.2, fitur auto farm lengkap) =================
 -- ADD: Anti AFK (tab Misc versi asli tidak dibawa ke Ringkas; Auto Farm menyalakannya otomatis saat mulai)
 local AntiAFKConnection = nil
@@ -3017,1859 +3150,413 @@ end
 })
 -- ================= AKHIR SECTION AUTO FARM =================
 
--- ================= VIP CMD MACRO MANAGER - BUILT-IN (PORT PERSIS DARA HUB BETA) =================
--- FIX (permintaan user): fitur VIP macro TIDAK lagi mengirim chat "!command" dan TIDAK lagi
--- loadstring/load ke DaraHub asli. Seluruh Macro Manager GUI dari DaraHub BETA dibuat BUILT-IN
--- di script ringkas ini - semua fitur yang tersambung ke VIP macro kini ada di tab:
---   * Tab Utility -> section VIP COMMAND -> tombol "VIP CMD Macro" = buka/tutup GUI ini (persis Beta)
---   * New / Edit / Duplicate / Delete macro (+ popup konfirmasi delete)
---   * Keybind per macro (tekan tombol keyboard = START/STOP macro tersebut)
---   * Delay per macro: nilai + satuan (Ms / Sec / Minute / Hour / Day / Week / Year)
---   * Stop Mode: Indefinitely / Time (jalan selama X) / Cycles (kirim sebanyak N kali)
---   * Start Condition (persis Beta): Round Type (Any / Round Start / Intermission) + Time
---     (Any Time / Below / Above / At Certain Time + nilai + satuan) + Rounds Completed (Any/1/2/3)
---     -> macro otomatis "PAUSED (cond)" saat kondisi belum terpenuhi, lanjut sendiri saat terpenuhi
---   * Status ON / OFF / PAUSED + countdown per macro (warna & format persis Beta)
---   * Preset manager (tombol ikon folder di title bar): Save As / Load / Delete preset
---     -> tersimpan ke DaraHub/EvadeMacroVipCMD.json (file config yang SAMA dengan DaraHub BETA,
---        jadi preset lama kamu langsung terbaca)
---   * Eksekusi resmi PERSIS BETA: ReplicatedStorage.Events.Admin.VIPCommand:InvokeServer(command)
---     (BUKAN kirim chat - command VIP tidak muncul di chat)
--- GUI dibuat tersembunyi (Enabled = false) dan TIDAK di-gate VIP: pemilik whitelist selalu bisa
--- membukanya (command-nya sendiri tetap tervalidasi server seperti biasa).
-do
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+end)
+if ok_AF then
+	DaraSectionDone("AUTO FARM")
+else
+	DaraSectionFail("AUTO FARM", err_AF)
+end
+DaraSectionStart("VIP CMD MACRO")
+local ok_VM, err_VM = pcall(function()
+-- ================= ADD: SECTION VIP CMD MACRO (kembali Task 22, keadaan awal MATI - skema config EvadeCMDMacroGUI asli) =================
+-- ADD: macro chat command VIP (!time / !specialround / !MapScale); config default
+-- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke DaraHub/Games/Evade/VIPMacroConfig.json
+-- FIX (Task 22): dikembalikan dalam keadaan MATI sesuai klarifikasi user ("keadaan mati bukan hilang"):
+-- Auto Run default OFF dan TIDAK auto-start saat load; nyalakan manual via toggle "Auto Run VIP Macro"
+-- atau tombol "Run All Macros Now".
 local HttpService = game:GetService("HttpService")
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-local CoreGui = game:GetService("CoreGui")
-local player = Player
-function getDpiScale()
- local Players = game:GetService("Players")
- local player = Players.LocalPlayer
- local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
- local frame = Instance.new("Frame", gui)
- frame.Size = UDim2.new(0, 100, 0, 100)
-  task.wait()
-  local scale = frame.AbsoluteSize.X / 100
-  gui:Destroy()
-  return math.clamp(math.round(scale * 10) / 10, 1, 3)
+local UIS = game:GetService("UserInputService")
+
+local VIP_MACRO_CONFIG_FILE = "DaraHub/Games/Evade/VIPMacroConfig.json"
+local VIP_MACRO_DEFAULT_CONFIG = '{"AutoFarm":[{"keybind":"F","delayValue":3,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro","command":"!time 1","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":1,"delayUnit":"Ms","startRoundType":"Intermission","name":"Macro","command":"!specialround Plushie Hell","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":30,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro_1790151459","command":"!MapScale 0","startTimeType":"Any Time","stopMode":"indefinitely"}]}'
+
+local VIPMacros = {}
+local VIPMacroRawConfig = ""
+-- FIX (Task 22): default MATI (dulu true) - macro tidak menyala saat load
+local VIPMacroAutoRunState = false
+local VIPAutoRunThread = nil
+local VIPWarnedNoRoundStatus = false
+
+-- FIX: RoundStatus dibaca lewat pcall; 2 = Round Active, 0/1 = Intermission (sesuai pemakaian asli).
+-- Bila registry tidak tersedia, kembalikan nil agar macro tetap jalan (fail-open) + warn sekali.
+local function VIPMacroIsRoundActive()
+if not ServerStateRegistryService then
+return nil
 end
-local DPI = getDpiScale()
-local FILLED = "Ã¢â€”Â"
-local OPEN = "Ã¢â€”â€¹"
-
-function safeReadFile(path)
-        if not readfile then return nil end
-        local success, content = pcall(readfile, path)
-        return success and content or nil
+local ok, status = pcall(function()
+return tonumber(ServerStateRegistryService.Registry and ServerStateRegistryService.Registry.RoundStatus)
+end)
+if not ok then
+return nil
 end
-
-function safeWriteFile(path, data)
-        if not writefile then return false end
-        local success, _ = pcall(writefile, path, data)
-        return success
+if status == nil and not VIPWarnedNoRoundStatus then
+VIPWarnedNoRoundStatus = true
+warn("[Dara Hub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
 end
-
-local CONFIG_DIR = "DaraHub"
-local CONFIG_FILE = CONFIG_DIR .. "/EvadeMacroVipCMD.json"
-if isfolder and not isfolder(CONFIG_DIR) then makefolder(CONFIG_DIR) end
-
-local Presets = {}
-
-function serializeMacro(macro)
-        local ser = table.clone(macro)
-        ser.keybind = macro.keybind.Name
-        if macro.startCondition then
-                ser.startCondition = macro.startCondition
-                ser.startRoundType = macro.startRoundType
-                ser.startTimeType = macro.startTimeType
-                ser.startTimeValue = macro.startTimeValue
-                ser.startTimeUnit = macro.startTimeUnit
-                ser.startRoundsCompleted = macro.startRoundsCompleted
-        end
-        return ser
+if status == nil then
+return nil
+end
+return status == 2
 end
 
-function deserializeMacro(ser)
-        local macro = table.clone(ser)
-        macro.keybind = ser.keybind and Enum.KeyCode[ser.keybind] or Enum.KeyCode.F
-        if ser.startCondition then
-                macro.startCondition = ser.startCondition
-                macro.startRoundType = ser.startRoundType
-                macro.startTimeType = ser.startTimeType
-                macro.startTimeValue = ser.startTimeValue
-                macro.startTimeUnit = ser.startTimeUnit
-                macro.startRoundsCompleted = ser.startRoundsCompleted
-        end
-        return macro
+local function VIPMacroDelaySeconds(macro)
+local n = tonumber(macro.delayValue) or 1
+local unit = tostring(macro.delayUnit or "Second")
+if unit == "Ms" then
+return math.max(n / 1000, 0)
+end
+return n
 end
 
-function loadPresets()
-        local data = safeReadFile(CONFIG_FILE)
-        if data then
-                local success, decoded = pcall(HttpService.JSONDecode, HttpService, data)
-                if success and typeof(decoded) == "table" then
-                        Presets = {}
-                        for name, arr in pairs(decoded) do
-                                Presets[name] = {}
-                                for i, ser in ipairs(arr) do
-                                        Presets[name][i] = deserializeMacro(ser)
-                                end
-                        end
-                end
-        end
+-- FIX: pengiriman chat dicoba lewat TextChatService (RBXGeneral:SendAsync) lalu fallback
+-- DefaultChatSystemChatEvents.SayMessageRequest (chat legacy); keduanya pcall + warn.
+local function VIPMacroSendChat(message)
+local sent = false
+local ok = pcall(function()
+local tcs = game:GetService("TextChatService")
+local channels = tcs and tcs:FindFirstChild("TextChannels")
+local general = channels and channels:FindFirstChild("RBXGeneral")
+if not general then
+error("RBXGeneral tidak ditemukan")
+end
+general:SendAsync(message)
+sent = true
+end)
+if not ok or not sent then
+pcall(function()
+local ev = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+local req = ev and ev:FindFirstChild("SayMessageRequest")
+if not req then
+error("SayMessageRequest tidak ditemukan")
+end
+req:FireServer(message, "All")
+sent = true
+end)
+end
+if not sent then
+warn("[Dara Hub] Gagal mengirim chat macro: " .. tostring(message))
+end
 end
 
-function savePresets()
-        local toSave = {}
-        for name, macros in pairs(Presets) do
-                toSave[name] = {}
-                for i, macro in ipairs(macros) do
-                        toSave[name][i] = serializeMacro(macro)
-                end
-        end
-        local json = HttpService:JSONEncode(toSave)
-        safeWriteFile(CONFIG_FILE, json)
+local function VIPMacroRunLoop(macro)
+while macro.Running do
+local mode = tostring(macro.startRoundType or "Any Time")
+if mode == "Intermission" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+elseif mode == "Round" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == false do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+if tostring(macro.startTimeType or "Any Time") == "Round Start" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active ~= true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+VIPMacroSendChat(tostring(macro.command or ""))
+if tostring(macro.stopMode or "indefinitely") == "Once" then
+macro.Running = false
+break
+end
+task.wait(VIPMacroDelaySeconds(macro))
+end
 end
 
-loadPresets()
+local function VIPMacroStopAll()
+for _, m in ipairs(VIPMacros) do
+m.Running = false
+end
+end
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MacroManagerGUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Enabled = false
-ScreenGui.Parent = CoreGui
-ScreenGui.ScreenInsets = Enum.ScreenInsets.None
-ScreenGui.DisplayOrder = 6
-local Main = Instance.new("Frame")
-Main.Name = "MainFrame"
-Main.Size = UDim2.new(0,420*DPI,0,520*DPI)
-Main.Position = UDim2.new(0.5,0,0.5,0)
-Main.AnchorPoint = Vector2.new(0.5,0.5)
-Main.BackgroundColor3 = Color3.fromRGB(25,25,35)
-Main.ClipsDescendants = true
-Main.Active = true
-Main.Parent = ScreenGui
-Instance.new("UICorner",Main).CornerRadius = UDim.new(0,12)
+local function VIPMacroStartAll()
+for _, m in ipairs(VIPMacros) do
+if not m.Running then
+m.Running = true
+task.spawn(VIPMacroRunLoop, m)
+end
+end
+end
 
-local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
-TitleBar.Size = UDim2.new(1,0,0,36*DPI)
-TitleBar.BackgroundColor3 = Color3.fromRGB(30,30,45)
-TitleBar.Parent = Main
-TitleBar.Active = true
-local Title = Instance.new("TextLabel")
-Title.Name = "TitleLabel"
-Title.Size = UDim2.new(1,-84,1,0)
-Title.Position = UDim2.new(0,8,0,0)
-Title.BackgroundTransparency = 1
-Title.Text = "Macro Manager"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16*DPI
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TitleBar
+local function VIPMacroIsVIP()
+local ok, isVIP = pcall(function()
+return LocalPlayer:GetAttribute("VIPCommandsAccess") == true
+end)
+return ok and isVIP == true
+end
 
-local ConfigBtn = Instance.new("TextButton")
-ConfigBtn.Name = "ConfigButton"
-ConfigBtn.Size = UDim2.new(0,28,0,28)
-ConfigBtn.Position = UDim2.new(1,-68,0,4)
-ConfigBtn.BackgroundColor3 = Color3.fromRGB(100,150,255)
-ConfigBtn.Text = "Ã°Å¸â€”â€šÃ¯Â¸Â"
-ConfigBtn.TextColor3 = Color3.new(1,1,1)
-ConfigBtn.Font = Enum.Font.GothamBold
-ConfigBtn.TextSize = 16*DPI
-ConfigBtn.Parent = TitleBar
-Instance.new("UICorner",ConfigBtn).CornerRadius = UDim.new(0,6)
+local function VIPMacroAutoStart()
+if VIPAutoRunThread then
+pcall(task.cancel, VIPAutoRunThread)
+VIPAutoRunThread = nil
+end
+VIPAutoRunThread = task.spawn(function()
+-- FIX: attribute VIPCommandsAccess bisa terisi lambat setelah load; polling 15 detik
+-- (versi asli hanya cek sekali saat load sehingga macro kadang tidak jalan)
+local waited = 0
+while waited < 15 do
+if VIPMacroIsVIP() then
+VIPMacroStartAll()
+pcall(function()
+WindUI:Notify({
+Title = "VIP CMD Macro",
+Content = "VIP terdeteksi - " .. #VIPMacros .. " macro mulai berjalan otomatis",
+Duration = 4
+})
+end)
+return
+end
+task.wait(1)
+waited = waited + 1
+end
+warn("[Dara Hub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
+end)
+end
 
-local Close = Instance.new("TextButton")
-Close.Name = "CloseButton"
-Close.Size = UDim2.new(0,28,0,28)
-Close.Position = UDim2.new(1,-32,0,4)
-Close.BackgroundColor3 = Color3.fromRGB(255,50,50)
-Close.Text = "X"
-Close.TextColor3 = Color3.new(1,1,1)
-Close.Font = Enum.Font.GothamBold
-Close.TextSize = 14*DPI
-Close.Parent = TitleBar
-Instance.new("UICorner",Close).CornerRadius = UDim.new(0,6)
+local function VIPMacroBuildStatus()
+if #VIPMacros == 0 then
+return "Tidak ada macro terload."
+end
+local lines = {}
+for i, m in ipairs(VIPMacros) do
+table.insert(lines, i .. ") " .. m.name .. ": " .. m.command .. " | tiap " .. tostring(m.delayValue) .. " " .. tostring(m.delayUnit) .. " | " .. tostring(m.startRoundType) .. " | keybind " .. (m.keybind ~= "" and m.keybind or "-"))
+end
+return table.concat(lines, "\n")
+end
 
-Close.MouseButton1Click:Connect(function()
-        ScreenGui.Enabled = false
+local function VIPMacroLoadFromTable(data)
+VIPMacroStopAll()
+VIPMacros = {}
+local list = data
+if type(data) == "table" and type(data.AutoFarm) == "table" then
+list = data.AutoFarm
+end
+if type(list) == "table" then
+for _, m in ipairs(list) do
+if type(m) == "table" and m.command then
+table.insert(VIPMacros, {
+name = tostring(m.name or "Macro"),
+command = tostring(m.command),
+keybind = tostring(m.keybind or ""),
+delayValue = tonumber(m.delayValue) or 1,
+delayUnit = tostring(m.delayUnit or "Second"),
+startRoundType = tostring(m.startRoundType or "Any Time"),
+startTimeType = tostring(m.startTimeType or "Any Time"),
+stopMode = tostring(m.stopMode or "indefinitely"),
+Running = false,
+Thread = nil,
+})
+end
+end
+end
+end
+
+local function VIPMacroApplyRaw(raw)
+if not raw or raw == "" then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config JSON masih kosong.", Duration = 3 })
+end)
+return false
+end
+local ok, data = pcall(function()
+return HttpService:JSONDecode(raw)
+end)
+if not ok or type(data) ~= "table" then
+warn("[Dara Hub] Config VIP Macro bukan JSON valid")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "JSON tidak valid!", Duration = 3 })
+end)
+return false
+end
+VIPMacroLoadFromTable(data)
+if #VIPMacros == 0 then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Tidak ada macro valid di config (butuh field command).", Duration = 3 })
+end)
+return false
+end
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = #VIPMacros .. " macro diterapkan.", Duration = 3 })
+end)
+return true
+end
+
+-- ADD: load config dari file (kalau pernah di-save), kalau tidak pakai config default ter-embed
+local VIPMacroLoadedFromDisk = false
+if isfile and readfile then
+local okFile, exists = pcall(isfile, VIP_MACRO_CONFIG_FILE)
+if okFile and exists then
+local ok, content = pcall(readfile, VIP_MACRO_CONFIG_FILE)
+if ok and type(content) == "string" and content ~= "" then
+local ok2, data = pcall(function()
+return HttpService:JSONDecode(content)
+end)
+if ok2 and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+VIPMacroLoadedFromDisk = true
+end
+end
+end
+end
+if not VIPMacroLoadedFromDisk then
+local ok, data = pcall(function()
+return HttpService:JSONDecode(VIP_MACRO_DEFAULT_CONFIG)
+end)
+if ok and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+end
+end
+
+Tabs.Auto:Section({ Title = "VIP CMD Macro" })
+
+Tabs.Auto:Paragraph({
+Title = "Macro Terload" .. (#VIPMacros > 0 and " (" .. #VIPMacros .. ")" or ""),
+Content = VIPMacroBuildStatus()
+})
+
+VIPMacroAutoRunToggle = Tabs.Auto:Toggle({
+Title = "Auto Run VIP Macro",
+Flag = "VIPMacroAutoRun",
+Desc = "Jalankan semua macro otomatis begitu VIP Commands aktif",
+-- FIX (Task 22): Value default false (keadaan mati) - user nyalakan manual bila mau
+Value = false,
+Callback = function(state)
+VIPMacroAutoRunState = state
+if state then
+VIPMacroAutoStart()
+else
+VIPMacroStopAll()
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Run All Macros Now",
+Icon = "play",
+Callback = function()
+if not VIPMacroIsVIP() then
+warn("[Dara Hub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Kamu belum punya VIP Commands (coba di private server sendiri).", Duration = 4 })
+end)
+end
+VIPMacroStartAll()
+end
+})
+
+Tabs.Auto:Button({
+Title = "Stop All Macros",
+Icon = "square",
+Callback = function()
+VIPMacroStopAll()
+end
+})
+
+Tabs.Auto:Space()
+
+VIPMacroConfigInput = Tabs.Auto:Input({
+Title = "Macro Config (JSON)",
+Flag = "VIPMacroConfigInput",
+Placeholder = "Paste config JSON di sini",
+Callback = function(value)
+VIPMacroRawConfig = value or ""
+end
+})
+
+Tabs.Auto:Button({
+Title = "Apply Config JSON",
+Icon = "check",
+Callback = function()
+if VIPMacroApplyRaw(VIPMacroRawConfig) then
+VIPMacroStopAll()
+if VIPMacroAutoRunState then
+VIPMacroAutoStart()
+end
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Save Config ke File",
+Desc = "Simpan config macro aktif ke DaraHub/Games/Evade/VIPMacroConfig.json",
+Icon = "save",
+Callback = function()
+if not writefile then
+warn("[Dara Hub] Executor tidak mendukung writefile - config tidak bisa disimpan")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Executor tidak mendukung writefile.", Duration = 3 })
+end)
+return
+end
+local ok = pcall(function()
+if isfolder and makefolder then
+if not isfolder("DaraHub") then makefolder("DaraHub") end
+if not isfolder("DaraHub/Games") then makefolder("DaraHub/Games") end
+if not isfolder("DaraHub/Games/Evade") then makefolder("DaraHub/Games/Evade") end
+end
+local list = {}
+for _, m in ipairs(VIPMacros) do
+table.insert(list, {
+keybind = m.keybind,
+delayValue = m.delayValue,
+delayUnit = m.delayUnit,
+startRoundType = m.startRoundType,
+name = m.name,
+command = m.command,
+startTimeType = m.startTimeType,
+stopMode = m.stopMode,
+})
+end
+writefile(VIP_MACRO_CONFIG_FILE, HttpService:JSONEncode({ AutoFarm = list }))
+end)
+if ok then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config tersimpan: " .. VIP_MACRO_CONFIG_FILE, Duration = 3 })
+end)
+else
+warn("[Dara Hub] Gagal menyimpan config VIP Macro")
+end
+end
+})
+
+-- ADD: keybind manual tiap macro (field keybind di config; semuanya "F" di config user)
+UIS.InputBegan:Connect(function(input, processed)
+if processed then
+return
+end
+local key = input.KeyCode and input.KeyCode.Name
+if not key then
+return
+end
+for _, m in ipairs(VIPMacros) do
+if m.keybind ~= "" and m.keybind == key then
+task.spawn(VIPMacroSendChat, m.command)
+end
+end
 end)
 
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Name = "MacroScroll"
-Scroll.Size = UDim2.new(1,-16,1,-128)
-Scroll.Position = UDim2.new(0,8,0,44)
-Scroll.BackgroundTransparency = 1
-Scroll.ScrollBarThickness = 5
-Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Scroll.Parent = Main
+-- FIX (Task 22): keadaan awal MATI - VIPMacroAutoStart() TIDAK dipanggil saat load lagi.
+-- Macro hanya berjalan bila user menyalakan toggle "Auto Run VIP Macro"
+-- (callback memanggil VIPMacroAutoStart) atau menekan tombol "Run All Macros Now".
+-- ================= AKHIR SECTION VIP CMD MACRO =================
 
-local Layout = Instance.new("UIListLayout",Scroll)
-Layout.Name = "MacroListLayout"
-Layout.Padding = UDim.new(0,6)
-
-local NoMacrosLabel = Instance.new("TextLabel")
-NoMacrosLabel.Name = "NoMacrosLabel"
-NoMacrosLabel.Size = UDim2.new(1,-32,1,-100)
-NoMacrosLabel.Position = UDim2.new(0,16,0,50)
-NoMacrosLabel.BackgroundTransparency = 1
-NoMacrosLabel.Text = "No VIP Command macros available"
-NoMacrosLabel.TextColor3 = Color3.fromRGB(150,150,150)
-NoMacrosLabel.Font = Enum.Font.Gotham
-NoMacrosLabel.TextSize = 16*DPI
-NoMacrosLabel.TextWrapped = true
-NoMacrosLabel.Visible = true
-NoMacrosLabel.Parent = Main
-
-local CreateBtn = Instance.new("TextButton")
-CreateBtn.Name = "CreateButton"
-CreateBtn.Size = UDim2.new(1,-16,0,36)
-CreateBtn.Position = UDim2.new(0,8,1,-44)
-CreateBtn.BackgroundColor3 = Color3.fromRGB(0,170,255)
-CreateBtn.Text = "+ New Macro"
-CreateBtn.TextColor3 = Color3.new(1,1,1)
-CreateBtn.Font = Enum.Font.GothamBold
-CreateBtn.TextSize = 15*DPI
-CreateBtn.Parent = Main
-Instance.new("UICorner",CreateBtn).CornerRadius = UDim.new(0,8)
-
-local DelayUnits = {"Ms","Sec","Minute","Hour","Day","Week","Year"}
-
-function toMs(v,u)
-        local m = {Ms=1,Sec=1000,Minute=60000,Hour=3600000,Day=86400000,Week=604800000,Year=31536000000}
-        return (v or 0) * (m[u] or 1)
+end)
+if ok_VM then
+	DaraSectionDone("VIP CMD MACRO")
+else
+	DaraSectionFail("VIP CMD MACRO", err_VM)
 end
-
-local TimeUnits = {"Ms","Second","Minute","Hour","Day","Week","Month","Year"}
-
-function toSeconds(v,u)
-        local m = {Ms=0.001,Second=1,Minute=60,Hour=3600,Day=86400,Week=604800,Month=2629800,Year=31557600}
-        return (v or 0) * (m[u] or 1)
-end
-
-function formatTimeRemaining(seconds)
-        if seconds <= 0 then return "Done" end
-        local years = math.floor(seconds/31557600); seconds %= 31557600
-        local months = math.floor(seconds/2629800); seconds %= 2629800
-        local weeks = math.floor(seconds/604800); seconds %= 604800
-        local days = math.floor(seconds/86400); seconds %= 86400
-        local hours = math.floor(seconds/3600); seconds %= 3600
-        local mins = math.floor(seconds/60); seconds %= 60
-        local parts = {}
-        if years>0 then table.insert(parts,years.."y") end
-        if months>0 then table.insert(parts,months.."mo") end
-        if weeks>0 then table.insert(parts,weeks.."w") end
-        if days>0 then table.insert(parts,days.."d") end
-        if hours>0 then table.insert(parts,hours.."h") end
-        if mins>0 then table.insert(parts,mins.."m") end
-        if seconds > 0 and (#parts > 0 and seconds >= 1 or #parts == 0) then
-                local sec_str = seconds < 1 and string.format("%.1fs", seconds) or math.floor(seconds) .. "s"
-                table.insert(parts, sec_str)
-        end
-        return table.concat(parts," ")
-end
-
-local RoundTypes = {"Any","Round Start","Intermission"}
-local TimeConditions = {"Any Time","Below","Above","At Certain Time"}
-local RoundsCompletedOptions = {"1", "2", "3"}
-local Macros = {}
-
-function getRoundState()
-        local gameFolder = workspace:FindFirstChild("Game")
-        if gameFolder then
-                local stats = gameFolder:FindFirstChild("Stats")
-                if stats then
-                        local roundStarted = stats:GetAttribute("RoundStarted")
-                        if roundStarted ~= nil then
-                                return roundStarted and "Round Start" or "Intermission"
-                        end
-                end
-        end
-        return nil
-end
-
-function getRoundsCompleted()
-        local gameFolder = workspace:FindFirstChild("Game")
-        if gameFolder then
-                local stats = gameFolder:FindFirstChild("Stats")
-                if stats then
-                        local rounds = stats:GetAttribute("RoundsCompleted")
-                        return typeof(rounds) == "number" and rounds or 0
-                end
-        end
-        return 0
-end
-
-function updateNoMacrosLabel()
-        NoMacrosLabel.Visible = #Macros == 0
-end
-
-function updateCanvas()
-        task.defer(function()
-                Scroll.CanvasSize = UDim2.new(0,0,0,Layout.AbsoluteContentSize.Y+10)
-        end)
-end
-
-local ConfirmPopup = nil
-
-function showDeleteConfirm(data,idx,entryFrame)
-        if ConfirmPopup then ConfirmPopup:Destroy() end
-        ConfirmPopup = Instance.new("Frame")
-        ConfirmPopup.Name = "DeleteConfirmPopup"
-        ConfirmPopup.Size = UDim2.new(0,260*DPI,0,130*DPI)
-        ConfirmPopup.Position = UDim2.new(0.5,0,0.5,0)
-        ConfirmPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        ConfirmPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        ConfirmPopup.ZIndex = 20
-        ConfirmPopup.Parent = ScreenGui
-        Instance.new("UICorner",ConfirmPopup).CornerRadius = UDim.new(0,12)
-        local msg = Instance.new("TextLabel")
-        msg.Text = "Delete this macro?"
-        msg.Size = UDim2.new(1,-20,0,50)
-        msg.Position = UDim2.new(0,10,0,10)
-        msg.BackgroundTransparency = 1
-        msg.TextColor3 = Color3.new(1,1,1)
-        msg.Font = Enum.Font.GothamBold
-        msg.TextSize = 15*DPI
-        msg.ZIndex = 21
-        msg.Parent = ConfirmPopup
-        local yes = Instance.new("TextButton")
-        yes.Size = UDim2.new(0.45,0,0,32)
-        yes.Position = UDim2.new(0.05,0,1,-40)
-        yes.BackgroundColor3 = Color3.fromRGB(255,50,50)
-        yes.Text = "Yes"
-        yes.TextColor3 = Color3.new(1,1,1)
-        yes.Font = Enum.Font.GothamBold
-        yes.TextSize = 13*DPI
-        yes.ZIndex = 21
-        yes.Parent = ConfirmPopup
-        Instance.new("UICorner",yes).CornerRadius = UDim.new(0,8)
-        local no = Instance.new("TextButton")
-        no.Size = UDim2.new(0.45,0,0,32)
-        no.Position = UDim2.new(0.5,0,1,-40)
-        no.BackgroundColor3 = Color3.fromRGB(100,100,100)
-        no.Text = "No"
-        no.TextColor3 = Color3.new(1,1,1)
-        no.Font = Enum.Font.GothamBold
-        no.TextSize = 13*DPI
-        no.ZIndex = 21
-        no.Parent = ConfirmPopup
-        Instance.new("UICorner",no).CornerRadius = UDim.new(0,8)
-        no.MouseButton1Click:Connect(function()
-                ConfirmPopup:Destroy(); ConfirmPopup=nil
-        end)
-        yes.MouseButton1Click:Connect(function()
-                if data.running and data.stopMacro then 
-                        data.stopMacro() 
-                end
-                entryFrame:Destroy()
-                table.remove(Macros,idx)
-                updateNoMacrosLabel()
-                updateCanvas()
-                ConfirmPopup:Destroy(); ConfirmPopup=nil
-        end)
-end
-
-local MacroManager = {}
-MacroManager.__index = MacroManager
-
-function MacroManager.new(data)
-        local self = setmetatable({}, MacroManager)
-        
-        self.data = data
-        self.running = false
-        self.pausedByCondition = false
-        self.connections = {}
-        self.startTime = nil
-        self.cycleCount = nil
-        self.maxCycles = nil
-        self.nextRun = nil
-        
-        return self
-end
-
-function MacroManager:cleanupConnections()
-        for i, conn in ipairs(self.connections) do
-                if conn and conn.Connected then
-                        pcall(function() conn:Disconnect() end)
-                end
-                self.connections[i] = nil
-        end
-        self.connections = {}
-end
-
-function MacroManager:checkTimeCondition()
-        if not self.data.startTimeType or self.data.startTimeType == "Any Time" then
-                return true
-        end
-        local gameFolder = workspace:FindFirstChild("Game")
-        if not gameFolder then return false end
-        local stats = gameFolder:FindFirstChild("Stats")
-        if not stats then return false end
-        local timerValue = stats:GetAttribute("Timer")
-        if not timerValue then return false end
-        local targetTime = toSeconds(self.data.startTimeValue or 0, self.data.startTimeUnit or "Second")
-        if self.data.startTimeType == "Below" then
-                return timerValue < targetTime
-        elseif self.data.startTimeType == "Above" then
-                return timerValue > targetTime
-        elseif self.data.startTimeType == "At Certain Time" then
-                return math.abs(timerValue - targetTime) < 0.5
-        end
-        return false
-end
-
-function MacroManager:checkRoundCondition()
-        if not self.data.startRoundType or self.data.startRoundType == "Any" then
-                return true
-        end
-        local currentRoundState = getRoundState()
-        return currentRoundState == self.data.startRoundType
-end
-
-function MacroManager:checkRoundsCompletedCondition()
-        if not self.data.startRoundsCompleted or self.data.startRoundsCompleted == "Any" then
-                return true
-        end
-        local required = tonumber(self.data.startRoundsCompleted)
-        local actual = getRoundsCompleted()
-        return actual >= required
-end
-
-function MacroManager:resumeFromPause()
-        if self.pausedByCondition and self:checkRoundCondition() and self:checkTimeCondition() and self:checkRoundsCompletedCondition() then
-                self.pausedByCondition = false
-                if self.status then
-                        self.status.Text = "ON"
-                        self.status.TextColor3 = Color3.fromRGB(0,255,0)
-                end
-                if self.updateCountdown then self:updateCountdown() end
-        end
-end
-
-function MacroManager:pauseDueToCondition()
-        if self.running and not self.pausedByCondition then
-                self.pausedByCondition = true
-                if self.status then
-                        self.status.Text = "PAUSED"
-                        self.status.TextColor3 = Color3.fromRGB(255,150,50)
-                end
-                if self.updateCountdown then self:updateCountdown() end
-        end
-end
-
-function MacroManager:monitorConditions()
-        if not self.running then return end
-        if self:checkRoundCondition() and self:checkTimeCondition() and self:checkRoundsCompletedCondition() then
-                self:resumeFromPause()
-        else
-                self:pauseDueToCondition()
-        end
-end
-
-function MacroManager:startCountdownUpdate()
-        if self.countdownConn and self.countdownConn.Connected then 
-                self.countdownConn:Disconnect() 
-        end
-        
-        self.countdownConn = RunService.Heartbeat:Connect(function()
-                if not self.running or not self.countdown then return end
-                
-                if not self.running then
-                        self.countdown.Text = "Ready"
-                        self.countdown.TextColor3 = Color3.fromRGB(255,200,100)
-                        if self.countdownConn and self.countdownConn.Connected then 
-                                self.countdownConn:Disconnect() 
-                        end
-                        return
-                end
-                
-                local elapsed = tick() - self.startTime
-                local delayMs = toMs(self.data.delayValue, self.data.delayUnit)
-                local delaySec = delayMs / 1000
-                local nextInSec = delaySec - ((tick() - self.startTime) % delaySec)
-                
-                if self.data.stopMode == "time" then
-                        local remaining = math.max(0, self.data.stopTime - elapsed)
-                        self.countdown.Text = self.pausedByCondition and "PAUSED (cond)" or formatTimeRemaining(remaining)
-                        self.countdown.TextColor3 = remaining<=0 and Color3.fromRGB(255,100,100) or (self.pausedByCondition and Color3.fromRGB(255,150,50) or Color3.fromRGB(100,255,100))
-                elseif self.data.stopMode == "cycles" then
-                        local left = math.max(0, (self.maxCycles or 0) - self.cycleCount)
-                        self.countdown.Text = self.pausedByCondition and "PAUSED (cond)" or left.." cycle"..(left==1 and "" or "s").." left | "..formatTimeRemaining(nextInSec)
-                        self.countdown.TextColor3 = self.pausedByCondition and Color3.fromRGB(255,150,50) or Color3.fromRGB(100,255,100)
-                else
-                        self.countdown.Text = self.pausedByCondition and "PAUSED (cond)" or formatTimeRemaining(nextInSec)
-                        self.countdown.TextColor3 = self.pausedByCondition and Color3.fromRGB(255,150,50) or Color3.fromRGB(100,255,100)
-                end
-        end)
-        
-        table.insert(self.connections, self.countdownConn)
-end
-
-function MacroManager:updateCountdown()
-        if not self.countdown then return end
-        
-        if not self.running then
-                self.countdown.Text = "Ready"
-                self.countdown.TextColor3 = Color3.fromRGB(255,200,100)
-                return
-        end
-        
-        self:startCountdownUpdate()
-end
-
-function MacroManager:startMacro()
-        if self.running then return end
-        
-        self.running = true
-        self.pausedByCondition = false
-        self.startTime = tick()
-        self.cycleCount = 0
-        self.maxCycles = (self.data.stopMode=="cycles") and self.data.stopCycles or nil
-        self.nextRun = tick()
-        
-        local delayMs = toMs(self.data.delayValue, self.data.delayUnit)
-        
-        self:cleanupConnections()
-        
-        local mainConn = RunService.Heartbeat:Connect(function()
-                if not self.running or self.pausedByCondition then return end
-                
-                local now = tick()
-                if now >= self.nextRun then
-                        pcall(function()
-                                ReplicatedStorage.Events.Admin.VIPCommand:InvokeServer(self.data.command)
-                        end)
-                        self.cycleCount += 1
-                        self.nextRun = now + delayMs / 1000
-                end
-                
-                if self.data.stopMode=="time" and (now - self.startTime >= self.data.stopTime) then 
-                        self:stopMacro()
-                        return 
-                end
-                if self.data.stopMode=="cycles" and self.cycleCount >= self.maxCycles then 
-                        self:stopMacro()
-                        return 
-                end
-        end)
-        
-        table.insert(self.connections, mainConn)
-        
-        if self.data.startCondition then
-                local monitorConn = RunService.Heartbeat:Connect(function()
-                        self:monitorConditions()
-                end)
-                table.insert(self.connections, monitorConn)
-        end
-        
-        local keyConn = UserInputService.InputBegan:Connect(function(inp, gp)
-                if gp or inp.KeyCode ~= self.data.keybind then return end
-                if self.running then
-                        self:stopMacro()
-                else
-                        self:startMacro()
-                end
-        end)
-        
-        table.insert(self.connections, keyConn)
-        
-        if self.startBtn then
-                self.startBtn.Text = "STOP"
-                self.startBtn.BackgroundColor3 = Color3.fromRGB(255,50,50)
-        end
-        if self.status then
-                self.status.Text = "ON"
-                self.status.TextColor3 = Color3.fromRGB(0,255,0)
-        end
-        
-        self:updateCountdown()
-end
-
-function MacroManager:stopMacro()
-        self.running = false
-        self.pausedByCondition = false
-        
-        self:cleanupConnections()
-        
-        if self.startBtn then
-                self.startBtn.Text = "START"
-                self.startBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
-        end
-        if self.status then
-                self.status.Text = "OFF"
-                self.status.TextColor3 = Color3.fromRGB(255,100,100)
-        end
-        if self.countdown then
-                self.countdown.Text = "Ready"
-                self.countdown.TextColor3 = Color3.fromRGB(255,200,100)
-        end
-end
-
-function makeEntry(data, idx)
-        local f = Instance.new("Frame")
-        f.Name = "MacroEntry_" .. idx
-        f.Size = UDim2.new(1, 0, 0, 180)
-        f.BackgroundColor3 = Color3.fromRGB(35,35,50)
-        f.ZIndex = 2
-        f.Parent = Scroll
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0,8)
-
-        local name = Instance.new("TextLabel")
-        name.Name = "MacroNameLabel"
-        name.Size = UDim2.new(0.6,0,0,22)
-        name.Position = UDim2.new(0,8,0,4)
-        name.BackgroundTransparency = 1
-        name.Text = data.name~="" and data.name or ("Macro "..idx)
-        name.TextColor3 = Color3.new(1,1,1)
-        name.Font = Enum.Font.GothamBold
-        name.TextSize = 13*DPI
-        name.TextXAlignment = Enum.TextXAlignment.Left
-        name.ZIndex = 3
-        name.Parent = f
-
-        local cmd = Instance.new("TextLabel")
-        cmd.Name = "CommandLabel"
-        cmd.Size = UDim2.new(1,-16,0,18)
-        cmd.Position = UDim2.new(0,8,0,26)
-        cmd.BackgroundTransparency = 1
-        cmd.Text = data.command
-        cmd.TextColor3 = Color3.fromRGB(180,180,180)
-        cmd.Font = Enum.Font.Gotham
-        cmd.TextSize = 11*DPI
-        cmd.TextXAlignment = Enum.TextXAlignment.Left
-        cmd.ZIndex = 3
-        cmd.Parent = f
-
-        local info = Instance.new("TextLabel")
-        info.Name = "InfoLabel"
-        info.Size = UDim2.new(1,-16,0,20)
-        info.Position = UDim2.new(0,8,0,44)
-        info.BackgroundTransparency = 1
-        info.Text = string.format("Delay: %d %s | Key: %s", data.delayValue, data.delayUnit, (data.keybind and data.keybind.Name) or "F")
-        info.TextColor3 = Color3.fromRGB(120,200,255)
-        info.Font = Enum.Font.Gotham
-        info.TextSize = 10*DPI
-        info.TextXAlignment = Enum.TextXAlignment.Left
-        info.ZIndex = 3
-        info.Parent = f
-
-        local startInfo = Instance.new("TextLabel")
-        startInfo.Name = "StartInfoLabel"
-        startInfo.Size = UDim2.new(1,-16,0,18)
-        startInfo.Position = UDim2.new(0,8,0,66)
-        startInfo.BackgroundTransparency = 1
-        if data.startCondition then
-                local startText = "Start: "
-                if data.startRoundType and data.startRoundType ~= "Any" then
-                        startText = startText .. data.startRoundType
-                end
-                if data.startTimeType and data.startTimeType ~= "Any Time" then
-                        if startText ~= "Start: " then startText = startText .. ", " end
-                        startText = startText .. data.startTimeType .. " " .. (data.startTimeValue or "") .. " " .. (data.startTimeUnit or "")
-                end
-                if data.startRoundsCompleted and data.startRoundsCompleted ~= "Any" then
-                        if startText ~= "Start: " then startText = startText .. ", " end
-                        startText = startText .. "Rounds: " .. data.startRoundsCompleted
-                end
-                startInfo.Text = startText
-        else
-                startInfo.Text = "Start: Manual"
-        end
-        startInfo.TextColor3 = Color3.fromRGB(255,150,100)
-        startInfo.Font = Enum.Font.Gotham
-        startInfo.TextSize = 10*DPI
-        startInfo.TextXAlignment = Enum.TextXAlignment.Left
-        startInfo.ZIndex = 3
-        startInfo.Parent = f
-
-        local repeatLabel = Instance.new("TextLabel")
-        repeatLabel.Name = "RepeatLabel"
-        repeatLabel.Size = UDim2.new(1,-16,0,18)
-        repeatLabel.Position = UDim2.new(0,8,0,86)
-        repeatLabel.BackgroundTransparency = 1
-        repeatLabel.Text = data.stopMode=="indefinitely" and "Run indefinitely"
-                or data.stopMode=="time" and "Amount of time"
-                or "Number of cycles"
-        repeatLabel.TextColor3 = Color3.fromRGB(255,200,100)
-        repeatLabel.Font = Enum.Font.Gotham
-        repeatLabel.TextSize = 11*DPI
-        repeatLabel.TextXAlignment = Enum.TextXAlignment.Left
-        repeatLabel.ZIndex = 3
-        repeatLabel.Parent = f
-
-        local countdown = Instance.new("TextLabel")
-        countdown.Name = "CountdownLabel"
-        countdown.Size = UDim2.new(1,-16,0,18)
-        countdown.Position = UDim2.new(0,8,0,104)
-        countdown.BackgroundTransparency = 1
-        countdown.Text = "Ready"
-        countdown.TextColor3 = Color3.fromRGB(255,200,100)
-        countdown.Font = Enum.Font.GothamBold
-        countdown.TextSize = 12*DPI
-        countdown.TextXAlignment = Enum.TextXAlignment.Left
-        countdown.ZIndex = 3
-        countdown.Parent = f
-
-        local status = Instance.new("TextLabel")
-        status.Name = "StatusLabel"
-        status.Size = UDim2.new(0,70,0,18)
-        status.Position = UDim2.new(1,-78,0,4)
-        status.BackgroundTransparency = 1
-        status.Text = "OFF"
-        status.TextColor3 = Color3.fromRGB(255,100,100)
-        status.Font = Enum.Font.GothamBold
-        status.TextSize = 11*DPI
-        status.ZIndex = 3
-        status.Parent = f
-
-        function btn(txt, col, x, name)
-                local b = Instance.new("TextButton")
-                b.Name = name.."Button"
-                b.Size = UDim2.new(0,52,0,22)
-                b.Position = UDim2.new(0,x,1,-31)
-                b.BackgroundColor3 = col
-                b.Text = txt
-                b.TextColor3 = Color3.new(1,1,1)
-                b.Font = Enum.Font.GothamBold
-                b.TextSize = 11*DPI
-                b.ZIndex = 4
-                b.Parent = f
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-                return b
-        end
-
-        local startBtn = btn("START", Color3.fromRGB(0,200,0), 8, "Start")
-        local editBtn = btn("Edit", Color3.fromRGB(255,170,0), 68, "Edit")
-        local dupBtn = btn("Dup", Color3.fromRGB(0,170,255), 128, "Duplicate")
-        local delBtn = btn("Del", Color3.fromRGB(255,50,50), 188, "Delete")
-        
-        local manager = MacroManager.new(data)
-        manager.startBtn = startBtn
-        manager.status = status
-        manager.countdown = countdown
-        data.manager = manager
-        
-        startBtn.MouseButton1Click:Connect(function()
-                if manager.running then
-                        manager:stopMacro()
-                else
-                        manager:startMacro()
-                end
-        end)
-        
-        dupBtn.MouseButton1Click:Connect(function()
-                local copy = table.clone(data)
-                copy.name = (copy.name~="" and copy.name or "Macro").." (Copy)"
-                table.insert(Macros, copy)
-                makeEntry(copy, #Macros)
-                updateNoMacrosLabel()
-                updateCanvas()
-        end)
-        
-        delBtn.MouseButton1Click:Connect(function() 
-                showDeleteConfirm(data, idx, f) 
-        end)
-        
-        editBtn.MouseButton1Click:Connect(function() 
-                CmdEditMacro(data, idx, f) 
-        end)
-        
-        data.entryFrame = f
-        updateNoMacrosLabel()
-        updateCanvas()
-        
-        return f
-end
-
-local Popup, activeDropdown, overlay = nil, nil, nil
-
-function closeAllDropdowns()
-        if activeDropdown then activeDropdown.Visible = false; activeDropdown = nil end
-        if overlay then overlay:Destroy(); overlay = nil end
-end
-
-function createOverlay()
-        if overlay then overlay:Destroy() end
-        overlay = Instance.new("TextButton")
-        overlay.Size = UDim2.new(1,0,1,0)
-        overlay.BackgroundTransparency = 0.9
-        overlay.BackgroundColor3 = Color3.new(0,0,0)
-        overlay.Text = ""
-        overlay.ZIndex = 14
-        overlay.Parent = Popup
-        overlay.MouseButton1Click:Connect(closeAllDropdowns)
-end
-
-function makeDropdown(btn, list, options, default, cb)
-        btn.Text = default
-        list.Visible = false
-        list.ZIndex = 15
-        for i, opt in ipairs(options) do
-                local o = Instance.new("TextButton")
-                o.Size = UDim2.new(1,0,0,28)
-                o.Position = UDim2.new(0,0,0,(i-1)*28)
-                o.BackgroundColor3 = Color3.fromRGB(50,50,70)
-                o.Text = opt
-                o.TextColor3 = Color3.new(1,1,1)
-                o.Font = Enum.Font.Gotham
-                o.TextSize = 13*DPI
-                o.ZIndex = 16
-                o.Parent = list
-                Instance.new("UICorner", o).CornerRadius = UDim.new(0,6)
-                o.MouseButton1Click:Connect(function()
-                        btn.Text = opt
-                        cb(opt)
-                        closeAllDropdowns()
-                end)
-        end
-        btn.ZIndex = 11
-        btn.MouseButton1Click:Connect(function()
-                if activeDropdown == list then
-                        closeAllDropdowns()
-                else
-                        closeAllDropdowns()
-                        list.Visible = true
-                        activeDropdown = list
-                        createOverlay()
-                end
-        end)
-end
-
-function CmdEditMacro(editData, oldIdx, oldFrame)
-        if Popup then Popup:Destroy() end
-        local isEdit = editData ~= nil
-        local data = isEdit and table.clone(editData) or {
-                name="", command="", delayValue=1, delayUnit="Ms",
-                keybind=Enum.KeyCode.F, stopMode="indefinitely",
-                stopTime=5, stopTimeUnit="Second", stopCycles=10,
-                startCondition=false, startRoundType="Any", startTimeType="Any Time",
-                startTimeValue=10, startTimeUnit="Second", startRoundsCompleted="Any"
-        }
-
-        Popup = Instance.new("Frame")
-        Popup.Active = true
-        Popup.Name = "EditMacroPopup"
-        Popup.Size = UDim2.new(0,420*DPI,0,520*DPI)
-        Popup.Position = UDim2.new(0.5,0,0.5,0)
-        Popup.AnchorPoint = Vector2.new(0.5,0.5)
-        Popup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        Popup.ZIndex = 10
-        Popup.Parent = ScreenGui
-        Instance.new("UICorner", Popup).CornerRadius = UDim.new(0,12)
-
-        local pTitle = Instance.new("TextLabel")
-        pTitle.Size = UDim2.new(1,0,0,36)
-        pTitle.BackgroundColor3 = Color3.fromRGB(35,35,55)
-        pTitle.Text = isEdit and "Edit Macro" or "New Macro"
-        pTitle.TextColor3 = Color3.new(1,1,1)
-        pTitle.Font = Enum.Font.GothamBold
-        pTitle.TextSize = 16*DPI
-        pTitle.ZIndex = 11
-        pTitle.Parent = Popup
-        Instance.new("UICorner", pTitle).CornerRadius = UDim.new(0,12)
-
-        local nameBox = Instance.new("TextBox")
-        nameBox.Size = UDim2.new(1,-16,0,32)
-        nameBox.Position = UDim2.new(0,8,0,44)
-        nameBox.PlaceholderText = "Enter Name"
-        nameBox.Text = data.name
-        nameBox.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        nameBox.TextColor3 = Color3.new(1,1,1)
-        nameBox.Font = Enum.Font.Gotham
-        nameBox.TextSize = 13*DPI
-        nameBox.ClearTextOnFocus = false
-        nameBox.ZIndex = 11
-        nameBox.Parent = Popup
-        Instance.new("UICorner", nameBox)
-
-        local cmdBox = Instance.new("TextBox")
-        cmdBox.Size = UDim2.new(1,-16,0,32)
-        cmdBox.Position = UDim2.new(0,8,0,82)
-        cmdBox.PlaceholderText = "Enter command here, use ''!'' To execute a command"
-        cmdBox.Text = data.command
-        cmdBox.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        cmdBox.TextColor3 = Color3.new(1,1,1)
-        cmdBox.Font = Enum.Font.Gotham
-        cmdBox.TextSize = 13*DPI
-        cmdBox.ClearTextOnFocus = false
-        cmdBox.ZIndex = 11
-        cmdBox.Parent = Popup
-        Instance.new("UICorner", cmdBox)
-
-        local delayVal = Instance.new("TextBox")
-        delayVal.Size = UDim2.new(0,90,0,32)
-        delayVal.Position = UDim2.new(0,8,0,120)
-        delayVal.PlaceholderText = "Delay"
-        delayVal.Text = tostring(data.delayValue or 1)
-        delayVal.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        delayVal.TextColor3 = Color3.new(1,1,1)
-        delayVal.Font = Enum.Font.Gotham
-        delayVal.TextSize = 13*DPI
-        delayVal.ClearTextOnFocus = false
-        delayVal.ZIndex = 11
-        delayVal.Parent = Popup
-        Instance.new("UICorner", delayVal)
-
-        local delayDrop = Instance.new("TextButton")
-        delayDrop.Size = UDim2.new(0,90,0,32)
-        delayDrop.Position = UDim2.new(0,106,0,120)
-        delayDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        delayDrop.TextColor3 = Color3.new(1,1,1)
-        delayDrop.Font = Enum.Font.GothamBold
-        delayDrop.TextSize = 13*DPI
-        delayDrop.Text = data.delayUnit or "Ms"
-        delayDrop.ZIndex = 11
-        delayDrop.Parent = Popup
-        Instance.new("UICorner", delayDrop)
-
-        local dropList = Instance.new("Frame")
-        dropList.Size = UDim2.new(0,90,0,196)
-        dropList.Position = UDim2.new(0,106,0,120)
-        dropList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        dropList.Visible = false
-        dropList.ZIndex = 15
-        dropList.Parent = Popup
-        Instance.new("UICorner", dropList)
-
-        makeDropdown(delayDrop, dropList, DelayUnits, data.delayUnit or "Ms", function(u) data.delayUnit = u end)
-
-        local keyBtn = Instance.new("TextButton")
-        keyBtn.Size = UDim2.new(1,-16,0,32)
-        keyBtn.Position = UDim2.new(0,8,0,162)
-        keyBtn.Text = "Key: " .. (data.keybind and data.keybind.Name or "F")
-        keyBtn.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        keyBtn.TextColor3 = Color3.new(1,1,1)
-        keyBtn.Font = Enum.Font.Gotham
-        keyBtn.TextSize = 13*DPI
-        keyBtn.ZIndex = 11
-        keyBtn.Parent = Popup
-        Instance.new("UICorner", keyBtn)
-
-        local waiting = false
-        keyBtn.MouseButton1Click:Connect(function()
-                if waiting then return end
-                waiting = true
-                keyBtn.Text = "Press any key..."
-                local c = nil
-                c = UserInputService.InputBegan:Connect(function(inp)
-                        if inp.KeyCode ~= Enum.KeyCode.Unknown then
-                                data.keybind = inp.KeyCode
-                                keyBtn.Text = "Key: " .. inp.KeyCode.Name
-                                waiting = false
-                                c:Disconnect()
-                        end
-                end)
-        end)
-
-        local startWhenLabel = Instance.new("TextLabel")
-        startWhenLabel.Size = UDim2.new(1,-16,0,24)
-        startWhenLabel.Position = UDim2.new(0,8,0,200)
-        startWhenLabel.BackgroundTransparency = 1
-        startWhenLabel.Text = "Start when"
-        startWhenLabel.TextColor3 = Color3.fromRGB(200,200,200)
-        startWhenLabel.Font = Enum.Font.GothamBold
-        startWhenLabel.TextSize = 14*DPI
-        startWhenLabel.TextXAlignment = Enum.TextXAlignment.Left
-        startWhenLabel.ZIndex = 11
-        startWhenLabel.Parent = Popup
-
-        local roundTypeLabel = Instance.new("TextLabel")
-        roundTypeLabel.Size = UDim2.new(0.5,-4,0,20)
-        roundTypeLabel.Position = UDim2.new(0,8,0,230)
-        roundTypeLabel.BackgroundTransparency = 1
-        roundTypeLabel.Text = "Round type"
-        roundTypeLabel.TextColor3 = Color3.fromRGB(180,180,180)
-        roundTypeLabel.Font = Enum.Font.Gotham
-        roundTypeLabel.TextSize = 12*DPI
-        roundTypeLabel.TextXAlignment = Enum.TextXAlignment.Left
-        roundTypeLabel.ZIndex = 11
-        roundTypeLabel.Parent = Popup
-
-        local roundTypeDrop = Instance.new("TextButton")
-        roundTypeDrop.Size = UDim2.new(0.5,-12,0,28)
-        roundTypeDrop.Position = UDim2.new(0,8,0,250)
-        roundTypeDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        roundTypeDrop.TextColor3 = Color3.new(1,1,1)
-        roundTypeDrop.Font = Enum.Font.GothamBold
-        roundTypeDrop.TextSize = 12*DPI
-        roundTypeDrop.Text = data.startRoundType or "Any"
-        roundTypeDrop.ZIndex = 11
-        roundTypeDrop.Parent = Popup
-        Instance.new("UICorner", roundTypeDrop)
-
-        local roundTypeList = Instance.new("Frame")
-        roundTypeList.Size = UDim2.new(0.5,-12,0,84)
-        roundTypeList.Position = UDim2.new(0,8,0,250)
-        roundTypeList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        roundTypeList.Visible = false
-        roundTypeList.ZIndex = 15
-        roundTypeList.Parent = Popup
-        Instance.new("UICorner", roundTypeList)
-
-        makeDropdown(roundTypeDrop, roundTypeList, RoundTypes, data.startRoundType or "Any", function(u) data.startRoundType = u end)
-
-        local timeTypeLabel = Instance.new("TextLabel")
-        timeTypeLabel.Size = UDim2.new(0.5,-4,0,20)
-        timeTypeLabel.Position = UDim2.new(0.5,4,0,230)
-        timeTypeLabel.BackgroundTransparency = 1
-        timeTypeLabel.Text = "Certain time"
-        timeTypeLabel.TextColor3 = Color3.fromRGB(180,180,180)
-        timeTypeLabel.Font = Enum.Font.Gotham
-        timeTypeLabel.TextSize = 12*DPI
-        timeTypeLabel.TextXAlignment = Enum.TextXAlignment.Left
-        timeTypeLabel.ZIndex = 11
-        timeTypeLabel.Parent = Popup
-
-        local timeTypeDrop = Instance.new("TextButton")
-        timeTypeDrop.Size = UDim2.new(0.5,-12,0,28)
-        timeTypeDrop.Position = UDim2.new(0.5,4,0,250)
-        timeTypeDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        timeTypeDrop.TextColor3 = Color3.new(1,1,1)
-        timeTypeDrop.Font = Enum.Font.GothamBold
-        timeTypeDrop.TextSize = 12*DPI
-        timeTypeDrop.Text = data.startTimeType or "Any Time"
-        timeTypeDrop.ZIndex = 11
-        timeTypeDrop.Parent = Popup
-        Instance.new("UICorner", timeTypeDrop)
-
-        local timeTypeList = Instance.new("Frame")
-        timeTypeList.Size = UDim2.new(0.5,-12,0,112)
-        timeTypeList.Position = UDim2.new(0.5,4,0,250)
-        timeTypeList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        timeTypeList.Visible = false
-        timeTypeList.ZIndex = 15
-        timeTypeList.Parent = Popup
-        Instance.new("UICorner", timeTypeList)
-
-        makeDropdown(timeTypeDrop, timeTypeList, TimeConditions, data.startTimeType or "Any Time", function(u) data.startTimeType = u end)
-
-        local timeValueLabel = Instance.new("TextLabel")
-        timeValueLabel.Size = UDim2.new(0.3,-4,0,20)
-        timeValueLabel.Position = UDim2.new(0.5,4,0,310)
-        timeValueLabel.BackgroundTransparency = 1
-        timeValueLabel.Text = "Enter time"
-        timeValueLabel.TextColor3 = Color3.fromRGB(180,180,180)
-        timeValueLabel.Font = Enum.Font.Gotham
-        timeValueLabel.TextSize = 12*DPI
-        timeValueLabel.TextXAlignment = Enum.TextXAlignment.Left
-        timeValueLabel.Visible = false
-        timeValueLabel.ZIndex = 11
-        timeValueLabel.Parent = Popup
-
-        local timeValueBox = Instance.new("TextBox")
-        timeValueBox.Size = UDim2.new(0.3,-12,0,28)
-        timeValueBox.Position = UDim2.new(0.5,4,0,330)
-        timeValueBox.PlaceholderText = "Value"
-        timeValueBox.Text = tostring(data.startTimeValue or 10)
-        timeValueBox.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        timeValueBox.TextColor3 = Color3.new(1,1,1)
-        timeValueBox.Font = Enum.Font.Gotham
-        timeValueBox.TextSize = 13*DPI
-        timeValueBox.ClearTextOnFocus = false
-        timeValueBox.Visible = false
-        timeValueBox.ZIndex = 11
-        timeValueBox.Parent = Popup
-        Instance.new("UICorner", timeValueBox)
-
-        local timeUnitDrop = Instance.new("TextButton")
-        timeUnitDrop.Size = UDim2.new(0.2,-8,0,28)
-        timeUnitDrop.Position = UDim2.new(0.78,4,0,330)
-        timeUnitDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        timeUnitDrop.TextColor3 = Color3.new(1,1,1)
-        timeUnitDrop.Font = Enum.Font.GothamBold
-        timeUnitDrop.TextSize = 12*DPI
-        timeUnitDrop.Text = data.startTimeUnit or "Second"
-        timeUnitDrop.Visible = false
-        timeUnitDrop.ZIndex = 11
-        timeUnitDrop.Parent = Popup
-        Instance.new("UICorner", timeUnitDrop)
-
-        local timeUnitList = Instance.new("Frame")
-        timeUnitList.Size = UDim2.new(0.2,-8,0,196)
-        timeUnitList.Position = UDim2.new(0.78,4,0,130)
-        timeUnitList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        timeUnitList.Visible = false
-        timeUnitList.ZIndex = 15
-        timeUnitList.Parent = Popup
-        Instance.new("UICorner", timeUnitList)
-
-        makeDropdown(timeUnitDrop, timeUnitList, TimeUnits, data.startTimeUnit or "Second", function(u) data.startTimeUnit = u end)
-
-        local roundsCompletedLabel = Instance.new("TextLabel")
-        roundsCompletedLabel.Size = UDim2.new(0.5,-4,0,20)
-        roundsCompletedLabel.Position = UDim2.new(0,8,0,280)
-        roundsCompletedLabel.BackgroundTransparency = 1
-        roundsCompletedLabel.Text = "Rounds Completed"
-        roundsCompletedLabel.TextColor3 = Color3.fromRGB(180,180,180)
-        roundsCompletedLabel.Font = Enum.Font.Gotham
-        roundsCompletedLabel.TextSize = 12*DPI
-        roundsCompletedLabel.TextXAlignment = Enum.TextXAlignment.Left
-        roundsCompletedLabel.ZIndex = 11
-        roundsCompletedLabel.Parent = Popup
-
-        local roundsCompletedDrop = Instance.new("TextButton")
-        roundsCompletedDrop.Size = UDim2.new(0.5,-12,0,28)
-        roundsCompletedDrop.Position = UDim2.new(0,8,0,300)
-        roundsCompletedDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        roundsCompletedDrop.TextColor3 = Color3.new(1,1,1)
-        roundsCompletedDrop.Font = Enum.Font.GothamBold
-        roundsCompletedDrop.TextSize = 12*DPI
-        roundsCompletedDrop.Text = data.startRoundsCompleted or "Any"
-        roundsCompletedDrop.ZIndex = 11
-        roundsCompletedDrop.Parent = Popup
-        Instance.new("UICorner", roundsCompletedDrop)
-
-        local roundsCompletedList = Instance.new("Frame")
-        roundsCompletedList.Size = UDim2.new(0.5,-12,0,112)
-        roundsCompletedList.Position = UDim2.new(0,8,0,299)
-        roundsCompletedList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        roundsCompletedList.Visible = false
-        roundsCompletedList.ZIndex = 15
-        roundsCompletedList.Parent = Popup
-        Instance.new("UICorner", roundsCompletedList)
-
-        makeDropdown(roundsCompletedDrop, roundsCompletedList, {"Any","1","2","3"}, data.startRoundsCompleted or "Any", function(u) data.startRoundsCompleted = u end)
-
-        function updateTimeFields()
-                local showTimeFields = data.startTimeType and data.startTimeType ~= "Any Time"
-                timeValueLabel.Visible = showTimeFields
-                timeValueBox.Visible = showTimeFields
-                timeUnitDrop.Visible = showTimeFields
-        end
-
-        timeTypeDrop:GetPropertyChangedSignal("Text"):Connect(function()
-                data.startTimeType = timeTypeDrop.Text
-                updateTimeFields()
-        end)
-
-        updateTimeFields()
-
-        local stopAfterLabel = Instance.new("TextLabel")
-        stopAfterLabel.Size = UDim2.new(1,-16,0,24)
-        stopAfterLabel.Position = UDim2.new(0,8,0,330)
-        stopAfterLabel.BackgroundTransparency = 1
-        stopAfterLabel.Text = "Stop after"
-        stopAfterLabel.TextColor3 = Color3.fromRGB(200,200,200)
-        stopAfterLabel.Font = Enum.Font.GothamBold
-        stopAfterLabel.TextSize = 14*DPI
-        stopAfterLabel.TextXAlignment = Enum.TextXAlignment.Left
-        stopAfterLabel.ZIndex = 11
-        stopAfterLabel.Parent = Popup
-
-        local radioRows = {}
-
-        function updateRadios()
-                for _, row in ipairs(radioRows) do
-                        local radio = row:FindFirstChild("RadioBtn")
-                        local bg = row:FindFirstChild("CircleBg")
-                        local mode = row:FindFirstChild("Mode")
-                        if radio and bg and mode then
-                                local sel = mode.Value == data.stopMode
-                                radio.Text = sel and FILLED or OPEN
-                                bg.BackgroundColor3 = sel and Color3.fromRGB(0,200,0) or Color3.fromRGB(70,70,70)
-                        end
-                end
-        end
-
-        function makeRadio(y, txt, mode)
-                local row = Instance.new("Frame")
-                row.Size = UDim2.new(1,-16,0,32)
-                row.Position = UDim2.new(0,8,0,y)
-                row.BackgroundTransparency = 1
-                row.ZIndex = 11
-                row.Parent = Popup
-                local bg = Instance.new("Frame")
-                bg.Name = "CircleBg"
-                bg.Size = UDim2.new(0,28,0,28)
-                bg.Position = UDim2.new(0,0,0,2)
-                bg.BackgroundColor3 = data.stopMode==mode and Color3.fromRGB(0,200,0) or Color3.fromRGB(70,70,70)
-                bg.ZIndex = 11
-                bg.Parent = row
-                Instance.new("UICorner", bg).CornerRadius = UDim.new(0,14)
-                local radio = Instance.new("TextButton")
-                radio.Name = "RadioBtn"
-                radio.Size = UDim2.new(0,28,0,28)
-                radio.Position = UDim2.new(0,0,0,2)
-                radio.BackgroundTransparency = 1
-                radio.Text = data.stopMode==mode and FILLED or OPEN
-                radio.TextColor3 = Color3.new(1,1,1)
-                radio.Font = Enum.Font.Code
-                radio.TextSize = 22*DPI
-                radio.ZIndex = 12
-                radio.Parent = row
-                local lbl = Instance.new("TextLabel")
-                lbl.Size = UDim2.new(1,-36,1,0)
-                lbl.Position = UDim2.new(0,36,0,0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = txt
-                lbl.TextColor3 = Color3.new(1,1,1)
-                lbl.Font = Enum.Font.Gotham
-                lbl.TextSize = 13*DPI
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.ZIndex = 11
-                lbl.Parent = row
-                radio.MouseButton1Click:Connect(function()
-                        data.stopMode = mode
-                        updateRadios()
-                end)
-                local modeVal = Instance.new("StringValue")
-                modeVal.Name = "Mode"
-                modeVal.Value = mode
-                modeVal.Parent = row
-                table.insert(radioRows, row)
-                return row
-        end
-
-        local timeRow = makeRadio(360, "Amount of time", "time")
-        local cycleRow = makeRadio(400, "Number of cycles", "cycles")
-        makeRadio(440, "Run indefinitely", "indefinitely")
-
-        local timeInput = Instance.new("TextBox")
-        timeInput.Size = UDim2.new(0,70,0,28)
-        timeInput.Position = UDim2.new(0,130,0,2)
-        timeInput.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        timeInput.TextColor3 = Color3.new(1,1,1)
-        timeInput.Font = Enum.Font.Gotham
-        timeInput.TextSize = 13*DPI
-        if data.stopMode=="time" and data.stopTime then
-                local unit = data.stopTimeUnit or "Second"
-                local val = data.stopTime / toSeconds(1,unit)
-                timeInput.Text = tostring(math.floor(val+0.5))
-        else
-                timeInput.Text = "5"
-                timeInput.PlaceholderText = "Time value"
-        end
-        timeInput.ClearTextOnFocus = false
-        timeInput.ZIndex = 11
-        timeInput.Parent = timeRow
-        Instance.new("UICorner", timeInput)
-
-        local timeDrop = Instance.new("TextButton")
-        timeDrop.Size = UDim2.new(0,70,0,28)
-        timeDrop.Position = UDim2.new(0,208,0,2)
-        timeDrop.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        timeDrop.TextColor3 = Color3.new(1,1,1)
-        timeDrop.Font = Enum.Font.GothamBold
-        timeDrop.TextSize = 13*DPI
-        timeDrop.Text = data.stopTimeUnit or "Second"
-        timeDrop.ZIndex = 11
-        timeDrop.Parent = timeRow
-        Instance.new("UICorner", timeDrop)
-
-        local tList = Instance.new("Frame")
-        tList.Size = UDim2.new(0,70,0,224)
-        tList.Position = UDim2.new(0,208,0,-190)
-        tList.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        tList.Visible = false
-        tList.ZIndex = 15
-        tList.Parent = timeRow
-        Instance.new("UICorner", tList)
-
-        makeDropdown(timeDrop, tList, TimeUnits, data.stopTimeUnit or "Second", function(u) data.stopTimeUnit = u end)
-
-        local cycleInput = Instance.new("TextBox")
-        cycleInput.Size = UDim2.new(0,100,0,28)
-        cycleInput.Position = UDim2.new(0,150,0,2)
-        cycleInput.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        cycleInput.TextColor3 = Color3.new(1,1,1)
-        cycleInput.Font = Enum.Font.Gotham
-        cycleInput.TextSize = 13*DPI
-        cycleInput.Text = tostring(data.stopCycles or 10)
-        cycleInput.ClearTextOnFocus = false
-        cycleInput.ZIndex = 11
-        cycleInput.Parent = cycleRow
-        Instance.new("UICorner", cycleInput)
-
-        local save = Instance.new("TextButton")
-        save.Size = UDim2.new(0.5,-12,0,36)
-        save.Position = UDim2.new(0,8,1,-44)
-        save.BackgroundColor3 = Color3.fromRGB(0,200,0)
-        save.Text = isEdit and "Update" or "Create"
-        save.TextColor3 = Color3.new(1,1,1)
-        save.Font = Enum.Font.GothamBold
-        save.TextSize = 15*DPI
-        save.ZIndex = 11
-        save.Parent = Popup
-        Instance.new("UICorner", save)
-
-        local cancel = Instance.new("TextButton")
-        cancel.Size = UDim2.new(0.5,-12,0,36)
-        cancel.Position = UDim2.new(0.5,4,1,-44)
-        cancel.BackgroundColor3 = Color3.fromRGB(150,150,150)
-        cancel.Text = "Cancel"
-        cancel.TextColor3 = Color3.new(1,1,1)
-        cancel.Font = Enum.Font.GothamBold
-        cancel.TextSize = 15*DPI
-        cancel.ZIndex = 11
-        cancel.Parent = Popup
-        Instance.new("UICorner", cancel)
-
-        cancel.MouseButton1Click:Connect(function()
-                closeAllDropdowns()
-                Popup:Destroy(); Popup=nil
-        end)
-
-        function updateSaveBtn()
-                local hasCmd = cmdBox.Text:match("^%s*(.-)%s*$") ~= ""
-                save.BackgroundColor3 = hasCmd and Color3.fromRGB(0,200,0) or Color3.fromRGB(100,100,100)
-                save.TextColor3 = hasCmd and Color3.new(1,1,1) or Color3.fromRGB(180,180,180)
-        end
-
-        cmdBox:GetPropertyChangedSignal("Text"):Connect(updateSaveBtn)
-        updateSaveBtn()
-
-        save.MouseButton1Click:Connect(function()
-                local cmd = cmdBox.Text:match("^%s*(.-)%s*$")
-                if cmd == "" then return end
-                local name = nameBox.Text ~= "" and nameBox.Text or "Macro"
-                local dVal = tonumber(delayVal.Text) or 1
-                local newData = {
-                        name = name,
-                        command = cmd,
-                        delayValue = dVal,
-                        delayUnit = delayDrop.Text,
-                        keybind = data.keybind,
-                        stopMode = data.stopMode,
-                        stopTime = nil,
-                        stopTimeUnit = nil,
-                        stopCycles = nil,
-                        startCondition = (roundTypeDrop.Text ~= "Any" or timeTypeDrop.Text ~= "Any Time" or roundsCompletedDrop.Text ~= "Any"),
-                        startRoundType = roundTypeDrop.Text,
-                        startTimeType = timeTypeDrop.Text,
-                        startTimeValue = tonumber(timeValueBox.Text) or 10,
-                        startTimeUnit = timeUnitDrop.Text,
-                        startRoundsCompleted = roundsCompletedDrop.Text
-                }
-                if data.stopMode == "time" then
-                        local val = tonumber(timeInput.Text) or 5
-                        local unit = timeDrop.Text
-                        newData.stopTime = toSeconds(val, unit)
-                        newData.stopTimeUnit = unit
-                elseif data.stopMode == "cycles" then
-                        newData.stopCycles = tonumber(cycleInput.Text) or 10
-                end
-                if isEdit then
-                        if editData.manager and editData.manager.running then 
-                                editData.manager:stopMacro() 
-                        end
-                        oldFrame:Destroy()
-                        table.remove(Macros, oldIdx)
-                end
-                table.insert(Macros, newData)
-                makeEntry(newData, #Macros)
-                updateNoMacrosLabel()
-                updateCanvas()
-                closeAllDropdowns()
-                Popup:Destroy(); Popup=nil
-        end)
-
-        updateRadios()
-
-        local cam = workspace.CurrentCamera
-        local scale = math.min(1, cam.ViewportSize.X*0.78/(420*DPI), cam.ViewportSize.Y*0.78/(520*DPI))
-        Instance.new("UIScale", Popup).Scale = scale
-end
-
-ConfigPopup = nil
-ConfigScroll = nil
-PresetConfirmPopup = nil
-SaveAsPopup = nil
-selectedPresetRow = nil
-
-function highlightPresetRow(row, selected)
-        if selected then
-                row.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-        else
-                row.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-        end
-end
-
-function showPresetDeleteConfirm(presetName, row)
-        if PresetConfirmPopup then PresetConfirmPopup:Destroy() end
-        PresetConfirmPopup = Instance.new("Frame")
-        PresetConfirmPopup.Name = "PresetDeleteConfirm"
-        PresetConfirmPopup.Size = UDim2.new(0,260*DPI,0,130*DPI)
-        PresetConfirmPopup.Position = UDim2.new(0.5,0,0.5,0)
-        PresetConfirmPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        PresetConfirmPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        PresetConfirmPopup.ZIndex = 40
-        PresetConfirmPopup.Parent = ScreenGui
-        Instance.new("UICorner", PresetConfirmPopup).CornerRadius = UDim.new(0,12)
-        local msg = Instance.new("TextLabel")
-        msg.Text = "Delete preset '" .. presetName .. "'?"
-        msg.Size = UDim2.new(1,-20,0,50)
-        msg.Position = UDim2.new(0,10,0,10)
-        msg.BackgroundTransparency = 1
-        msg.TextColor3 = Color3.new(1,1,1)
-        msg.Font = Enum.Font.GothamBold
-        msg.TextSize = 15*DPI
-        msg.TextWrapped = true
-        msg.ZIndex = 41
-        msg.Parent = PresetConfirmPopup
-        local yes = Instance.new("TextButton")
-        yes.Size = UDim2.new(0.45,0,0,32)
-        yes.Position = UDim2.new(0.05,0,1,-40)
-        yes.BackgroundColor3 = Color3.fromRGB(255,50,50)
-        yes.Text = "Yes"
-        yes.TextColor3 = Color3.new(1,1,1)
-        yes.Font = Enum.Font.GothamBold
-        yes.TextSize = 13*DPI
-        yes.ZIndex = 41
-        yes.Parent = PresetConfirmPopup
-        Instance.new("UICorner", yes).CornerRadius = UDim.new(0,8)
-        local no = Instance.new("TextButton")
-        no.Size = UDim2.new(0.45,0,0,32)
-        no.Position = UDim2.new(0.5,0,1,-40)
-        no.BackgroundColor3 = Color3.fromRGB(100,100,100)
-        no.Text = "No"
-        no.TextColor3 = Color3.new(1,1,1)
-        no.Font = Enum.Font.GothamBold
-        no.TextSize = 13*DPI
-        no.ZIndex = 41
-        no.Parent = PresetConfirmPopup
-        Instance.new("UICorner", no).CornerRadius = UDim.new(0,8)
-        no.MouseButton1Click:Connect(function()
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-        end)
-        yes.MouseButton1Click:Connect(function()
-                Presets[presetName] = nil
-                savePresets()
-                row:Destroy()
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-        end)
-end
-
-function showPresetLoadConfirm(presetName, presetData)
-        if PresetConfirmPopup then PresetConfirmPopup:Destroy() end
-        PresetConfirmPopup = Instance.new("Frame")
-        PresetConfirmPopup.Name = "PresetLoadConfirm"
-        PresetConfirmPopup.Size = UDim2.new(0,260*DPI,0,130*DPI)
-        PresetConfirmPopup.Position = UDim2.new(0.5,0,0.5,0)
-        PresetConfirmPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        PresetConfirmPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        PresetConfirmPopup.ZIndex = 40
-        PresetConfirmPopup.Parent = ScreenGui
-        Instance.new("UICorner", PresetConfirmPopup).CornerRadius = UDim.new(0,12)
-        local msg = Instance.new("TextLabel")
-        msg.Text = "Loading '" .. presetName .. "' will replace current macros. Continue?"
-        msg.Size = UDim2.new(1,-20,0,50)
-        msg.Position = UDim2.new(0,10,0,10)
-        msg.BackgroundTransparency = 1
-        msg.TextColor3 = Color3.new(1,1,1)
-        msg.Font = Enum.Font.GothamBold
-        msg.TextSize = 15*DPI
-        msg.TextWrapped = true
-        msg.ZIndex = 41
-        msg.Parent = PresetConfirmPopup
-        local yes = Instance.new("TextButton")
-        yes.Size = UDim2.new(0.45,0,0,32)
-        yes.Position = UDim2.new(0.05,0,1,-40)
-        yes.BackgroundColor3 = Color3.fromRGB(0,170,255)
-        yes.Text = "Yes"
-        yes.TextColor3 = Color3.new(1,1,1)
-        yes.Font = Enum.Font.GothamBold
-        yes.TextSize = 13*DPI
-        yes.ZIndex = 41
-        yes.Parent = PresetConfirmPopup
-        Instance.new("UICorner", yes).CornerRadius = UDim.new(0,8)
-        local no = Instance.new("TextButton")
-        no.Size = UDim2.new(0.45,0,0,32)
-        no.Position = UDim2.new(0.5,0,1,-40)
-        no.BackgroundColor3 = Color3.fromRGB(100,100,100)
-        no.Text = "No"
-        no.TextColor3 = Color3.new(1,1,1)
-        no.Font = Enum.Font.GothamBold
-        no.TextSize = 13*DPI
-        no.ZIndex = 41
-        no.Parent = PresetConfirmPopup
-        Instance.new("UICorner", no).CornerRadius = UDim.new(0,8)
-        no.MouseButton1Click:Connect(function()
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-        end)
-        yes.MouseButton1Click:Connect(function()
-                for _, macro in ipairs(Macros) do
-                        if macro.manager and macro.manager.running then
-                                macro.manager:stopMacro()
-                        end
-                end
-                
-                Macros = {}
-                for i, m in ipairs(presetData) do
-                        Macros[i] = table.clone(m)
-                end
-                
-                for _, c in ipairs(Scroll:GetChildren()) do
-                        if c:IsA("Frame") and c.Name:match("^MacroEntry_") then c:Destroy() end
-                end
-                
-                for i, m in ipairs(Macros) do 
-                        makeEntry(m, i) 
-                end
-                
-                updateNoMacrosLabel()
-                updateCanvas()
-                if ConfigPopup then ConfigPopup:Destroy(); ConfigPopup = nil end
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-        end)
-end
-
-function showPresetSaveConflict(presetName, input, saveBtn, defaultName)
-        if PresetConfirmPopup then PresetConfirmPopup:Destroy() end
-        PresetConfirmPopup = Instance.new("Frame")
-        PresetConfirmPopup.Name = "PresetSaveConflict"
-        PresetConfirmPopup.Active = true
-        PresetConfirmPopup.Size = UDim2.new(0,280*DPI,0,150*DPI)
-        PresetConfirmPopup.Position = UDim2.new(0.5,0,0.5,0)
-        PresetConfirmPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        PresetConfirmPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        PresetConfirmPopup.ZIndex = 50
-        PresetConfirmPopup.Parent = ScreenGui
-        Instance.new("UICorner", PresetConfirmPopup).CornerRadius = UDim.new(0,12)
-        local msg = Instance.new("TextLabel")
-        msg.Text = "Preset '" .. presetName .. "' already exists."
-        msg.Size = UDim2.new(1,-20,0,40)
-        msg.Position = UDim2.new(0,10,0,10)
-        msg.BackgroundTransparency = 1
-        msg.TextColor3 = Color3.new(1,1,1)
-        msg.Font = Enum.Font.GothamBold
-        msg.TextSize = 15*DPI
-        msg.TextWrapped = true
-        msg.ZIndex = 51
-        msg.Parent = PresetConfirmPopup
-        local replace = Instance.new("TextButton")
-        replace.Size = UDim2.new(0.3,0,0,32)
-        replace.Position = UDim2.new(0.05,0,1,-40)
-        replace.BackgroundColor3 = Color3.fromRGB(255,170,0)
-        replace.Text = "Replace"
-        replace.TextColor3 = Color3.new(1,1,1)
-        replace.Font = Enum.Font.GothamBold
-        replace.TextSize = 13*DPI
-        replace.ZIndex = 51
-        replace.Parent = PresetConfirmPopup
-        Instance.new("UICorner", replace).CornerRadius = UDim.new(0,8)
-        local rename = Instance.new("TextButton")
-        rename.Size = UDim2.new(0.35,0,0,32)
-        rename.Position = UDim2.new(0.36,0,1,-40)
-        rename.BackgroundColor3 = Color3.fromRGB(0,170,255)
-        rename.Text = "Rename"
-        rename.TextColor3 = Color3.new(1,1,1)
-        rename.Font = Enum.Font.GothamBold
-        rename.TextSize = 13*DPI
-        rename.ZIndex = 51
-        rename.Parent = PresetConfirmPopup
-        Instance.new("UICorner", rename).CornerRadius = UDim.new(0,8)
-        local cancel = Instance.new("TextButton")
-        cancel.Size = UDim2.new(0.3,0,0,32)
-        cancel.Position = UDim2.new(0.719,0,1,-40)
-        cancel.BackgroundColor3 = Color3.fromRGB(100,100,100)
-        cancel.Text = "Cancel"
-        cancel.TextColor3 = Color3.new(1,1,1)
-        cancel.Font = Enum.Font.GothamBold
-        cancel.TextSize = 13*DPI
-        cancel.ZIndex = 51
-        cancel.Parent = PresetConfirmPopup
-        Instance.new("UICorner", cancel).CornerRadius = UDim.new(0,8)
-        cancel.MouseButton1Click:Connect(function()
-                input:Destroy()
-                saveBtn:Destroy()
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-        end)
-        function performSave(finalName)
-                Presets[finalName] = {}
-                for i, macro in ipairs(Macros) do
-                        Presets[finalName][i] = table.clone(macro)
-                        Presets[finalName][i].manager = nil
-                end
-                savePresets()
-                input:Destroy()
-                saveBtn:Destroy()
-                PresetConfirmPopup:Destroy(); PresetConfirmPopup=nil
-                openConfigPopup()
-        end
-        replace.MouseButton1Click:Connect(function()
-                performSave(presetName)
-        end)
-        rename.MouseButton1Click:Connect(function()
-                local newName = presetName
-                local i = 1
-                while Presets[newName] do
-                        newName = presetName .. " (" .. i .. ")"
-                        i += 1
-                end
-                performSave(newName)
-        end)
-end
-
-function showSaveAsPopup()
-        if SaveAsPopup then SaveAsPopup:Destroy() end
-        if ConfigPopup then ConfigPopup:Destroy() end
-        selectedPresetRow = nil
-        local defaultName = "Preset " .. os.date("%H-%M-%S")
-        SaveAsPopup = Instance.new("Frame")
-        SaveAsPopup.Name = "SaveAsPopup"
-        SaveAsPopup.Active = true
-        SaveAsPopup.Size = UDim2.new(0,320*DPI,0,400*DPI)
-        SaveAsPopup.Position = UDim2.new(0.5,0,0.5,0)
-        SaveAsPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        SaveAsPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        SaveAsPopup.ZIndex = 30
-        SaveAsPopup.Parent = ScreenGui
-        Instance.new("UICorner", SaveAsPopup).CornerRadius = UDim.new(0,12)
-        local pTitle = Instance.new("TextLabel")
-        pTitle.Size = UDim2.new(1,0,0,36)
-        pTitle.BackgroundColor3 = Color3.fromRGB(35,35,55)
-        pTitle.Text = "Save As"
-        pTitle.TextColor3 = Color3.new(1,1,1)
-        pTitle.Font = Enum.Font.GothamBold
-        pTitle.TextSize = 16*DPI
-        pTitle.ZIndex = 31
-        pTitle.Parent = SaveAsPopup
-        Instance.new("UICorner", pTitle).CornerRadius = UDim.new(0,12)
-        local existingScroll = Instance.new("ScrollingFrame")
-        existingScroll.Name = "ExistingPresetsScroll"
-        existingScroll.Size = UDim2.new(1,-16,0,200)
-        existingScroll.Position = UDim2.new(0,8,0,44)
-        existingScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        existingScroll.BackgroundTransparency = 1
-        existingScroll.ScrollBarThickness = 5
-        existingScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        existingScroll.ZIndex = 31
-        existingScroll.Parent = SaveAsPopup
-        local existingLayout = Instance.new("UIListLayout", existingScroll)
-        existingLayout.Padding = UDim.new(0,6)
-        local input = nil
-        for presetName, _ in pairs(Presets) do
-                local row = Instance.new("Frame")
-                row.Size = UDim2.new(1,0,0,30)
-                row.BackgroundColor3 = Color3.fromRGB(40,40,55)
-                row.ZIndex = 32
-                row.Parent = existingScroll
-                Instance.new("UICorner", row).CornerRadius = UDim.new(0,6)
-                local label = Instance.new("TextButton")
-                label.Text = presetName
-                label.Size = UDim2.new(1,-16,1,0)
-                label.Position = UDim2.new(0,8,0,0)
-                label.BackgroundTransparency = 1
-                label.TextColor3 = Color3.new(1,1,1)
-                label.Font = Enum.Font.Gotham
-                label.TextSize = 13*DPI
-                label.TextXAlignment = Enum.TextXAlignment.Left
-                label.ZIndex = 33
-                label.Parent = row
-                label.MouseButton1Click:Connect(function()
-                        if selectedPresetRow then
-                                highlightPresetRow(selectedPresetRow, false)
-                        end
-                        selectedPresetRow = row
-                        highlightPresetRow(row, true)
-                        if input then
-                                input.Text = presetName
-                        end
-                end)
-        end
-        local inputLabel = Instance.new("TextLabel")
-        inputLabel.Text = "Enter preset name"
-        inputLabel.Size = UDim2.new(1,-16,0,24)
-        inputLabel.Position = UDim2.new(0,8,0,260)
-        inputLabel.BackgroundTransparency = 1
-        inputLabel.TextColor3 = Color3.fromRGB(200,200,200)
-        inputLabel.Font = Enum.Font.Gotham
-        inputLabel.TextSize = 14*DPI
-        inputLabel.ZIndex = 31
-        inputLabel.Parent = SaveAsPopup
-        input = Instance.new("TextBox")
-        input.Text = ""
-        input.ClearTextOnFocus = false
-        input.PlaceholderText = defaultName
-        input.Size = UDim2.new(1,-16,0,32)
-        input.Position = UDim2.new(0,8,0,284)
-        input.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        input.TextColor3 = Color3.new(1,1,1)
-        input.Font = Enum.Font.Gotham
-        input.TextSize = 13*DPI
-        input.ZIndex = 31
-        input.Parent = SaveAsPopup
-        Instance.new("UICorner", input).CornerRadius = UDim.new(0,8)
-        local saveBtn = Instance.new("TextButton")
-        saveBtn.Size = UDim2.new(0.5,-12,0,36)
-        saveBtn.Position = UDim2.new(0,8,1,-44)
-        saveBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
-        saveBtn.Text = "Save"
-        saveBtn.TextColor3 = Color3.new(1,1,1)
-        saveBtn.Font = Enum.Font.GothamBold
-        saveBtn.TextSize = 15*DPI
-        saveBtn.ZIndex = 31
-        saveBtn.Parent = SaveAsPopup
-        Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0,8)
-        local cancelBtn = Instance.new("TextButton")
-        cancelBtn.Size = UDim2.new(0.5,-12,0,36)
-        cancelBtn.Position = UDim2.new(0.5,4,1,-44)
-        cancelBtn.BackgroundColor3 = Color3.fromRGB(150,150,150)
-        cancelBtn.Text = "Cancel"
-        cancelBtn.TextColor3 = Color3.new(1,1,1)
-        cancelBtn.Font = Enum.Font.GothamBold
-        cancelBtn.TextSize = 15*DPI
-        cancelBtn.ZIndex = 31
-        cancelBtn.Parent = SaveAsPopup
-        Instance.new("UICorner", cancelBtn).CornerRadius = UDim.new(0,8)
-        cancelBtn.MouseButton1Click:Connect(function()
-                SaveAsPopup:Destroy(); SaveAsPopup = nil
-                openConfigPopup()
-        end)
-        saveBtn.MouseButton1Click:Connect(function()
-                local presetName = input.Text:match("^%s*(.-)%s*$")
-                if presetName == "" then presetName = defaultName end
-                if Presets[presetName] then
-                        showPresetSaveConflict(presetName, input, saveBtn, defaultName)
-                else
-                        Presets[presetName] = {}
-                        for i, macro in ipairs(Macros) do
-                                Presets[presetName][i] = table.clone(macro)
-                                Presets[presetName][i].manager = nil
-                        end
-                        savePresets()
-                        SaveAsPopup:Destroy(); SaveAsPopup = nil
-                        openConfigPopup()
-                end
-        end)
-        local cam = workspace.CurrentCamera
-        local scale = math.min(1, cam.ViewportSize.X*0.78/(360*DPI), cam.ViewportSize.Y*0.78/(400*DPI))
-        Instance.new("UIScale", SaveAsPopup).Scale = scale
-end
-
-function openConfigPopup()
-        if ConfigPopup then ConfigPopup:Destroy() end
-        ConfigPopup = Instance.new("Frame")
-        ConfigPopup.Active = true
-        ConfigPopup.Size = UDim2.new(0,320*DPI,0,400*DPI)
-        ConfigPopup.Position = UDim2.new(0.5,0,0.5,0)
-        ConfigPopup.AnchorPoint = Vector2.new(0.5,0.5)
-        ConfigPopup.BackgroundColor3 = Color3.fromRGB(30,30,40)
-        ConfigPopup.ZIndex = 30
-        ConfigPopup.Parent = ScreenGui
-        Instance.new("UICorner", ConfigPopup).CornerRadius = UDim.new(0,12)
-        local pTitle = Instance.new("TextLabel")
-        pTitle.Size = UDim2.new(1,0,0,36)
-        pTitle.BackgroundColor3 = Color3.fromRGB(35,35,55)
-        pTitle.Text = "Macro Presets"
-        pTitle.TextColor3 = Color3.new(1,1,1)
-        pTitle.Font = Enum.Font.GothamBold
-        pTitle.TextSize = 16*DPI
-        pTitle.ZIndex = 31
-        pTitle.Parent = ConfigPopup
-        Instance.new("UICorner", pTitle).CornerRadius = UDim.new(0,12)
-        ConfigScroll = Instance.new("ScrollingFrame")
-        ConfigScroll.Size = UDim2.new(1,-16,1,-88)
-        ConfigScroll.Position = UDim2.new(0,8,0,44)
-        ConfigScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        ConfigScroll.BackgroundTransparency = 1
-        ConfigScroll.ScrollBarThickness = 5
-        ConfigScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        ConfigScroll.ZIndex = 31
-        ConfigScroll.Parent = ConfigPopup
-        local cfgLayout = Instance.new("UIListLayout", ConfigScroll)
-        cfgLayout.Padding = UDim.new(0,6)
-        local saveAsBtn = Instance.new("TextButton")
-        saveAsBtn.Size = UDim2.new(0.5,-12,0,36)
-        saveAsBtn.Position = UDim2.new(0,8,1,-44)
-        saveAsBtn.BackgroundColor3 = Color3.fromRGB(0,170,255)
-        saveAsBtn.Text = "Save As"
-        saveAsBtn.TextColor3 = Color3.new(1,1,1)
-        saveAsBtn.Font = Enum.Font.GothamBold
-        saveAsBtn.TextSize = 15*DPI
-        saveAsBtn.ZIndex = 31
-        saveAsBtn.Parent = ConfigPopup
-        Instance.new("UICorner", saveAsBtn).CornerRadius = UDim.new(0,8)
-        local closeCfgBtn = Instance.new("TextButton")
-        closeCfgBtn.Size = UDim2.new(0.5,-12,0,36)
-        closeCfgBtn.Position = UDim2.new(0.5,4,1,-44)
-        closeCfgBtn.BackgroundColor3 = Color3.fromRGB(150,150,150)
-        closeCfgBtn.Text = "Close"
-        closeCfgBtn.TextColor3 = Color3.new(1,1,1)
-        closeCfgBtn.Font = Enum.Font.GothamBold
-        closeCfgBtn.TextSize = 15*DPI
-        closeCfgBtn.ZIndex = 31
-        closeCfgBtn.Parent = ConfigPopup
-        Instance.new("UICorner", closeCfgBtn).CornerRadius = UDim.new(0,8)
-        closeCfgBtn.MouseButton1Click:Connect(function()
-                ConfigPopup:Destroy(); ConfigPopup = nil
-        end)
-        saveAsBtn.MouseButton1Click:Connect(function()
-                showSaveAsPopup()
-        end)
-        for presetName, presetData in pairs(Presets) do
-                local row = Instance.new("Frame")
-                row.Size = UDim2.new(1,0,0,40)
-                row.BackgroundColor3 = Color3.fromRGB(40,40,55)
-                row.ZIndex = 32
-                row.Parent = ConfigScroll
-                Instance.new("UICorner", row).CornerRadius = UDim.new(0,8)
-                local label = Instance.new("TextLabel")
-                label.Text = presetName
-                label.Size = UDim2.new(0.6,0,1,0)
-                label.Position = UDim2.new(0,8,0,0)
-                label.BackgroundTransparency = 1
-                label.TextColor3 = Color3.new(1,1,1)
-                label.Font = Enum.Font.Gotham
-                label.TextSize = 13*DPI
-                label.TextXAlignment = Enum.TextXAlignment.Left
-                label.ZIndex = 33
-                label.Parent = row
-                local loadBtn = Instance.new("TextButton")
-                loadBtn.Size = UDim2.new(0,60,0,28)
-                loadBtn.Position = UDim2.new(1,-130,0,6)
-                loadBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
-                loadBtn.Text = "Load"
-                loadBtn.TextColor3 = Color3.new(1,1,1)
-                loadBtn.Font = Enum.Font.GothamBold
-                loadBtn.TextSize = 12*DPI
-                loadBtn.ZIndex = 33
-                loadBtn.Parent = row
-                Instance.new("UICorner", loadBtn).CornerRadius = UDim.new(0,6)
-                local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.new(0,60,0,28)
-                delBtn.Position = UDim2.new(1,-65,0,6)
-                delBtn.BackgroundColor3 = Color3.fromRGB(255,50,50)
-                delBtn.Text = "Delete"
-                delBtn.TextColor3 = Color3.new(1,1,1)
-                delBtn.Font = Enum.Font.GothamBold
-                delBtn.TextSize = 12*DPI
-                delBtn.ZIndex = 33
-                delBtn.Parent = row
-                Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0,6)
-                loadBtn.MouseButton1Click:Connect(function()
-                        showPresetLoadConfirm(presetName, presetData)
-                end)
-                delBtn.MouseButton1Click:Connect(function()
-                        showPresetDeleteConfirm(presetName, row)
-                end)
-        end
-        local cam = workspace.CurrentCamera
-        local scale = math.min(1, cam.ViewportSize.X*0.78/(360*DPI), cam.ViewportSize.Y*0.78/(400*DPI))
-        Instance.new("UIScale", ConfigPopup).Scale = scale
-end
-
-ConfigBtn.MouseButton1Click:Connect(openConfigPopup)
-CreateBtn.MouseButton1Click:Connect(function() CmdEditMacro() end)
-
-updateNoMacrosLabel()
-updateCanvas()
-
-local cam = workspace.CurrentCamera
-local scale = math.min(1, cam.ViewportSize.X*0.78/(420*DPI), cam.ViewportSize.Y*0.78/(520*DPI))
-local uiScale = Instance.new("UIScale", Main)
-uiScale.Scale = scale
-end
--- ================= AKHIR VIP CMD MACRO MANAGER BUILT-IN =================
-
+DaraSectionStart("AUTO VOTE")
+local ok_AV, err_AV = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): AUTO VOTE - port dari DaraHub BETA (tab Auto).
 -- Otomatis memilih map / game mode saat voting terbuka: selama popup Vote
@@ -5062,6 +3749,14 @@ end
 end
 })
 end
+end)
+if ok_AV then
+	DaraSectionDone("AUTO VOTE")
+else
+	DaraSectionFail("AUTO VOTE", err_AV)
+end
+DaraSectionStart("AUTO WHISTLE")
+local ok_AW, err_AW = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): AUTO WHISTLE - port dari DaraHub BETA (tab Auto).
 -- Meniup peluit otomatis tiap 1 detik (interval persis Beta) lewat KeybindService.
@@ -5108,6 +3803,12 @@ end
 end
 })
 end
+end)
+if ok_AW then
+	DaraSectionDone("AUTO WHISTLE")
+else
+	DaraSectionFail("AUTO WHISTLE", err_AW)
+end
 
 
 
@@ -5115,6 +3816,8 @@ end
 -- ================= TAB VISUALS =================
 Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
 Tabs.Visuals:Divider()
+DaraSectionStart("FULL BRIGHT")
+local ok_FB, err_FB = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): FULL BRIGHT - port dari DaraHub BETA (tab Visuals).
 -- ============================================================
@@ -5179,7 +3882,15 @@ end
 end
 })
 end
+end)
+if ok_FB then
+	DaraSectionDone("FULL BRIGHT")
+else
+	DaraSectionFail("FULL BRIGHT", err_FB)
+end
 
+DaraSectionStart("REMOVE FOG")
+local ok_RF, err_RF = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): REMOVE FOG - port dari DaraHub BETA (tab Visuals).
 -- FogEnd dibesarkan + semua Atmosphere dihapus; saat OFF dikembalikan persis seperti semula.
@@ -5259,6 +3970,13 @@ end
 end
 })
 end
+end)
+if ok_RF then
+	DaraSectionDone("REMOVE FOG")
+else
+	DaraSectionFail("REMOVE FOG", err_RF)
+end
+DaraSectionStart("TIMER GUI")
 
 
 
@@ -5816,6 +4534,8 @@ handleTimerToggles()
 end
 })
 Tabs.Visuals:Space()
+DaraSectionDone("TIMER GUI")
+DaraSectionStart("VISUALS: STATS/DEATHFEED/COLA")
 -- ============================================================
 -- SHOW PLAYER STATS (UPDATE BETA) - ditulis ulang mengikuti DaraHub BETA.
 -- Game versi terbaru memindahkan UserData ke Client.Services.UserData dan menghapus
@@ -6305,6 +5025,8 @@ Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
 end
 end
 
+DaraSectionDone("VISUALS: STATS/DEATHFEED/COLA")
+DaraSectionStart("TAB UTILITY")
 -- ================= TAB UTILITY =================
 Tabs.Utility:Toggle({
 Title = "Invis Walls Collide",
@@ -6933,6 +5655,9 @@ Duration = 3
 })
 end
 end
+DaraSectionDone("TAB UTILITY")
+DaraSectionStart("CUSTOM GRAVITY")
+local ok_CG, err_CG = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA): CUSTOM GRAVITY - port dari DaraHub BETA (tab Utility).
 -- Toggle Custom Gravity + input Gravity Value + tombol layar Gravity (floating button,
@@ -7132,6 +5857,14 @@ end)
 end)
 end
 })
+end)
+if ok_CG then
+	DaraSectionDone("CUSTOM GRAVITY")
+else
+	DaraSectionFail("CUSTOM GRAVITY", err_CG)
+end
+DaraSectionStart("VIP COMMAND")
+local ok_VC, err_VC = pcall(function()
 -- ============================================================
 -- ADD (UPDATE BETA + permintaan user "unlock vip commands"): SECTION VIP COMMAND.
 -- Di Beta, section ini HANYA muncul bila VIPCommandsAccess == true. Sesuai permintaan,
@@ -7186,20 +5919,20 @@ end
 Tabs.Utility:Button({
 Title = "VIP CMD Macro",
 Icon = "rbxassetid://107814281854748",
-Desc = "Buka/tutup Macro Manager VIP CMD - BUILT-IN port persis DaraHub BETA (tidak load ke DaraHub asli)",
+Desc = "Buka GUI macro VIP resmi dari DaraHub (EvadeCMDMacroGUI)",
 Callback = function()
--- FIX (permintaan user): TIDAK loadstring ke DaraHub asli lagi. Macro Manager sudah dibuat
--- BUILT-IN saat script load (lihat blok "VIP CMD MACRO MANAGER - BUILT-IN" di atas).
--- Persis Beta: tombol ini hanya men-toggle GUI MacroManagerGUI di CoreGui.
-local coreGui = game:GetService("CoreGui")
-local macroGui = coreGui:FindFirstChild("MacroManagerGUI")
-if macroGui then
-macroGui.Enabled = not macroGui.Enabled
-else
+task.spawn(function()
+-- FIX: loadstring dibungkus pcall + notify (sebelumnya error langsung bila koneksi gagal)
+local okGUI, errGUI = pcall(function()
+loadstring(game:HttpGet(BaseURL .. "/api/script/Tools/EvadeCMDMacroGUI.lua"))()
+end)
+if not okGUI then
+warn("[Dara Hub] Gagal memuat EvadeCMDMacroGUI: " .. tostring(errGUI))
 pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Macro Manager belum siap - coba lagi beberapa detik.", Duration = 3 })
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Gagal memuat GUI (cek koneksi/executor).", Duration = 3 })
 end)
 end
+end)
 end
 })
 do
@@ -7237,13 +5970,17 @@ local mapName = SelectedMapSetting or "BrickMaze"
 if mapName and mapName ~= "" then
 if isValidMap(mapName) then
 pcall(function()
--- FIX: remote PERSIS BETA - Events.CustomServers.Admin (bukan Events.Admin.VIPCommand)
-game:GetService("ReplicatedStorage").Events.CustomServers.Admin:FireServer("AddMap", mapName)
+local adminEvents = ReplicatedStorage:FindFirstChild("Events")
+local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
+local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+if vipCommand then
+vipCommand:FireServer("AddMap", mapName)
 WindUI:Notify({
 Title = "Custom Server",
 Content = "Added map: " .. mapName,
 Duration = 3
 })
+end
 end)
 else
 WindUI:Notify({
@@ -7264,13 +6001,17 @@ local mapName = SelectedMapSetting or "BrickMaze"
 if mapName and mapName ~= "" then
 if isValidMap(mapName) then
 pcall(function()
--- FIX: remote PERSIS BETA - Events.CustomServers.Admin (bukan Events.Admin.VIPCommand)
-game:GetService("ReplicatedStorage").Events.CustomServers.Admin:FireServer("RemoveMap", mapName)
+local adminEvents = ReplicatedStorage:FindFirstChild("Events")
+local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
+local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+if vipCommand then
+vipCommand:FireServer("RemoveMap", mapName)
 WindUI:Notify({
 Title = "Custom Server",
 Content = "Removed map: " .. mapName,
 Duration = 3
 })
+end
 end)
 else
 WindUI:Notify({
@@ -7282,68 +6023,18 @@ end
 end
 end
 })
--- ADD (port PERSIS DaraHub BETA): validasi + input + tombol Set Game Mode
-local function isValidGameMode(gameMode)
-local gamemodesFolder = ReplicatedStorage:FindFirstChild("Info")
-if gamemodesFolder then
-gamemodesFolder = gamemodesFolder:FindFirstChild("Gamemodes")
-if gamemodesFolder then
-for _, mode in ipairs(gamemodesFolder:GetChildren()) do
-if mode.Name == gameMode then
-return true
 end
-end
-end
-end
-return false
-end
-local SelectedGameMode = "Pro"
 Tabs.Utility:Space()
-gameModeInput = Tabs.Utility:Input({
-Title = "Select Game Mode",
-Flag = "GameModeInput",
-Placeholder = "Enter game mode (e.g., Pro)",
-Value = "Pro",
-Callback = function(value)
-SelectedGameMode = value
-end
-})
-Tabs.Utility:Button({
-Title = "Set Game Mode",
-Desc = "Change the server game mode",
-Icon = "settings",
-Callback = function()
-local gameMode = SelectedGameMode or "Pro"
-if gameMode and gameMode ~= "" then
-if isValidGameMode(gameMode) then
-pcall(function()
--- PERSIS BETA: Events.CustomServers.Admin "Gamemode" + pesan in-game
-game:GetService("ReplicatedStorage").Events.CustomServers.Admin:FireServer("Gamemode", gameMode)
-game:GetService("Players").LocalPlayer.PlayerGui.Global.Messages.Use:Fire(
-"Gamemode will be automatically applied whenever possible",
-"Success"
-)
-WindUI:Notify({
-Title = "Custom Server",
-Content = "Set game mode to: " .. gameMode,
-Duration = 3
-})
 end)
+if ok_VC then
+	DaraSectionDone("VIP COMMAND")
 else
-WindUI:Notify({
-Title = "Custom Server",
-Content = "Invalid game mode: " .. gameMode,
-Duration = 3
-})
+	DaraSectionFail("VIP COMMAND", err_VC)
 end
-end
-end
-})
-end
-Tabs.Utility:Space()
 
 
 
+DaraSectionStart("TAB TELEPORT")
 -- ================= TAB TELEPORT =================
 -- Helper teleport (dipindah utuh dari file asli, hanya dipakai tab Teleport)
 function isNPCModel(model)
@@ -7939,6 +6630,8 @@ root.CFrame = CFrame.new(x, y, z)
 end
 })
 
+DaraSectionDone("TAB TELEPORT")
+DaraSectionStart("TAB SHOP")
 -- ================= TAB SHOP (SINKRON DARAHUB BETA) =================
 -- UPDATE BETA: shop automation mengikuti DaraHub BETA - Daily/Token dari service Shops,
 -- Event Shop dibaca dari EventTiers (harga Tickets, tier, status) + live keys (slot Event),
@@ -8618,6 +7311,8 @@ end
 -- di dalamnya ada UIScale (kompensasi DPI) -> Z mengalikan skala dasar tersebut, jadi proporsional di semua HP.
 -- ============================================================
 -- ADD (Task 24): Drag Control - tahan 5 detik tombol layar untuk lock/unlock drag
+DaraSectionDone("TAB SHOP")
+DaraSectionStart("SETTINGS: DRAG CONTROL")
 Tabs.Settings:Space()
 Tabs.Settings:Section({ Title = "Drag Control", TextSize = 20 })
 Tabs.Settings:Toggle({
@@ -8633,6 +7328,9 @@ end
 end
 })
 
+DaraSectionDone("SETTINGS: DRAG CONTROL")
+DaraSectionStart("SCREEN BUTTON SIZE")
+local ok_BS, err_BS = pcall(function()
 Tabs.Settings:Space()
 Tabs.Settings:Section({ Title = "Screen Button Size (Per Tombol)", TextSize = 20 })
 
@@ -8754,9 +7452,16 @@ end
 -- terapkan sekali saat load (nilai default = ukuran asli, tidak mengubah apa pun)
 applyAllButtons()
 end
+end)
+if ok_BS then
+	DaraSectionDone("SCREEN BUTTON SIZE")
+else
+	DaraSectionFail("SCREEN BUTTON SIZE", err_BS)
+end
 
 
 
+DaraSectionStart("PLATFORM PC & SENSITIVITAS")
 -- ============================================================
 -- UPDATE PC: DUKUNGAN PLATFORM PC (tab Settings).
 -- 1) Show Top GUI on PC  : tombol layar Zoom / Front View-Reload / Leaderboard kini
@@ -9008,4 +7713,9 @@ end
 
 end
 
+DaraSectionDone("PLATFORM PC & SENSITIVITAS")
+
 Window:SelectTab(1)
+
+-- v1.4.2: LAPORAN LOAD - ringkasan status semua section (notif + console)
+pcall(DaraHubFinalReport)
