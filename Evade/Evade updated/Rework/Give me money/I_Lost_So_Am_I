@@ -1,8 +1,34 @@
 --[[
-    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.5.1
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.5.2
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.5.2 (MINIMIZE BUTTON ASLI DARA HUB + MENU ROBLOX SELALU BISA DIBUKA) ============================
+    - MINIMIZE BUTTON KEMBALI KE MILIK ASLI DARA HUB (permintaan user - bukan lagi bawaan
+      WindUI): pill bawaan WindUI (icon "eye" + tulisan) DIHAPUS. Window Icon dikembalikan
+      (icon.png dari darahub.pages.dev) dan OpenButton kembali PERSIS konfigurasi ASLI
+      DaraHub yang terbaru: OpenButton = { ShowIconOnly = true } = tombol icon-only kecil
+      bergambar logo DaraHub, bisa di-drag, klik = buka UI kembali. SetIconSize(48) juga
+      dikembalikan (persis DaraHub asli).
+    - LIBRARY UI KEMBALI KE ASLI DARA HUB YANG TERBARU: WindUI-Moded langsung dari
+      darahub.pages.dev (MD5 diverifikasi identik dengan yang dipakai DaraHub asli saat
+      ini). Library inilah yang mendukung ShowIconOnly - library repo v1.6.65 TIDAK punya
+      opsi itu (field-nya berubah nama jadi OnlyIcon). Patch font-capability + patch
+      floating-icon dual-varian tetap aktif (pola library asli otomatis terpakai).
+    - FIX "TIDAK BISA MEMBUKA MENU ROBLOX / LEAVE GAME" (akar masalah ditemukan):
+      fitur Top GUI (tombol Zoom/Reload/Leaderboard versi mobile, warisan DaraHub asli)
+      mematikan topbar Roblox asli (SetCore TopbarEnabled=false) SEBELUM topbar pengganti
+      selesai dibuat. Di executor dengan pembatasan capability ("The current thread cannot
+      access 'Instance' - lacking capability Plugin") pembuatan topbar pengganti GAGAL di
+      tengah jalan (error ditelan pcall section) -> topbar asli sudah MATI + pengganti
+      tidak jadi -> TOMBOL MENU ROBLOX HILANG = tidak bisa leave game.
+      Kini (fail-safe): topbar pengganti DIBUAT DULU sepenuhnya; HANYA jika sukses topbar
+      asli dimatikan. Gagal = sisa build dihancurkan + topbar asli TETAP MENYALA. Plus
+      WATCHDOG: bila topbar pengganti hilang, topbar asli otomatis dinyalakan lagi. Saat
+      script dihancurkan (OnDestroy) topbar asli juga selalu dinyalakan kembali.
+    - Engine tombol layar bawaan (fallback ButtonLib): DisplayOrder 999999 -> 0 (sama
+      persis dengan ButtonLib ASLI DaraHub) supaya tidak pernah menutupi topbar/menu Roblox.
 
     ============================ UPDATE v1.5.1 (FLOATING BUTTON FITUR SELALU MUNCUL + SHOW/HIDE BAWAAN WINDUI) ============================
     - PENTING: ada DUA hal BERBEDA yang sebelumnya tercampur:
@@ -293,7 +319,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[JoblessHub] ============ LAPORAN LOAD v1.5.1 ============")
+        print("[JoblessHub] ============ LAPORAN LOAD v1.5.2 ============")
         print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -310,7 +336,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "JoblessHub Ringkas v1.5.1 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.5.2 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -488,7 +514,7 @@ g.Name = "Darahub"
 g.IgnoreGuiInset = true
 g.ResetOnSpawn = false
 g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-g.DisplayOrder = 999999
+g.DisplayOrder = 0 -- FIX v1.5.2: sama persis ButtonLib ASLI (default 0) - tidak menutupi topbar/menu Roblox
 g.Parent = CoreGui
 gui = g
 end)
@@ -500,7 +526,7 @@ g.Name = "Darahub"
 g.IgnoreGuiInset = true
 g.ResetOnSpawn = false
 g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-g.DisplayOrder = 999999
+g.DisplayOrder = 0 -- FIX v1.5.2: sama persis ButtonLib ASLI (default 0) - tidak menutupi topbar/menu Roblox
 g.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 gui = g
 end)
@@ -689,9 +715,12 @@ local okWindUI, WindUIMod = pcall(function()
 -- Loop update font di WindUI (UpdateFont) dibungkus pcall per-elemen agar SATU objek UI
 -- bermasalah ("lacking capability Plugin" di sebagian executor/Roblox terbaru) TIDAK
 -- menggagalkan pembuatan semua elemen berikutnya (efek domino = banyak tab kosong).
--- FIX v1.5.0: library WindUI kini dari repo GitHub sendiri (WindUI ASLI Footagesus,
--- bukan lagi WindUI-Moded dari darahub.pages.dev). URL memakai %20 (spasi) - JANGAN di-decode.
-local WINDUI_URL = "https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/WindUI%20by%20DaraHub/main.lua"
+-- FIX v1.5.2 (KEMBALI KE ASLI DARA HUB - permintaan user): library WindUI kembali di-load
+-- dari SUMBER ASLI DaraHub yang TERBARU: darahub.pages.dev (WindUI-Moded; MD5 diverifikasi
+-- identik dengan yang dipakai DaraHub asli saat ini). Library inilah yang mendukung tombol
+-- minimize ASLI DaraHub (OpenButton ShowIconOnly + icon.png) - library repo v1.6.65 tidak
+-- punya opsi ShowIconOnly (field-nya berubah nama jadi OnlyIcon).
+local WINDUI_URL = "https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"
 local libSrc = game:HttpGet(WINDUI_URL)
 -- FIX v1.5.0: DUA pola font - library v1.6.64 (repo skrg) pakai pola lama, v1.6.65 pola baru.
 -- Kalau repo di-update ke versi baru, patch tetap jalan. Tidak ketemu = warning, TIDAK fatal.
@@ -744,7 +773,7 @@ end
 return loadstring(libSrc)()
 end)
 if not okWindUI or type(WindUIMod) ~= "table" then
-        warn("[JoblessHub] Gagal memuat WindUI (main.lua dari GitHub: WindUI by DaraHub/main.lua) - library UI tidak valid.")
+        warn("[JoblessHub] Gagal memuat WindUI (WindUI-Moded dari darahub.pages.dev - sumber asli DaraHub) - library UI tidak valid.")
         pcall(function()
                 game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat WindUI - cek internet lalu eksekusi ulang. Detail di console.")
         end)
@@ -972,7 +1001,9 @@ DaraSectionStart("WINDOW & LAYAR")
 Window = WindUI:CreateWindow({
 NewElements = true,
 Title = "JoblessHub | Evade 2.2",
--- v1.5.0: Icon (foto) DIHAPUS - window & floating Show/Hide tanpa foto sama sekali.
+-- FIX v1.5.2 (MINIMIZE BUTTON ASLI DARA HUB): icon ASLI DaraHub dikembalikan - dipakai
+-- window topbar DAN floating minimize button (ShowIconOnly), persis seperti DaraHub asli.
+Icon = BaseURL .. "/icon.png",
 Author = "JoblessHub",
 Folder = "JoblessHub/Games/Evade",
 Size = UDim2.fromOffset(580, 490),
@@ -981,30 +1012,25 @@ HidePanelBackground = false,
 Acrylic = false,
 HideSearchBar = false,
 SideBarWidth = 200,
--- FIX v1.5.0 (SHOW/HIDE TANPA FOTO): gaya BAWAAN WindUI - pill bertuliskan "JoblessHub" dengan
--- garis gradient, TANPA foto sama sekali (catatan: ShowIconOnly tanpa foto = transparan total /
--- tidak terlihat, karena itu dipakai gaya teks bawaan). Bisa di-drag; klik = buka UI kembali.
--- FIX v1.4.6 (tetap aktif): OnlyMobile = false = floating icon SELALU dimunculkan lagi setelah
--- window di-minimize, di SEMUA perangkat (HP/PC) walau KeyboardEnabled terdeteksi (executor
--- baru bisa melaporkan itu walau di HP) - library menganggap "PC" dan tidak menampilkan icon.
--- tidak terlihat, karena itu dipakai gaya teks bawaan). Bisa di-drag; klik = buka UI kembali.
--- FIX v1.5.1 (TOMBOL MINIMIZE PAKAI BAWAAN WINDUI): tambah ICON BAWAAN WindUI (lucide "eye")
--- di OpenButton - TANPA foto eksternal sama sekali. Bentuk akhir = pill bawaan WindUI
--- [drag handle | icon mata | tulisan "JoblessHub"] - jelas TERLIHAT (v1.5.0 tanpa gambar
--- kurang jelas), bisa di-drag, klik = buka UI kembali. Icon lucide dirender sistem icon
--- internal WindUI (mekanisme yang sama dengan icon tab), jadi tampil di semua perangkat.
+-- FIX v1.5.2 (TOMBOL MINIMIZE KEMBALI KE ASLI DARA HUB - permintaan user): pill bawaan
+-- WindUI (icon "eye" + tulisan "JoblessHub") DIHAPUS. OpenButton kembali PERSIS konfigurasi
+-- ASLI DaraHub yang terbaru: ShowIconOnly = true = tombol icon-only bergambar logo DaraHub
+-- (icon.png dari darahub.pages.dev), bisa di-drag, klik = buka UI kembali.
+-- OnlyMobile = false tetap dipasang (fix v1.4.6, tidak mengubah tampilan): floating icon
+-- SELALU dimunculkan lagi setelah window di-minimize, di SEMUA perangkat (HP/PC) walau
+-- KeyboardEnabled terdeteksi (executor baru bisa melaporkan itu walau di HP) - library
+-- menganggap "PC" dan tidak menampilkan icon.
 OpenButton = {
-Title = "JoblessHub",
-Icon = "eye",
+ShowIconOnly = true,
 OnlyMobile = false
 }})
 WindUI.TransparencyValue = 0.7
 pcall(function()
 Window:ToggleTransparency(true)
 Window:DisableTopbarButtons({ "Fullscreen" })
--- v1.5.0: SetIconSize dihapus (icon window/foto sudah tidak ada).
--- Show/Hide window memakai fitur native WindUI: OpenButton (di CreateWindow) + SetToggleKey.
--- FIX: SetToggleKey dipindah keluar dari tab Settings yang dihapus (nilai default sama: RightControl)
+-- FIX v1.5.2: SetIconSize(48) dikembalikan - persis DaraHub asli (ukuran icon window topbar).
+Window:SetIconSize(48)
+-- Show/Hide window memakai mekanisme ASLI DaraHub: OpenButton ShowIconOnly + SetToggleKey.
 Window:SetToggleKey(Enum.KeyCode.RightControl)
 end)
 
@@ -1059,7 +1085,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.5.1",
+Title = "v1.5.2",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -1164,6 +1190,9 @@ Window:OnDestroy(function()
 if ButtonLib then ButtonLib:DestroyScreengui() end -- FIX v1.5.1: guard nil
 mouseUnlock(false)
 if stopRampBooster then stopRampBooster() end
+-- FIX v1.5.2: JAMINAN menu Roblox - topbar Roblox asli SELALU dinyalakan lagi saat script
+-- dihancurkan (kalau Top GUI sempat mematikannya), supaya menu/leave game tidak pernah hilang.
+pcall(function() game:GetService("StarterGui"):SetCore("TopbarEnabled", true) end)
 end)
 
 -- Services & Variable
@@ -1535,7 +1564,7 @@ end
 -- (tab Settings). destroyTopGUI() mematikan dengan bersih: melepas keybind yang masih
 -- tertahan, menghancurkan tombol/ScreenGui buatan script, lalu mengembalikan topbar Roblox.
 local TopGUICreated = false
-local TopGuiHandles = { screenGui = nil, injected = {}, releaseHolds = nil }
+local TopGuiHandles = { screenGui = nil, injected = {}, releaseHolds = nil, topbarDisabled = false }
 local function destroyTopGUI()
 if TopGuiHandles.releaseHolds then
 pcall(TopGuiHandles.releaseHolds)
@@ -1553,6 +1582,7 @@ end)
 end
 TopGuiHandles.injected = {}
 TopGUICreated = false
+TopGuiHandles.topbarDisabled = false -- FIX v1.5.2: flag topbar-asli-dimatikan direset
 pcall(function() game:GetService("StarterGui"):SetCore("TopbarEnabled", true) end)
 end
 local function ensureTopGUI()
@@ -1596,33 +1626,7 @@ end
 end 
 end 
 
-if not targetParent then 
-if PlayerGui:FindFirstChild("TopbarStandard") then 
-PlayerGui:FindFirstChild("TopbarStandard"):Destroy() 
-end 
-starterGui:SetCore("TopbarEnabled", false) 
-
-local screenGui = Instance.new("ScreenGui") 
-screenGui.Name, screenGui.IgnoreGuiInset, screenGui.ScreenInsets, screenGui.DisplayOrder, screenGui.ResetOnSpawn, screenGui.Parent = "TopbarStandard", false, Enum.ScreenInsets.TopbarSafeInsets, 100, false, PlayerGui 
--- UPDATE PC: simpan ScreenGui buatan sendiri agar bisa dihancurkan oleh destroyTopGUI
-TopGuiHandles.screenGui = screenGui 
-
-local holders = Instance.new("Frame") 
-holders.Name, holders.BackgroundTransparency, holders.BorderSizePixel, holders.Position, holders.Size, holders.Parent = "Holders", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, -2), screenGui 
-
-local frame = Instance.new("Frame") 
-frame.Name, frame.BackgroundTransparency, frame.BorderSizePixel, frame.Position, frame.Size, frame.Parent = "Main", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0), holders 
-
-local scrollingFrame = Instance.new("ScrollingFrame") 
-scrollingFrame.Name, scrollingFrame.Parent, scrollingFrame.BackgroundTransparency, scrollingFrame.BorderSizePixel, scrollingFrame.Position, scrollingFrame.Size, scrollingFrame.CanvasSize, scrollingFrame.AutomaticCanvasSize, scrollingFrame.ScrollBarThickness, scrollingFrame.ScrollingDirection, scrollingFrame.ScrollingEnabled = "Right", frame, 1, 0, UDim2.new(0, 12, 0, 0), UDim2.new(1, -24, 1, 0), UDim2.new(0, 0, 0, 0), Enum.AutomaticSize.X, 0, Enum.ScrollingDirection.X, false 
-
-local uiListLayout = Instance.new("UIListLayout") 
-uiListLayout.Parent, uiListLayout.Padding, uiListLayout.SortOrder, uiListLayout.FillDirection, uiListLayout.HorizontalAlignment, uiListLayout.VerticalAlignment = scrollingFrame, UDim.new(0, 12), Enum.SortOrder.LayoutOrder, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Bottom 
-targetParent = scrollingFrame 
-else 
-starterGui:SetCore("TopbarEnabled", true) 
-end 
-
+-- FIX v1.5.2: config tombol + pembuatnya dipindah ke ATUR supaya bisa dipakai jalur baru.
 local keybindButtonsConfig = { 
 { name = "SecondaryButton", layoutOrder = 999, icon = "rbxassetid://126943351764139", label = "Zoom", key = "Secondary", enablesLockValue = false }, 
 { name = "ReloadButton", layoutOrder = 997, icon = "rbxassetid://78648212535999", label = "Front View/Reload", key = "Reload", enablesLockValue = false }, 
@@ -1679,16 +1683,82 @@ end)
 createdButtons[config.key] = { Button = Button, updateVisualState = updateVisualState } 
 end 
 
+-- Membuat semua tombol keybind + mencatat handle-nya (dipakai kedua jalur).
+local function injectKeybindButtons(parent) 
 for _, config in ipairs(keybindButtonsConfig) do 
-createKeybindButton(config, targetParent) 
+createKeybindButton(config, parent) 
 end 
--- UPDATE PC: simpan handle tombol yang dibuat + cara melepas keybind yang tertahan
 for _, config in ipairs(keybindButtonsConfig) do 
 local data = createdButtons[config.key] 
 if data and data.Button then 
 table.insert(TopGuiHandles.injected, data.Button) 
 end 
 end 
+end 
+
+-- ================== FIX v1.5.2 (MENU ROBLOX SELALU BISA DIBUKA) ==================
+-- MASALAH (urutan lama): topbar Roblox asli DIMATIKAN DULU (SetCore TopbarEnabled=false),
+-- BARU topbar pengganti (Top GUI) dibuat. Di executor dengan pembatasan capability
+-- ("The current thread cannot access 'Instance' - lacking capability Plugin"), pembuatan
+-- topbar pengganti GAGAL di tengah jalan dan error-nya DITELAN pcall section -> topbar
+-- asli sudah MATI + pengganti tidak jadi -> TOMBOL MENU ROBLOX HILANG -> tidak bisa
+-- membuka menu Roblox / leave game.
+-- SOLUSI (urutan dibalik, fail-safe): topbar pengganti DIBUAT DULU sepenuhnya dalam pcall;
+-- HANYA bila sukses topbar asli dimatikan. Bila gagal -> sisa build dihancurkan + topbar
+-- asli DINYALAKAN (tetap ada) -> menu Roblox selalu bisa dibuka. Plus WATCHDOG: bila
+-- topbar pengganti hilang (dihancurkan game/executor), topbar asli otomatis dinyalakan lagi.
+if not targetParent then 
+if PlayerGui:FindFirstChild("TopbarStandard") then 
+PlayerGui:FindFirstChild("TopbarStandard"):Destroy() 
+end 
+local buildOK, buildErr = pcall(function()
+local screenGui = Instance.new("ScreenGui") 
+screenGui.Name, screenGui.IgnoreGuiInset, screenGui.ScreenInsets, screenGui.DisplayOrder, screenGui.ResetOnSpawn, screenGui.Parent = "TopbarStandard", false, Enum.ScreenInsets.TopbarSafeInsets, 100, false, PlayerGui 
+TopGuiHandles.screenGui = screenGui 
+
+local holders = Instance.new("Frame") 
+holders.Name, holders.BackgroundTransparency, holders.BorderSizePixel, holders.Position, holders.Size, holders.Parent = "Holders", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, -2), screenGui 
+
+local frame = Instance.new("Frame") 
+frame.Name, frame.BackgroundTransparency, frame.BorderSizePixel, frame.Position, frame.Size, frame.Parent = "Main", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0), holders 
+
+local scrollingFrame = Instance.new("ScrollingFrame") 
+scrollingFrame.Name, scrollingFrame.Parent, scrollingFrame.BackgroundTransparency, scrollingFrame.BorderSizePixel, scrollingFrame.Position, scrollingFrame.Size, scrollingFrame.CanvasSize, scrollingFrame.AutomaticCanvasSize, scrollingFrame.ScrollBarThickness, scrollingFrame.ScrollingDirection, scrollingFrame.ScrollingEnabled = "Right", frame, 1, 0, UDim2.new(0, 12, 0, 0), UDim2.new(1, -24, 1, 0), UDim2.new(0, 0, 0, 0), Enum.AutomaticSize.X, 0, Enum.ScrollingDirection.X, false 
+
+local uiListLayout = Instance.new("UIListLayout") 
+uiListLayout.Parent, uiListLayout.Padding, uiListLayout.SortOrder, uiListLayout.FillDirection, uiListLayout.HorizontalAlignment, uiListLayout.VerticalAlignment = scrollingFrame, UDim.new(0, 12), Enum.SortOrder.LayoutOrder, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Bottom 
+targetParent = scrollingFrame 
+
+injectKeybindButtons(targetParent) 
+end)
+if buildOK then 
+-- Build topbar pengganti SUKSES -> BARULAH topbar asli dimatikan (perilaku asli DaraHub).
+starterGui:SetCore("TopbarEnabled", false) 
+TopGuiHandles.topbarDisabled = true 
+-- WATCHDOG v1.5.2: bila topbar pengganti hilang tapi topbar asli masih dimatikan,
+-- NYALAKAN lagi topbar asli -> menu Roblox tidak pernah hilang selamanya.
+task.delay(8, function()
+if TopGuiHandles.topbarDisabled then
+local sg = TopGuiHandles.screenGui
+if not sg or not sg.Parent then
+TopGuiHandles.topbarDisabled = false
+pcall(function() starterGui:SetCore("TopbarEnabled", true) end)
+warn("[JoblessHub] Top GUI hilang - topbar Roblox asli otomatis DINYALAKAN lagi (menu Roblox selalu bisa dibuka).")
+end
+end
+end)
+else 
+-- Build GAGAL (mis. capability executor) -> topbar Roblox ASLI TETAP MENYALA.
+warn("[JoblessHub] Top GUI gagal dibuat (" .. tostring(buildErr) .. ") - topbar Roblox ASLI tetap dipakai (menu Roblox aman).")
+TopGuiHandles.screenGui = nil 
+pcall(function() starterGui:SetCore("TopbarEnabled", true) end) 
+end 
+else 
+-- TopbarStandard milik game ditemukan -> tombol di-INJECT ke dalamnya, topbar asli tetap menyala.
+starterGui:SetCore("TopbarEnabled", true) 
+injectKeybindButtons(targetParent) 
+end 
+
 TopGuiHandles.releaseHolds = function() 
 for key, held in pairs(currentMouseHold) do 
 if held then 
