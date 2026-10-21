@@ -1,8 +1,28 @@
 --[[
-    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru) - EDISI PERBAIKAN TOTAL v1.4.3
-    Basis: DARAHUBBETA (script asli) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
+    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.4
+    Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.4.4 (SINKRON DATA DARAHUB BETA BARU / EVADE 2.2) ============================
+    Game sudah update ke Evade 2.2 dan DaraHub Beta ikut di-update; datanya disamakan dengan Beta terbaru:
+    - SINKRON 1 (REDEEM CODE): jalur redeem kini PERSIS DaraHub Beta - remote asli game
+      ReplicatedStorage.Shared.UserData.Remotes.RedeemCode:FireServer(code) dicoba DULU, lalu fallback ke
+      service Codes (Client.Services.UserData.Codes). Sebelumnya hanya lewat service - bila service pindah
+      di 2.2, redeem selalu gagal ("tidak ditemukan"). Kini dua jalur, dua-duanya pcall.
+    - SINKRON 2 (CATCH NPC / AUTO FARM): pola scan sumber NPC pemberi reward event di-update. Pola lama hanya
+      cocok "Services.UserData.EventService" (layout lama); game 2.2 memakai layout UserData baru
+      (Client.Services.UserData.Event). Pola baru "UserData.Event" cocok untuk KEDUANYA sehingga mode
+      Catch NPC tidak lagi "tidak menemukan" NPC di versi game baru.
+    - SINKRON 3 (VIP CMD MACRO 100% BUILT-IN): tombol "VIP CMD Macro" TIDAK lagi me-load GUI remote dari
+      darahub.pages.dev (aturan: dilarang load DaraHub asli). Tombol kini membuka tab Auto tempat section
+      "VIP CMD Macro" built-in berada. Semua fungsi macro tetap jalan 100% offline dari dalam script.
+    - SINKRON 4 (EVADE 2.2): judul window + basis data mengikuti Beta terbaru (Evade 2.2). Nilai movement
+      (Speed 1500, Friction 5, GroundedDistCheck 2.9, dll.), Auto Farm (Token Farm/Catch NPC/Auto Ticket,
+      delay 0.84-4), Self Revive, Auto Vote, Auto Whistle, Full Bright, Remove Fog, Shop & Auto Exchange
+      diverifikasi BARIS PER BARIS terhadap Beta baru - semua sudah identik, tidak ada yang diubah.
+    - ANTI ERROR (lanjutan): sistem warning per section tetap aktif - error satu section TIDAK mematikan
+      script; notif "SECTION ERROR" muncul di layar + laporan lengkap di akhir load (terlihat di HP).
 
     ============================ UPDATE v1.4.3 (FIX CAPABILITY + ANTI "SATU ERROR MATI SEMUA") ============================
     Dari error logs kamu (35 error / 20 warning):
@@ -204,7 +224,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[Dara Hub] ============ LAPORAN LOAD v1.4.3 ============")
+        print("[Dara Hub] ============ LAPORAN LOAD v1.4.4 ============")
         print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -221,7 +241,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "DaraHub Ringkas v1.4.3 siap dipakai",
+                                        Title = "DaraHub Ringkas v1.4.4 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -608,7 +628,7 @@ DaraSectionDone("DRAG CONTROL")
 DaraSectionStart("WINDOW & LAYAR")
 Window = WindUI:CreateWindow({
 NewElements = true,
-Title = "Dara Hub | Evade 2.1",
+Title = "Dara Hub | Evade 2.2",
 Icon = BaseURL .. "/icon.png",
 Author = "Made by: Pnsdg And Yomka",
 Folder = "DaraHub/Games/Evade",
@@ -653,7 +673,7 @@ Color = IsTouchDevice and Color3.fromHex("#30a2ff") or Color3.fromHex("#ffaa30")
 })
 pcall(function()
 WindUI:Notify({
-Title = "Dara Hub | Evade 2.1",
+Title = "Dara Hub | Evade 2.2",
 Content = "Platform terdeteksi: " .. PlatformLabel .. ". Dukungan PC (Sensitivity, PC Keybinds, Top GUI on PC) ada di tab Settings.",
 Duration = 4
 })
@@ -675,7 +695,7 @@ else
 print("The injector does not support identifyexecutor()")
 end
 Window:Tag({
-Title = "v1.2.9",
+Title = "v1.4.4",
 Color = Color3.fromHex("#30ff6a")
 })
 Tabs = {
@@ -2955,7 +2975,11 @@ if cached ~= nil then
 return cached
 end
 local src = getModuleSource(module)
-local rewarded = src ~= nil and src:find("require%(%w+%.Services%.UserData%.EventService%)") ~= nil
+-- UPDATE v1.4.4 (SINKRON BETA): pola sumber di-update - game 2.2 memakai layout UserData baru
+-- (Client.Services.UserData.Event); pola lama hanya cocok "Services.UserData.EventService". Pola
+-- baru "UserData%.Event" cocok untuk KEDUANYA (EventService & Event) - Catch NPC tetap menemukan
+-- NPC pemberi reward baik di layout lama maupun baru.
+local rewarded = src ~= nil and src:find("UserData%.Event") ~= nil
 pcall(module.SetAttribute, module, "CatchRewarded", rewarded)
 return rewarded
 end
@@ -6016,19 +6040,32 @@ end
 Tabs.Utility:Button({
 Title = "VIP CMD Macro",
 Icon = "rbxassetid://107814281854748",
-Desc = "Buka GUI macro VIP resmi dari DaraHub (EvadeCMDMacroGUI)",
+Desc = "Buka macro VIP built-in (100% dalam script, tanpa load remote DaraHub)",
 Callback = function()
-task.spawn(function()
--- FIX: loadstring dibungkus pcall + notify (sebelumnya error langsung bila koneksi gagal)
-local okGUI, errGUI = pcall(function()
-loadstring(game:HttpGet(BaseURL .. "/api/script/Tools/EvadeCMDMacroGUI.lua"))()
-end)
-if not okGUI then
-warn("[Dara Hub] Gagal memuat EvadeCMDMacroGUI: " .. tostring(errGUI))
+-- UPDATE v1.4.4 (ATURAN USER): macro VIP kini 100% built-in - tombol TIDAK lagi me-load GUI
+-- remote dari darahub.pages.dev (aturan: dilarang load DaraHub asli). Tombol memindahkan
+-- tampilan ke tab Auto tempat section "VIP CMD Macro" built-in berada.
+local switched = false
 pcall(function()
-WindUI:Notify({ Title = "VIP CMD Macro", Content = "Gagal memuat GUI (cek koneksi/executor).", Duration = 3 })
+if Window and Tabs and Tabs.Auto then
+Window:SelectTab(Tabs.Auto)
+switched = true
+end
+end)
+if not switched then
+pcall(function()
+if Window then
+Window:SelectTab(4)
+switched = true
+end
 end)
 end
+pcall(function()
+WindUI:Notify({
+Title = "VIP CMD Macro (built-in)",
+Content = switched and "Macro VIP 100% built-in ada di tab Auto - section VIP CMD Macro." or "Buka tab Auto -> section VIP CMD Macro.",
+Duration = 4
+})
 end)
 end
 })
@@ -6767,6 +6804,9 @@ WindUI:Notify({ Title = "Redeem Code", Content = "Kode masih kosong.", Duration 
 end)
 return
 end
+-- UPDATE v1.4.4 (SINKRON BETA): redeem kini PERSIS DaraHub Beta - remote asli game
+-- (ReplicatedStorage.Shared.UserData.Remotes.RedeemCode) dicoba DULU, lalu fallback ke service
+-- Codes (Client.Services.UserData.Codes). Dua jalur, dua-duanya pcall - yang penting ada tetap jalan.
 local already = false
 pcall(function()
 already = PlayerData.IsRedeemed(code)
@@ -6777,11 +6817,29 @@ WindUI:Notify({ Title = "Redeem Code", Content = "Kode sudah pernah dipakai: " .
 end)
 return
 end
-local ok = PlayerData.RedeemCode(code)
+local okRedeem = false
+local redeemVia = nil
+-- Jalur 1 (persis Beta): remote Shared.UserData.Remotes.RedeemCode
+pcall(function()
+local sharedUD = ReplicatedStorage:FindFirstChild("Shared")
+local userData = sharedUD and sharedUD:FindFirstChild("UserData")
+local remotes = userData and userData:FindFirstChild("Remotes")
+local redeemRemote = remotes and remotes:FindFirstChild("RedeemCode")
+if redeemRemote then
+redeemRemote:FireServer(code)
+okRedeem = true
+redeemVia = "remote game (jalur Beta)"
+end
+end)
+-- Jalur 2 (fallback): service Codes
+if not okRedeem then
+okRedeem = PlayerData.RedeemCode(code)
+redeemVia = "service Codes (fallback)"
+end
 pcall(function()
 WindUI:Notify({
 Title = "Redeem Code",
-Content = ok and ("Kode berhasil diredeem: " .. tostring(code)) or ("Gagal redeem kode: " .. tostring(code)),
+Content = okRedeem and ("Kode dikirim via " .. redeemVia .. ": " .. tostring(code)) or ("Gagal redeem kode: " .. tostring(code)),
 Duration = 4
 })
 end)
