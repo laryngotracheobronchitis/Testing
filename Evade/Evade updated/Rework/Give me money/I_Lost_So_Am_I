@@ -1,8 +1,24 @@
 --[[
-    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.4
+    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.5
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.4.5 (ANTI TAB KOSONG TOTAL - SAFE TAB PROXY) ============================
+    Diperiksa terhadap DaraHub Beta ASLI (Evade 2.2): file asli sendiri BISA mengalami tab kosong!
+    Di file asli baris 3619 ada "if PlayerData.EventActive() then" TELANJANG (tanpa pcall) dieksekusi
+    saat load; jika service Event tidak ada / pindah path, script asli MATI di situ dan SEMUA tab
+    setelahnya (Auto Farm s/d Settings, termasuk Anti AFK di Misc) tidak pernah muncul - persis
+    gejala "Auto Farm ke bawah tidak muncul + tab Visual s/d Setting kosong".
+    v1.4.5 memperbaiki dengan logika sendiri (Luau):
+    - SAFE TAB PROXY: semua Tabs.<Tab>:<Method>() dibungkus pcall. SATU elemen UI gagal dibuat =
+      warn jelas (tab:method:judul) + elemen dilewati (dummy) + elemen BERIKUTNYA TETAP DIBUAT.
+      Tidak ada lagi "satu error membuat semuanya tidak ada".
+    - 6 SECTION TANPA PCALL KINI TERLINDUNGI: TAB PLAYER, TAB COMBAT, TIMER GUI, VISUALS:
+      STATS/DEATHFEED/COLA, TAB UTILITY, TAB TELEPORT (total 23 section terlindungi).
+    - Window method calls (ToggleTransparency/Tag/SetToggleKey/dll.) dibungkus pcall.
+    - Tombol "Force Respawn" aman bila remote SetPlayerMode tidak ada (pcall + warn).
+    - Sistem warning per section tetap: warn console + notif "SECTION ERROR" + laporan akhir load.
 
     ============================ UPDATE v1.4.4 (SINKRON DATA DARAHUB BETA BARU / EVADE 2.2) ============================
     Game sudah update ke Evade 2.2 dan DaraHub Beta ikut di-update; datanya disamakan dengan Beta terbaru:
@@ -224,7 +240,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[Dara Hub] ============ LAPORAN LOAD v1.4.4 ============")
+        print("[Dara Hub] ============ LAPORAN LOAD v1.4.5 ============")
         print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -241,7 +257,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "DaraHub Ringkas v1.4.4 siap dipakai (Evade 2.2)",
+                                        Title = "DaraHub Ringkas v1.4.5 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -642,12 +658,14 @@ OpenButton = {
 ShowIconOnly = true
 }})
 WindUI.TransparencyValue = 0.7
+pcall(function()
 Window:ToggleTransparency(true)
 Window:DisableTopbarButtons({ "Fullscreen" })
 Window:SetIconSize(48)
 -- Show/Hide window memakai fitur native WindUI: OpenButton (di CreateWindow) + SetToggleKey.
 -- FIX: SetToggleKey dipindah keluar dari tab Settings yang dihapus (nilai default sama: RightControl)
 Window:SetToggleKey(Enum.KeyCode.RightControl)
+end)
 
 -- ================= UPDATE PC: deteksi platform =================
 -- Mendeteksi perangkat (Mobile / PC / Unknown) dari UserInputService; hasilnya dipakai
@@ -667,10 +685,12 @@ PlatformLabel = "Mobile"
 elseif IsKeyboardDevice or IsMouseDevice then
 PlatformLabel = "PC"
 end
+pcall(function()
 Window:Tag({
 Title = PlatformLabel,
 Color = IsTouchDevice and Color3.fromHex("#30a2ff") or Color3.fromHex("#ffaa30")
 })
+end)
 pcall(function()
 WindUI:Notify({
 Title = "Dara Hub | Evade 2.2",
@@ -688,26 +708,97 @@ for key, value in pairs(executor) do
 print(key .. ": " .. tostring(value))
 end
 elseif okExec and type(executor) == "string" then
+pcall(function()
 Window:Tag({
 Title = "" .. executor
 })
+end)
 else
 print("The injector does not support identifyexecutor()")
 end
+pcall(function()
 Window:Tag({
-Title = "v1.4.4",
+Title = "v1.4.5",
 Color = Color3.fromHex("#30ff6a")
 })
+end)
+-- ================= v1.4.5: SAFE TAB PROXY (anti "satu error mati semua") =================
+-- SEMUA pembuatan elemen UI lewat proxy: setiap Tabs.<Tab>:<Method>(config) dibungkus pcall.
+-- Bila SATU elemen gagal dibuat (contoh: bug font library, capability, elemen error), error
+-- DITANGKAP di sini: warn jelas (tab:method:judul), elemen DUMMY dikembalikan, dan pembuatan
+-- elemen BERIKUTNYA TETAP DICOBA -> tab tidak lagi kosong total karena satu elemen error.
+local function DaraDummyElement()
+	local dummy = {}
+	dummy.Value = ""
+	dummy.Set = function() end
+	dummy.SetVisible = function() end
+	dummy.SetText = function() end
+	dummy.SetValue = function() end
+	dummy.Destroy = function() end
+	return dummy
+end
+local function DaraSafeTab(cfg, tabName)
+	local okT, realTab = pcall(function() return Window:Tab(cfg) end)
+	if not okT or not realTab then
+		warn("[Dara Hub] Tab '" .. tabName .. "' GAGAL dibuat di library UI: " .. tostring(realTab))
+		realTab = nil
+	end
+	local proxy = {}
+	setmetatable(proxy, {
+		__index = function(_t, method)
+			return function(_self, config)
+				if realTab then
+					local okEl, resEl = pcall(function() return realTab[method](realTab, config) end)
+					if okEl then
+						if type(resEl) == "table" or type(resEl) == "userdata" then
+							local elProxy
+							elProxy = setmetatable({}, {
+								__index = function(_et, key)
+									local v = resEl[key]
+									if type(v) == "function" then
+										return function(_s, ...)
+											local okM, errM = pcall(v, resEl, ...)
+											if not okM then
+												warn("[Dara Hub] " .. tabName .. ":" .. tostring(key) .. " error: " .. tostring(errM))
+											end
+										end
+									end
+									return v
+								end,
+								__newindex = function(_et, key, val)
+									local okS, errS = pcall(function() resEl[key] = val end)
+									if not okS then
+										warn("[Dara Hub] elemen " .. tabName .. " (set " .. tostring(key) .. ") gagal: " .. tostring(errS))
+									end
+								end,
+							})
+							return elProxy
+						end
+						return resEl
+					end
+					local titleTxt = "?"
+					if type(config) == "table" and type(config.Title) == "string" then
+						titleTxt = config.Title
+					end
+					warn("[Dara Hub] UI '" .. tabName .. ":" .. method .. "' (" .. titleTxt .. ") GAGAL dibuat: " .. tostring(resEl) .. " - elemen dilewati, elemen berikutnya tetap dicoba.")
+					return DaraDummyElement()
+				end
+				return DaraDummyElement()
+			end
+		end,
+	})
+	return proxy
+end
 Tabs = {
-Main = Window:Tab({ Title = "Main", Icon = "layout-grid" }),
-Player = Window:Tab({ Title = "Player", Icon = "user" }),
-Combat = Window:Tab({ Title = "Combat", Icon = "sword" }),
-Auto = Window:Tab({ Title = "Auto", Icon = "repeat-2" }),
-Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
-Utility = Window:Tab({ Title = "Utility", Icon = "wrench" }),
-Teleport = Window:Tab({ Title = "Teleport", Icon = "navigation" }),
-Shop = Window:Tab({ Title = "Shop", Icon = "shopping-cart" }),
-Settings = Window:Tab({ Title = "Settings", Icon = "settings" })
+Main = DaraSafeTab({ Title = "Main", Icon = "layout-grid" }, "Main"),
+Player = DaraSafeTab({ Title = "Player", Icon = "user" }, "Player"),
+Combat = DaraSafeTab({ Title = "Combat", Icon = "sword" }, "Combat"),
+Auto = DaraSafeTab({ Title = "Auto", Icon = "repeat-2" }, "Auto"),
+Visuals = DaraSafeTab({ Title = "Visuals", Icon = "camera" }, "Visuals"),
+Utility = DaraSafeTab({ Title = "Utility", Icon = "wrench" }, "Utility"),
+Teleport = DaraSafeTab({ Title = "Teleport", Icon = "navigation" }, "Teleport"),
+Shop = DaraSafeTab({ Title = "Shop", Icon = "shopping-cart" }, "Shop"),
+Settings = DaraSafeTab({ Title = "Settings", Icon = "settings" }, "Settings")
 }
 
 function mouseUnlock(enabled)
@@ -1553,6 +1644,7 @@ else
 DaraSectionFail("TAB MAIN", err_TM)
 end
 DaraSectionStart("TAB PLAYER")
+local ok_TP, err_TP = pcall(function()
 -- ================= TAB PLAYER =================
 Tabs.Player:Section({ Title = "Player", TextSize = 40 })
 Tabs.Player:Divider()
@@ -1982,8 +2074,14 @@ end
 end)
 end
 
+end)
+if ok_TP then
 DaraSectionDone("TAB PLAYER")
+else
+DaraSectionFail("TAB PLAYER", err_TP)
+end
 DaraSectionStart("TAB COMBAT")
+local ok_TC, err_TC = pcall(function()
 -- ================= TAB COMBAT =================
 Tabs.Combat:Button({
 Title = "Infinite Range",
@@ -2241,7 +2339,12 @@ end
 })
 end
 
+end)
+if ok_TC then
 DaraSectionDone("TAB COMBAT")
+else
+DaraSectionFail("TAB COMBAT", err_TC)
+end
 DaraSectionStart("TAB AUTO (BHOP)")
 -- FIX v1.4.3: section dibungkus pcall (anti mati-total)
 local ok_AB, err_AB = pcall(function()
@@ -2555,7 +2658,11 @@ Tabs.Auto:Button({
 Title = "Force Respawn",
 Icon = "heart",
 Callback = function()
-changePlayerMode:FireServer(true)
+if changePlayerMode then
+pcall(function() changePlayerMode:FireServer(true) end)
+else
+warn("[Dara Hub] Force Respawn: Events.SetPlayerMode tidak ditemukan di game ini")
+end
 end
 })
 end)
@@ -4097,6 +4204,7 @@ else
 	DaraSectionFail("REMOVE FOG", err_RF)
 end
 DaraSectionStart("TIMER GUI")
+local ok_TG, err_TG = pcall(function()
 
 
 
@@ -4655,8 +4763,14 @@ end
 })
 -- FIX v1.4.3: dibungkus pcall (baris telanjang di ujung section yang tidak dibungkus)
 pcall(function() Tabs.Visuals:Space() end)
+end)
+if ok_TG then
 DaraSectionDone("TIMER GUI")
+else
+DaraSectionFail("TIMER GUI", err_TG)
+end
 DaraSectionStart("VISUALS: STATS/DEATHFEED/COLA")
+local ok_VS, err_VS = pcall(function()
 -- ============================================================
 -- SHOW PLAYER STATS (UPDATE BETA) - ditulis ulang mengikuti DaraHub BETA.
 -- Game versi terbaru memindahkan UserData ke Client.Services.UserData dan menghapus
@@ -5146,8 +5260,14 @@ Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
 end
 end
 
+end)
+if ok_VS then
 DaraSectionDone("VISUALS: STATS/DEATHFEED/COLA")
+else
+DaraSectionFail("VISUALS: STATS/DEATHFEED/COLA", err_VS)
+end
 DaraSectionStart("TAB UTILITY")
+local ok_TU, err_TU = pcall(function()
 -- ================= TAB UTILITY =================
 Tabs.Utility:Toggle({
 Title = "Invis Walls Collide",
@@ -5776,7 +5896,12 @@ Duration = 3
 })
 end
 end
+end)
+if ok_TU then
 DaraSectionDone("TAB UTILITY")
+else
+DaraSectionFail("TAB UTILITY", err_TU)
+end
 DaraSectionStart("CUSTOM GRAVITY")
 local ok_CG, err_CG = pcall(function()
 -- ============================================================
@@ -6169,6 +6294,7 @@ end
 
 
 DaraSectionStart("TAB TELEPORT")
+local ok_TL, err_TL = pcall(function()
 -- ================= TAB TELEPORT =================
 -- Helper teleport (dipindah utuh dari file asli, hanya dipakai tab Teleport)
 function isNPCModel(model)
@@ -6764,7 +6890,12 @@ root.CFrame = CFrame.new(x, y, z)
 end
 })
 
+end)
+if ok_TL then
 DaraSectionDone("TAB TELEPORT")
+else
+DaraSectionFail("TAB TELEPORT", err_TL)
+end
 DaraSectionStart("TAB SHOP")
 -- FIX v1.4.3: section dibungkus pcall (anti mati-total)
 local ok_TS, err_TS = pcall(function()
