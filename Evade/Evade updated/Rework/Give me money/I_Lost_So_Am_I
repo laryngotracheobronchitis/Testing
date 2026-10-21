@@ -1,8 +1,30 @@
 --[[
-    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru) - EDISI PERBAIKAN TOTAL v1.4.2
+    Dara Hub | Evade 2.1 - VERSI RINGKAS (basis DaraHub BETA / game versi terbaru) - EDISI PERBAIKAN TOTAL v1.4.3
     Basis: DARAHUBBETA (script asli) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.4.3 (FIX CAPABILITY + ANTI "SATU ERROR MATI SEMUA") ============================
+    Dari error logs kamu (35 error / 20 warning):
+    - PENYEBAB UTAMA: error "The current thread cannot access 'Instance' (lacking capability Plugin)"
+      datangnya dari LIBRARY UI (WindUI) yang di-load remote, tepat di fungsi update font-nya
+      (UpdateFont -> FontFace). Library itu meng-update font SEMUA elemen UI yang pernah dibuat setiap
+      kali membuat elemen baru, jadi cukup SATU objek bermasalah -> SEMUA elemen berikutnya ikut gagal
+      (efek domino) -> banyak tab jadi kosong.
+    - FIX 1 (patch library saat load): teks library sekarang di-patch otomatis sebelum dipasang - loop
+      update font dibungkus pcall per-elemen, satu objek bermasalah TIDAK lagi menggagalkan yang lain.
+    - FIX 2 (VirtualUser lazy): GetService("VirtualUser") (service ber-security Plugin) tidak dipanggil
+      lagi di tengah load (diduga memicu kehilangan capability thread di sebagian executor); sekarang
+      diambil lazy saat toggle Anti AFK dinyalakan + dibungkus pcall.
+    - FIX 3 (anti "satu error mati semua"): baris telanjang antar-section yang tadinya TANPA pcall
+      (header tab Visuals - baris 3817 lama, Tabs.Visuals:Space di ujung TIMER GUI, Window:SelectTab)
+      sekarang dilindungi. Baris-baris inilah yang membuat FULL BRIGHT s/d PLATFORM PC + tab
+      Visuals/Utility/Teleport/Shop tidak pernah dimuat setelah error pertama.
+    - FIX 4 (5 section tambahan dibungkus pcall): TAB MAIN, TAB AUTO (BHOP), TAB SHOP, SETTINGS: DRAG
+      CONTROL, PLATFORM PC & SENSITIVITAS. Total 16 section terlindungi; satu gagal = sisanya jalan.
+    - FIX 5 (Movement retry): "Gagal mengubah movement 'BhopEnabled' - tabel Movement game tidak
+      ditemukan" saat load = tabel memang belum siap; sekarang diulang otomatis 3 detik kemudian
+      (hening) dan hanya menampilkan warn bila tetap gagal.
 
     ============================ UPDATE v1.4.2 (FIX ERROR + SISTEM WARNING PER SECTION) ============================
     FIX "script tidak bisa jalan":
@@ -182,7 +204,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[Dara Hub] ============ LAPORAN LOAD v1.4.2 ============")
+        print("[Dara Hub] ============ LAPORAN LOAD v1.4.3 ============")
         print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -199,7 +221,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "DaraHub Ringkas v1.4.2 siap dipakai",
+                                        Title = "DaraHub Ringkas v1.4.3 siap dipakai",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -336,7 +358,28 @@ if not okLib then
         return
 end
 local okWindUI, WindUIMod = pcall(function()
-return loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua"))()
+-- FIX v1.4.3 (CAPABILITY PATCH): teks library di-download dulu, di-patch, BARU dipasang.
+-- Loop update font di WindUI (UpdateFont) dibungkus pcall per-elemen agar SATU objek UI
+-- bermasalah ("lacking capability Plugin" di sebagian executor/Roblox terbaru) TIDAK
+-- menggagalkan pembuatan semua elemen berikutnya (efek domino = banyak tab kosong).
+local libSrc = game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua")
+local FONT_LINE = 'v.FontFace=Font.new(r,v.FontFace.Weight,v.FontFace.Style)'
+local FONT_PATCHED = 'pcall(function() ' .. FONT_LINE .. ' end)'
+local nPatched = 0
+local searchFrom = 1
+while true do
+local p1, p2 = string.find(libSrc, FONT_LINE, searchFrom, true)
+if not p1 then break end
+libSrc = string.sub(libSrc, 1, p1 - 1) .. FONT_PATCHED .. string.sub(libSrc, p2 + 1)
+searchFrom = p1 + #FONT_PATCHED
+nPatched = nPatched + 1
+end
+if nPatched > 0 then
+print("[Dara Hub] Patch font-capability diterapkan ke library UI (" .. nPatched .. " titik)")
+else
+warn("[Dara Hub] PERINGATAN: pola font di library UI tidak ditemukan - library dipasang tanpa patch (kemungkinan library upstream berubah)")
+end
+return loadstring(libSrc)()
 end)
 if not okWindUI or type(WindUIMod) ~= "table" then
         warn("[Dara Hub] Gagal memuat WindUI (WindUI-Moded/main.lua) - library UI tidak valid.")
@@ -1256,6 +1299,11 @@ local velocity = hrp.AssemblyLinearVelocity
 return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
 end
 local movementFallbackNotified = false
+-- FIX v1.4.3: tabel Movement game sering BELUM siap saat script baru load (karakter
+-- belum spawn / CharacterService belum mengisi data) sehingga updateBhopEnabled di
+-- load-time melempar "tabel Movement game tidak ditemukan". Percobaan pertama gagal =
+-- ulangi otomatis 3 detik kemudian (hening); warn hanya bila tetap gagal.
+local movementRetryScheduled = {}
 -- FIX (Task 20): cache tabel Movement game yang valid; diisi hook Movement.Update
 -- tiap frame saat data tersedia, dipakai fallback MovementValueSet di atas.
 local cachedMovementData = nil
@@ -1297,6 +1345,15 @@ movement[MovementType] = value
 cachedMovementData = movement
 end)
 if not okFall and not movementFallbackNotified then
+-- FIX v1.4.3: retry otomatis sekali (3 detik) sebelum menampilkan warn - saat load,
+-- tabel Movement game memang sering belum ada (karakter belum spawn).
+if not movementRetryScheduled[MovementType] then
+movementRetryScheduled[MovementType] = true
+task.delay(3, function()
+pcall(MovementValueSet, MovementType, value)
+end)
+return
+end
 movementFallbackNotified = true
 warn("[Dara Hub] Gagal mengubah movement '" .. tostring(MovementType) .. "': " .. tostring(errFall))
 pcall(WindUI.Notify, WindUI, {
@@ -1422,6 +1479,8 @@ end)
 
 DaraSectionDone("MOVEMENT ENGINE")
 DaraSectionStart("TAB MAIN")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_TM, err_TM = pcall(function()
 -- ================= TAB MAIN =================
 Tabs.Main:Space()
 
@@ -1467,7 +1526,12 @@ end)
 end
 })
 
+end)
+if ok_TM then
 DaraSectionDone("TAB MAIN")
+else
+DaraSectionFail("TAB MAIN", err_TM)
+end
 DaraSectionStart("TAB PLAYER")
 -- ================= TAB PLAYER =================
 Tabs.Player:Section({ Title = "Player", TextSize = 40 })
@@ -2159,6 +2223,8 @@ end
 
 DaraSectionDone("TAB COMBAT")
 DaraSectionStart("TAB AUTO (BHOP)")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_AB, err_AB = pcall(function()
 -- ================= TAB AUTO =================
 Tabs.Auto:Section({Title="Bhop"})
 
@@ -2251,7 +2317,12 @@ end
 end
 }).Position = UDim2.new(0.5, -125, 0.4, 0)
 
+end)
+if ok_AB then
 DaraSectionDone("TAB AUTO (BHOP)")
+else
+DaraSectionFail("TAB AUTO (BHOP)", err_AB)
+end
 DaraSectionStart("SELF REVIVE")
 local ok_SR, err_SR = pcall(function()
 Tabs.Auto:Space()
@@ -2659,7 +2730,18 @@ local ok_AF, err_AF = pcall(function()
 -- ================= ADD: SECTION AUTO FARM (port dari DaraHub 2.2, fitur auto farm lengkap) =================
 -- ADD: Anti AFK (tab Misc versi asli tidak dibawa ke Ringkas; Auto Farm menyalakannya otomatis saat mulai)
 local AntiAFKConnection = nil
-local VirtualUser = game:GetService("VirtualUser")
+-- FIX v1.4.3 (CAPABILITY): GetService("VirtualUser") TIDAK dipanggil lagi saat load.
+-- Service ber-security Plugin yang disentuh di tengah load diduga melepaskan capability
+-- thread di sebagian executor -> SEMUA pembuatan UI sesudahnya gagal
+-- "lacking capability Plugin" (tab Auto/Visuals/Utility/Teleport/Shop jadi kosong).
+-- Sekarang diambil lazy di callback Anti AFK + dibungkus pcall.
+local VirtualUser = nil
+local function getVirtualUser()
+if VirtualUser then return VirtualUser end
+local okVU, resVU = pcall(game.GetService, game, "VirtualUser")
+if okVU then VirtualUser = resVU end
+return VirtualUser
+end
 
 -- FIX: akses Events.Interact memakai FindFirstChild bertingkat + warn agar tidak error saat load
 -- jika game mengubah struktur Events (pola sama dengan fix UserData di bagian Shop)
@@ -2682,9 +2764,13 @@ if AntiAFKConnection then
 AntiAFKConnection:Disconnect()
 end
 AntiAFKConnection = LocalPlayer.Idled:Connect(function()
-VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+local vuAFK = getVirtualUser()
+if not vuAFK then return end
+pcall(function()
+vuAFK:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 task.wait(1)
-VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+vuAFK:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
 end)
 else
 if AntiAFKConnection then
@@ -3814,8 +3900,18 @@ end
 
 
 -- ================= TAB VISUALS =================
+-- FIX v1.4.3: dua baris di bawah tadinya TANPA pcall - satu error di sini mematikan
+-- SEMUA section setelahnya (FULL BRIGHT s/d PLATFORM PC tidak pernah dimuat, tab
+-- Visuals/Utility/Teleport/Shop jadi kosong). Ini penyebab "satu error mati semua".
+do
+local ok_VH, err_VH = pcall(function()
 Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
 Tabs.Visuals:Divider()
+end)
+if not ok_VH then
+warn("[Dara Hub][SECTION ERROR] 'TAB VISUALS (header)' gagal: " .. tostring(err_VH))
+end
+end
 DaraSectionStart("FULL BRIGHT")
 local ok_FB, err_FB = pcall(function()
 -- ============================================================
@@ -4533,7 +4629,8 @@ SpecialRoundEnabled = state
 handleTimerToggles()
 end
 })
-Tabs.Visuals:Space()
+-- FIX v1.4.3: dibungkus pcall (baris telanjang di ujung section yang tidak dibungkus)
+pcall(function() Tabs.Visuals:Space() end)
 DaraSectionDone("TIMER GUI")
 DaraSectionStart("VISUALS: STATS/DEATHFEED/COLA")
 -- ============================================================
@@ -6632,6 +6729,8 @@ end
 
 DaraSectionDone("TAB TELEPORT")
 DaraSectionStart("TAB SHOP")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_TS, err_TS = pcall(function()
 -- ================= TAB SHOP (SINKRON DARAHUB BETA) =================
 -- UPDATE BETA: shop automation mengikuti DaraHub BETA - Daily/Token dari service Shops,
 -- Event Shop dibaca dari EventTiers (harga Tickets, tier, status) + live keys (slot Event),
@@ -7311,8 +7410,15 @@ end
 -- di dalamnya ada UIScale (kompensasi DPI) -> Z mengalikan skala dasar tersebut, jadi proporsional di semua HP.
 -- ============================================================
 -- ADD (Task 24): Drag Control - tahan 5 detik tombol layar untuk lock/unlock drag
+end)
+if ok_TS then
 DaraSectionDone("TAB SHOP")
+else
+DaraSectionFail("TAB SHOP", err_TS)
+end
 DaraSectionStart("SETTINGS: DRAG CONTROL")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_SD, err_SD = pcall(function()
 Tabs.Settings:Space()
 Tabs.Settings:Section({ Title = "Drag Control", TextSize = 20 })
 Tabs.Settings:Toggle({
@@ -7328,7 +7434,12 @@ end
 end
 })
 
+end)
+if ok_SD then
 DaraSectionDone("SETTINGS: DRAG CONTROL")
+else
+DaraSectionFail("SETTINGS: DRAG CONTROL", err_SD)
+end
 DaraSectionStart("SCREEN BUTTON SIZE")
 local ok_BS, err_BS = pcall(function()
 Tabs.Settings:Space()
@@ -7462,6 +7573,8 @@ end
 
 
 DaraSectionStart("PLATFORM PC & SENSITIVITAS")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_PP, err_PP = pcall(function()
 -- ============================================================
 -- UPDATE PC: DUKUNGAN PLATFORM PC (tab Settings).
 -- 1) Show Top GUI on PC  : tombol layar Zoom / Front View-Reload / Leaderboard kini
@@ -7713,9 +7826,17 @@ end
 
 end
 
+end)
+if ok_PP then
 DaraSectionDone("PLATFORM PC & SENSITIVITAS")
+else
+DaraSectionFail("PLATFORM PC & SENSITIVITAS", err_PP)
+end
 
+-- FIX v1.4.3: dibungkus pcall (baris telanjang setelah semua section)
+pcall(function()
 Window:SelectTab(1)
+end)
 
 -- v1.4.2: LAPORAN LOAD - ringkasan status semua section (notif + console)
 pcall(DaraHubFinalReport)
