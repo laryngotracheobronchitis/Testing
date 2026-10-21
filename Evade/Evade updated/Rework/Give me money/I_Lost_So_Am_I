@@ -1,8 +1,26 @@
 --[[
-    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.5.0
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.5.1
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.5.1 (FLOATING BUTTON FITUR SELALU MUNCUL + SHOW/HIDE BAWAAN WINDUI) ============================
+    - PENTING: ada DUA hal BERBEDA yang sebelumnya tercampur:
+        (1) Minimize/Show-Hide WindUI = tombol kecil yang muncul setelah UI di-minimize.
+        (2) Floating Button fitur (ButtonLib DaraHub) = Supper Bounce, Bunny Hop, Lag Switch,
+            Custom Gravity - tombol layar yang bisa di-drag untuk fitur.
+    - MINIMIZE/SHOW-HIDE: kini pakai fitur BAWAAN WindUI dengan ICON bawaan WindUI (lucide
+      "eye") - TANPA foto eksternal sama sekali. Bentuk = pill bawaan WindUI
+      [drag handle | icon mata | tulisan "JoblessHub"], jelas terlihat, klik = buka UI.
+      (v1.5.0 hanya teks; ShowIconOnly tanpa gambar = transparan tak terlihat.)
+      Fix lama tetap aktif: OnlyMobile = false + patch IsPC -> icon selalu muncul setelah minimize.
+    - FLOATING BUTTON FITUR (ButtonLib) TIDAK DIHAPUS - justru INI akar masalah "invisible":
+      LoadAll.lua lama memuat ButtonLib di BACKGROUND, jadi saat script membuat tombol,
+      ButtonLib masih nil -> error ditelan pcall -> 4 tombol fitur tidak pernah dibuat.
+      Kini: ButtonLib di-load SINKRON sebelum UI dibangun + DaraWaitButtonLib di tiap titik
+      create + ENGINE TOMBOL LAYAR BAWAAN (API kompatibel) bila link darahub.pages.dev gagal
+      -> Supper Bounce / Bunny Hop / Lag Switch / Gravity SELALU MUNCUL. Tidak ada fitur hilang.
+    - LoadAll.lua tidak lagi dipakai (NotifyToast/ErrorPrompt tidak pernah dipakai script).
 
     ============================ UPDATE v1.5.0 (REBRAND JOBLESSHUB + WINDUI ASLI TANPA FOTO) ============================
     - REBRAND: semua nama "Dara Hub"/"DaraHub" yang terlihat user (judul window, Author, notifikasi,
@@ -275,7 +293,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[JoblessHub] ============ LAPORAN LOAD v1.5.0 ============")
+        print("[JoblessHub] ============ LAPORAN LOAD v1.5.1 ============")
         print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -292,7 +310,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "JoblessHub Ringkas v1.5.0 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.5.1 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -417,17 +435,255 @@ end
 -- bisa dieksekusi ulang kapan saja tanpa harus rejoin (tidak ada lagi blokir eksekusi kedua).
 local BaseURL = "https://darahub.pages.dev"
 
--- FIX: pemuatan library dibungkus pcall + warn agar penyebab gagal terlihat jelas di console
-local okLib = pcall(function()
-loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
+-- ===================== FIX v1.5.1 (FLOATING BUTTON / BUTTONLIB FITUR) =====================
+-- MASALAH LAMA: LoadAll.lua memuat ButtonLib di BACKGROUND (task.spawn). Saat script membuat
+-- tombol layar fitur (Supper Bounce / Bunny Hop / Lag Switch / Custom Gravity), global
+-- ButtonLib sering masih NIL (download background belum selesai) -> error "attempt to index
+-- nil with 'Create'" -> ditelan pcall section -> SEMUA floating button fitur tidak pernah
+-- dibuat (invisible / tidak ada). SOLUSI:
+--   (1) ButtonLib di-load SINKRON langsung di sini (bukan lagi lewat LoadAll background);
+--   (2) DaraWaitButtonLib dipasang di SETIAP titik pembuatan tombol (4 titik + wrapper
+--       Drag Control) dan guard OnDestroy;
+--   (3) Bila darahub.pages.dev tidak terjangkau, ENGINE TOMBOL LAYAR BAWAAN (API kompatibel
+--       dengan ButtonLib) otomatis dipakai -> floating button fitur SELALU MUNCUL.
+-- Script ini tidak pernah memakai toast/prompt lib LoadAll, jadi tidak dimuat lagi (lebih cepat).
+local function DaraLoadLibFile(fileName, tries)
+tries = tonumber(tries) or 2
+for i = 1, tries do
+local okGet, src = pcall(function()
+return game:HttpGet(BaseURL .. "/Module/Library/GUI/" .. fileName)
 end)
-if not okLib then
-        warn("[JoblessHub] Gagal memuat library (LoadAll.lua): " .. "penyebab umum = koneksi internet / executor diblokir.")
-        pcall(function()
-                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat LIBRARY UI (LoadAll.lua) - cek internet lalu eksekusi ulang. Detail di console.")
-        end)
-        return
+if okGet and type(src) == "string" and #src > 0 then
+local okFn, fn = pcall(loadstring, src)
+if okFn and type(fn) == "function" then
+local okRun, runErr = pcall(fn)
+if okRun then return true end
+warn("[JoblessHub] Gagal menjalankan " .. fileName .. ": " .. tostring(runErr))
+return false
 end
+else
+warn("[JoblessHub] Percobaan " .. i .. ": gagal download " .. fileName .. " (" .. tostring(src) .. ")")
+end
+if i < tries then task.wait(0.3) end
+end
+return false
+end
+
+-- ENGINE TOMBOL LAYAR BAWAAN (fallback) - API kompatibel dengan ButtonLib DaraHub:
+-- Create:Button / Create:Toggle, SetVisible/SetText/SetCallback/Set/Get/Destroy,
+-- shortcut ButtonLib.<Flag>, ScreenGui "Darahub", Frame 250x90 bernama Flag + UIScale
+-- (kompatibel dengan fitur Drag Control & Screen Button Size).
+local function DaraBuildFallbackButtonLib()
+if getgenv().ButtonLib and getgenv().ButtonLib.Create then return getgenv().ButtonLib end
+local CoreGui = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+local BL = {}
+BL.Create = {}
+local gui = nil
+pcall(function() gui = CoreGui:FindFirstChild("Darahub") end)
+if not gui then
+pcall(function()
+local g = Instance.new("ScreenGui")
+g.Name = "Darahub"
+g.IgnoreGuiInset = true
+g.ResetOnSpawn = false
+g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+g.DisplayOrder = 999999
+g.Parent = CoreGui
+gui = g
+end)
+end
+if not gui then
+pcall(function()
+local g = Instance.new("ScreenGui")
+g.Name = "Darahub"
+g.IgnoreGuiInset = true
+g.ResetOnSpawn = false
+g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+g.DisplayOrder = 999999
+g.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+gui = g
+end)
+end
+if not gui then
+warn("[JoblessHub] Engine tombol layar bawaan gagal membuat ScreenGui.")
+return nil
+end
+local function dpiScale()
+local okVp, vp = pcall(function()
+return workspace.CurrentCamera.ViewportSize.Y
+end)
+if okVp and vp and vp > 0 then return vp / 1080 end
+return 1
+end
+local function baseFrame(config)
+local flag = tostring(config.Flag or config.Text or "Element")
+local frame = Instance.new("Frame")
+frame.Name = flag
+frame.Visible = config.Visible ~= false
+frame.Active = true
+frame.Size = UDim2.new(0, 250, 0, 90)
+frame.Position = config.Position or UDim2.new(0.5, -125, 0.5, -45)
+frame.BackgroundColor3 = Color3.new(1, 1, 1)
+frame.BackgroundTransparency = 0.2
+frame.ZIndex = config.ZIndex or 1
+frame.Parent = gui
+local scale = Instance.new("UIScale", frame)
+scale.Scale = dpiScale()
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 10)
+local strokeB = Instance.new("UIStroke", frame)
+strokeB.Thickness = 2
+strokeB.Color = Color3.new(0, 0, 0)
+strokeB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local strokeW = Instance.new("UIStroke", frame)
+strokeW.Thickness = 1
+strokeW.Color = Color3.new(1, 1, 1)
+strokeW.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local grad = Instance.new("UIGradient", frame)
+grad.Rotation = 90
+grad.Color = ColorSequence.new(Color3.fromRGB(47, 47, 47), Color3.new(0, 0, 0))
+local textButton = Instance.new("TextButton", frame)
+textButton.Name = "Button"
+textButton.Size = UDim2.new(1, 0, 1, 0)
+textButton.Position = UDim2.new(0, 0, 0, 0)
+textButton.BackgroundTransparency = 1
+textButton.Text = ""
+textButton.AutoButtonColor = false
+textButton.ZIndex = 10
+local label = Instance.new("TextLabel", frame)
+label.Name = "Label"
+label.Size = UDim2.new(1, -20, 1, 0)
+label.Position = UDim2.new(0, 10, 0, 0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.Font = Enum.Font.FredokaOne
+label.ZIndex = 5
+label.Text = config.Text or "Button"
+return frame, textButton, label, flag
+end
+-- Drag + klik persis gaya ButtonLib asli: klik = posisi tidak berubah sejak ditekan.
+local function makeDraggable(frame, textButton, callbacks)
+local startPosition = nil
+textButton.MouseButton1Down:Connect(function()
+startPosition = frame.Position
+end)
+textButton.MouseButton1Up:Connect(function()
+if startPosition then
+if frame.Position == startPosition and callbacks.OnClick then
+pcall(callbacks.OnClick)
+end
+startPosition = nil
+end
+end)
+local dragStart, startPos = nil, nil
+textButton.InputBegan:Connect(function(input)
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+dragStart = input.Position
+startPos = frame.Position
+end
+end)
+UIS.InputEnded:Connect(function(input)
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+dragStart = nil
+end
+end)
+UIS.InputChanged:Connect(function(moveInput)
+local t = moveInput.UserInputType
+if dragStart and startPos and (t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseMovement) then
+local delta = moveInput.Position - dragStart
+frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+end)
+end
+function BL:DestroyScreengui()
+pcall(function() gui:Destroy() end)
+gui = nil
+getgenv().ButtonLib = nil
+end
+function BL.Create:Button(config)
+config = config or {}
+local frame, textButton, label, flag = baseFrame(config)
+local api = {}
+local callback = config.Callback or config[1] or function() end
+function api:SetVisible(v) frame.Visible = v and true or false end
+function api:SetText(txt) label.Text = tostring(txt) end
+function api:GetText() return label.Text end
+function api:SetCallback(cb) if type(cb) == "function" then callback = cb end end
+function api:SetZIndex(z) frame.ZIndex = z end
+function api:GetZIndex() return frame.ZIndex end
+function api:GetFlag() return flag end
+function api:Destroy() pcall(function() frame:Destroy() end) if BL[flag] == api then BL[flag] = nil end end
+makeDraggable(frame, textButton, { OnClick = function() pcall(callback) end })
+BL[flag] = api
+return api
+end
+function BL.Create:Toggle(config)
+config = config or {}
+local frame, textButton, label, flag = baseFrame(config)
+local api = {}
+local callback = config.Callback or config[1] or function() end
+local baseText = config.Text or "Toggle"
+local state = config.Default and true or false
+local function updateUI()
+label.Text = baseText .. (state and " : ON" or " : OFF")
+end
+updateUI()
+function api:SetVisible(v) frame.Visible = v and true or false end
+function api:SetText(txt) baseText = tostring(txt) updateUI() end
+function api:GetText() return baseText end
+function api:SetCallback(cb) if type(cb) == "function" then callback = cb end end
+function api:Set(v) state = v and true or false updateUI() pcall(callback, state) end
+function api:Get() return state end
+function api:SetZIndex(z) frame.ZIndex = z end
+function api:GetZIndex() return frame.ZIndex end
+function api:GetFlag() return flag end
+function api:Destroy() pcall(function() frame:Destroy() end) if BL[flag] == api then BL[flag] = nil end end
+makeDraggable(frame, textButton, { OnClick = function() api:Set(not state) end })
+BL[flag] = api
+return api
+end
+getgenv().ButtonLib = BL
+return BL
+end
+
+-- Menunggu ButtonLib siap; dipasang di SETIAP titik pembuatan floating button fitur.
+-- Timeout habis -> coba download sekali lagi -> tetap gagal -> engine bawaan dipakai.
+local function DaraWaitButtonLib(timeout)
+timeout = tonumber(timeout) or 10
+local deadline = os.clock() + timeout
+while os.clock() < deadline do
+if getgenv().ButtonLib and getgenv().ButtonLib.Create then return getgenv().ButtonLib end
+task.wait(0.05)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraLoadLibFile("ButtonLib.lua", 1)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraBuildFallbackButtonLib()
+end
+return getgenv().ButtonLib
+end
+
+-- MUAT ButtonLib SINKRON SEKARANG (sebelum UI dibangun) supaya floating button pasti jadi.
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraLoadLibFile("ButtonLib.lua", 2)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+warn("[JoblessHub] ButtonLib (darahub.pages.dev) tidak terjangkau - memakai engine tombol layar BAWAAN. Floating button fitur TETAP muncul.")
+DaraBuildFallbackButtonLib()
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+pcall(function()
+game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat BUTTONLIB (tombol layar fitur) DAN engine bawaan gagal - cek internet lalu eksekusi ulang.")
+end)
+return
+end
+-- =================== AKHIR FIX v1.5.1 (FLOATING BUTTON / BUTTONLIB FITUR) ===================
+
 local okWindUI, WindUIMod = pcall(function()
 -- FIX v1.4.3 (CAPABILITY PATCH): teks library di-download dulu, di-patch, BARU dipasang.
 -- Loop update font di WindUI (UpdateFont) dibungkus pcall per-elemen agar SATU objek UI
@@ -679,6 +935,7 @@ DC.UnlockAll = unlockAllDragControl
 -- dapat sistem drag control. DraggingSystem milik ButtonLib lokal (tidak bisa dipatch
 -- dari luar), jadi lock/unlock diterapkan dari luar: pengembalian posisi (locked) +
 -- supresi klik + deteksi tahan 5 detik. Guard anti double-wrap agar aman dieksekusi ulang.
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap sebelum wrap
 pcall(function()
 if ButtonLib and ButtonLib.Create then
 if not ButtonLib.Create.__daraDragWrapped then
@@ -730,8 +987,15 @@ SideBarWidth = 200,
 -- FIX v1.4.6 (tetap aktif): OnlyMobile = false = floating icon SELALU dimunculkan lagi setelah
 -- window di-minimize, di SEMUA perangkat (HP/PC) walau KeyboardEnabled terdeteksi (executor
 -- baru bisa melaporkan itu walau di HP) - library menganggap "PC" dan tidak menampilkan icon.
+-- tidak terlihat, karena itu dipakai gaya teks bawaan). Bisa di-drag; klik = buka UI kembali.
+-- FIX v1.5.1 (TOMBOL MINIMIZE PAKAI BAWAAN WINDUI): tambah ICON BAWAAN WindUI (lucide "eye")
+-- di OpenButton - TANPA foto eksternal sama sekali. Bentuk akhir = pill bawaan WindUI
+-- [drag handle | icon mata | tulisan "JoblessHub"] - jelas TERLIHAT (v1.5.0 tanpa gambar
+-- kurang jelas), bisa di-drag, klik = buka UI kembali. Icon lucide dirender sistem icon
+-- internal WindUI (mekanisme yang sama dengan icon tab), jadi tampil di semua perangkat.
 OpenButton = {
 Title = "JoblessHub",
+Icon = "eye",
 OnlyMobile = false
 }})
 WindUI.TransparencyValue = 0.7
@@ -795,7 +1059,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.5.0",
+Title = "v1.5.1",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -897,7 +1161,7 @@ mouseUnlock(false)
 end)
 local stopRampBooster
 Window:OnDestroy(function()
-ButtonLib:DestroyScreengui()
+if ButtonLib then ButtonLib:DestroyScreengui() end -- FIX v1.5.1: guard nil
 mouseUnlock(false)
 if stopRampBooster then stopRampBooster() end
 end)
@@ -1811,6 +2075,7 @@ end
 end
 })
 
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
 SuperBounceButton = ButtonLib.Create:Button({
 Text = "Supper Bounce",
 Flag = "SuperBounce",
@@ -2505,6 +2770,7 @@ end
 end
 })
 
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
 ButtonLib.Create:Toggle({
 Text = "Bunny Hop",
 Flag = "BunnyHopToggle",
@@ -5757,6 +6023,7 @@ end
 end
 
 Tabs.Utility:Space()
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
 ButtonLib.Create:Button({
 Text = "Lag Switch",
 Flag = "LagSwitch",
@@ -6021,6 +6288,7 @@ end)
 end
 })
 
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
 ButtonLib.Create:Toggle({
 Text = "Gravity",
 Flag = "GravityToggle",
