@@ -1,8 +1,24 @@
 --[[
-    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.5
+    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.6
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.4.6 (FIX TOMBOL SHOW/HIDE HILANG SETELAH MINIMIZE) ============================
+    Gejala: setelah window di-minimize, floating icon (tombol Show/Hide) TIDAK MUNCUL SAMA SEKALI sehingga
+    UI tidak bisa dibuka lagi tanpa eksekusi ulang script. Dari bedah library WindUI-Moded ditemukan:
+    - Library menandai perangkat sebagai PC bila UserInputService.KeyboardEnabled = true. Executor yang
+      baru dipakai melaporkan KeyboardEnabled = true walau dipakai di HP, sehingga dianggap PC.
+    - Saat window di-minimize, library HANYA memunculkan kembali floating icon di perangkat mobile
+      (kondisi "not IsPC" di fungsi Close). Karena dianggap PC, icon tidak pernah dimunculkan lagi -
+      dan di HP tidak ada keyboard untuk menekan toggle key RightControl, jadi UI hilang total.
+    v1.4.6 memperbaiki dengan dua lapis (logika sendiri):
+    - LAPIS 1 (jalur utama - opsi resmi library): OpenButton kini dikirim "OnlyMobile = false", fitur
+      bawaan library yang memaksa IsPC = false sehingga floating icon SELALU dimunculkan kembali
+      setelah minimize di semua perangkat. Icon tetap bisa di-drag; klik icon = buka UI.
+    - LAPIS 2 (cadangan - patch library saat load): syarat "not au.IsPC" di fungsi Close library
+      dihapus lewat patch teks otomatis (pola sama dengan patch font v1.4.3). Bila pola tidak
+      ditemukan (library berubah), patch dilewati dengan warning - TIDAK fatal.
 
     ============================ UPDATE v1.4.5 (ANTI TAB KOSONG TOTAL - SAFE TAB PROXY) ============================
     Diperiksa terhadap DaraHub Beta ASLI (Evade 2.2): file asli sendiri BISA mengalami tab kosong!
@@ -240,7 +256,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[Dara Hub] ============ LAPORAN LOAD v1.4.5 ============")
+        print("[Dara Hub] ============ LAPORAN LOAD v1.4.6 ============")
         print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -257,7 +273,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "DaraHub Ringkas v1.4.5 siap dipakai (Evade 2.2)",
+                                        Title = "DaraHub Ringkas v1.4.6 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -414,6 +430,19 @@ if nPatched > 0 then
 print("[Dara Hub] Patch font-capability diterapkan ke library UI (" .. nPatched .. " titik)")
 else
 warn("[Dara Hub] PERINGATAN: pola font di library UI tidak ditemukan - library dipasang tanpa patch (kemungkinan library upstream berubah)")
+end
+-- FIX v1.4.6 (LAPIS 2 - CADANGAN): hapus syarat "not au.IsPC" di fungsi Close library agar
+-- floating icon Show/Hide tetap dimunculkan setelah minimize di SEMUA perangkat. LAPIS 1
+-- (OnlyMobile = false di OpenButton) adalah jalur utama; patch ini cadangan bila jalur resmi
+-- berubah. Pola tidak ketemu = warning saja, TIDAK fatal (library tetap terpasang).
+local ICON_LINE = 'if au.OpenButtonMain and not au.Destroyed and not au.IsPC and au.IsOpenButtonEnabled then'
+local ICON_PATCHED = 'if au.OpenButtonMain and not au.Destroyed and au.IsOpenButtonEnabled then'
+local pI1, pI2 = string.find(libSrc, ICON_LINE, 1, true)
+if pI1 then
+libSrc = string.sub(libSrc, 1, pI1 - 1) .. ICON_PATCHED .. string.sub(libSrc, pI2 + 1)
+print("[Dara Hub] Patch floating-icon diterapkan ke library UI (syarat IsPC dihapus)")
+else
+warn("[Dara Hub] PERINGATAN: pola floating-icon di library UI tidak ditemukan - patch dilewati (jalur utama OnlyMobile=false tetap aktif)")
 end
 return loadstring(libSrc)()
 end)
@@ -654,8 +683,14 @@ HidePanelBackground = false,
 Acrylic = false,
 HideSearchBar = false,
 SideBarWidth = 200,
+-- FIX v1.4.6 (TOMBOL SHOW/HIDE): OnlyMobile = false = opsi resmi library agar floating icon
+-- Show/Hide SELALU dimunculkan lagi setelah window di-minimize, di SEMUA perangkat (HP/PC).
+-- Library menganggap perangkat "PC" bila KeyboardEnabled terdeteksi (executor baru bisa
+-- melaporkan itu walau di HP) dan TIDAK menampilkan icon lagi saat minimize - kini dipaksa
+-- mode mobile. Icon tetap bisa di-drag; klik icon = buka UI kembali.
 OpenButton = {
-ShowIconOnly = true
+ShowIconOnly = true,
+OnlyMobile = false
 }})
 WindUI.TransparencyValue = 0.7
 pcall(function()
@@ -718,7 +753,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.4.5",
+Title = "v1.4.6",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
