@@ -1,8 +1,27 @@
 --[[
-    Dara Hub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.4.6
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.5.0
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
     Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
     Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.5.0 (REBRAND JOBLESSHUB + WINDUI ASLI TANPA FOTO) ============================
+    - REBRAND: semua nama "Dara Hub"/"DaraHub" yang terlihat user (judul window, Author, notifikasi,
+      warn/print/kick, folder config) diganti "JoblessHub". Nama internal script tidak diubah (aman).
+    - LIBRARY UI GANTI SUMBER: WindUI kini di-load dari repo GitHub sendiri (WindUI ASLI Footagesus,
+      bukan lagi WindUI-Moded dari darahub.pages.dev):
+      raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/WindUI%20by%20DaraHub/main.lua
+      Diverifikasi baris-per-baris: API 100% kompatibel (Notify/Popup/Tag/DisableTopbarButtons/
+      SetToggleKey/SelectTab/semua elemen) - bedanya hanya wrapper callback keybind yang sudah
+      dikompensasi sejak v1.4.4. Opsi OnlyMobile (fix minimize) terverifikasi ada di library asli.
+    - SHOW/HIDE TANPA FOTO (bawaan WindUI): foto icon.png DIHAPUS dari window, SetIconSize dihapus.
+      Floating Show/Hide kini gaya BAWAAN WindUI: pill bertuliskan "JoblessHub" + garis gradient,
+      TANPA foto sama sekali, bisa di-drag, klik = buka UI. (ShowIconOnly tanpa foto = transparan
+      total / tidak terlihat, karena itu dipakai gaya teks bawaan.)
+    - SHOW/HIDE SELALU MUNCUL: fix v1.4.6 dipertahankan (OnlyMobile = false + patch syarat IsPC di
+      fungsi Close library; pola patch di-update ke variabel library asli "aw.", pola lama "au."
+      tetap dicoba). Patch font-capability diperluas: mendukung pola library v1.6.64 DAN v1.6.65.
+    - CONFIG MACRO: path config VIP Macro pindah ke JoblessHub/Games/Evade/VIPMacroConfig.json.
+      Config lama di folder DaraHub otomatis DIMIGRASI (dibaca dari path lama bila path baru kosong).
 
     ============================ UPDATE v1.4.6 (FIX TOMBOL SHOW/HIDE HILANG SETELAH MINIMIZE) ============================
     Gejala: setelah window di-minimize, floating icon (tombol Show/Hide) TIDAK MUNCUL SAMA SEKALI sehingga
@@ -150,17 +169,17 @@ local okWhitelist, errWhitelist = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/Evade/Evade%20updated/Rework/Give%20me%20money/Whitelist"))()
 end)
 if not okWhitelist then
-        warn("[Dara Hub] WHITELIST GAGAL DIMUAT: " .. tostring(errWhitelist))
-        warn("[Dara Hub] Penyebab umum: koneksi internet / executor diblokir / GitHub down. Script berhenti (fail-closed).")
+        warn("[JoblessHub] WHITELIST GAGAL DIMUAT: " .. tostring(errWhitelist))
+        warn("[JoblessHub] Penyebab umum: koneksi internet / executor diblokir / GitHub down. Script berhenti (fail-closed).")
         pcall(function()
-                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Whitelist gagal dimuat - cek internet lalu eksekusi ulang. Detail error di console. [" .. tostring(errWhitelist) .. "]")
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Whitelist gagal dimuat - cek internet lalu eksekusi ulang. Detail error di console. [" .. tostring(errWhitelist) .. "]")
         end)
         return
 end
 if getgenv().DaraHubWhitelisted ~= true then
-        warn("[Dara Hub] UserId TIDAK TERDAFTAR di whitelist - eksekusi dihentikan (fail-closed).")
+        warn("[JoblessHub] UserId TIDAK TERDAFTAR di whitelist - eksekusi dihentikan (fail-closed).")
         pcall(function()
-                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] UserId kamu tidak terdaftar di whitelist DaraHub Ringkas.")
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] UserId kamu tidak terdaftar di whitelist JoblessHub Ringkas.")
         end)
         return
 end
@@ -188,7 +207,7 @@ do
         end
 end
 if DaraHubStaleCrash then
-        warn("[Dara Hub][PERINGATAN] Eksekusi sebelumnya CRASH di section: " .. tostring(DaraHubStaleCrash) .. " - nama ini adalah bagian yang error.")
+        warn("[JoblessHub][PERINGATAN] Eksekusi sebelumnya CRASH di section: " .. tostring(DaraHubStaleCrash) .. " - nama ini adalah bagian yang error.")
 end
 
 function DaraSectionStart(name)
@@ -204,7 +223,7 @@ function DaraSectionStart(name)
                 getgenv().DaraHubSectionOrder[#getgenv().DaraHubSectionOrder + 1] = name
         end
         getgenv().DaraHubCurrentSection = name
-        print("[Dara Hub] Memuat section: " .. name)
+        print("[JoblessHub] Memuat section: " .. name)
 end
 
 function DaraSectionDone(name)
@@ -220,8 +239,8 @@ end
 
 function DaraSectionFail(name, err)
         getgenv().DaraHubSections[name] = { status = "ERROR", err = tostring(err) }
-        warn("[Dara Hub][SECTION ERROR] '" .. tostring(name) .. "' gagal dimuat: " .. tostring(err))
-        warn("[Dara Hub][SECTION ERROR] Script LANJUT ke section berikutnya - fitur '" .. tostring(name) .. "' mungkin tidak berfungsi.")
+        warn("[JoblessHub][SECTION ERROR] '" .. tostring(name) .. "' gagal dimuat: " .. tostring(err))
+        warn("[JoblessHub][SECTION ERROR] Script LANJUT ke section berikutnya - fitur '" .. tostring(name) .. "' mungkin tidak berfungsi.")
         DaraHubErrorCount = (DaraHubErrorCount or 0) + 1
         if WindUI and DaraHubErrorCount <= 4 then
                 pcall(function()
@@ -256,13 +275,13 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[Dara Hub] ============ LAPORAN LOAD v1.4.6 ============")
-        print("[Dara Hub] Section OK: " .. _okC .. "/" .. _total)
+        print("[JoblessHub] ============ LAPORAN LOAD v1.5.0 ============")
+        print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
-                print("[Dara Hub]   [" .. _st.status .. "] " .. _name .. (_st.ms and (" (" .. _st.ms .. "ms)") or "") .. (_st.err and (" - " .. tostring(_st.err)) or ""))
+                print("[JoblessHub]   [" .. _st.status .. "] " .. _name .. (_st.ms and (" (" .. _st.ms .. "ms)") or "") .. (_st.err and (" - " .. tostring(_st.err)) or ""))
         end
-        print("[Dara Hub] ==============================================")
+        print("[JoblessHub] ==============================================")
         if WindUI then
                 pcall(function()
                         if _errC > 0 then
@@ -273,7 +292,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "DaraHub Ringkas v1.4.6 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.5.0 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -338,7 +357,7 @@ function FireClient(path, ...)
 if not getconnections then
 if not fireClientWarned then
 fireClientWarned = true
-warn("[Dara Hub] Executor tidak mendukung 'getconnections' - nilai movement dikirim via jalur langsung")
+warn("[JoblessHub] Executor tidak mendukung 'getconnections' - nilai movement dikirim via jalur langsung")
 end
 return false
 end
@@ -403,9 +422,9 @@ local okLib = pcall(function()
 loadstring(game:HttpGet(BaseURL .. "/Module/Library/GUI/LoadAll.lua"))() -- load lib stuff
 end)
 if not okLib then
-        warn("[Dara Hub] Gagal memuat library (LoadAll.lua): " .. "penyebab umum = koneksi internet / executor diblokir.")
+        warn("[JoblessHub] Gagal memuat library (LoadAll.lua): " .. "penyebab umum = koneksi internet / executor diblokir.")
         pcall(function()
-                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Gagal memuat LIBRARY UI (LoadAll.lua) - cek internet lalu eksekusi ulang. Detail di console.")
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat LIBRARY UI (LoadAll.lua) - cek internet lalu eksekusi ulang. Detail di console.")
         end)
         return
 end
@@ -414,10 +433,19 @@ local okWindUI, WindUIMod = pcall(function()
 -- Loop update font di WindUI (UpdateFont) dibungkus pcall per-elemen agar SATU objek UI
 -- bermasalah ("lacking capability Plugin" di sebagian executor/Roblox terbaru) TIDAK
 -- menggagalkan pembuatan semua elemen berikutnya (efek domino = banyak tab kosong).
-local libSrc = game:HttpGet(BaseURL .. "/Module/Library/GUI/WindUI-Moded/main.lua")
-local FONT_LINE = 'v.FontFace=Font.new(r,v.FontFace.Weight,v.FontFace.Style)'
-local FONT_PATCHED = 'pcall(function() ' .. FONT_LINE .. ' end)'
+-- FIX v1.5.0: library WindUI kini dari repo GitHub sendiri (WindUI ASLI Footagesus,
+-- bukan lagi WindUI-Moded dari darahub.pages.dev). URL memakai %20 (spasi) - JANGAN di-decode.
+local WINDUI_URL = "https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/WindUI%20by%20DaraHub/main.lua"
+local libSrc = game:HttpGet(WINDUI_URL)
+-- FIX v1.5.0: DUA pola font - library v1.6.64 (repo skrg) pakai pola lama, v1.6.65 pola baru.
+-- Kalau repo di-update ke versi baru, patch tetap jalan. Tidak ketemu = warning, TIDAK fatal.
+local FONT_LINES = {
+'v.FontFace=Font.new(r,v.FontFace.Weight,v.FontFace.Style)',
+'x.FontFace=Font.new(u,x.FontFace.Weight,x.FontFace.Style)',
+}
 local nPatched = 0
+for _, FONT_LINE in ipairs(FONT_LINES) do
+local FONT_PATCHED = 'pcall(function() ' .. FONT_LINE .. ' end)'
 local searchFrom = 1
 while true do
 local p1, p2 = string.find(libSrc, FONT_LINE, searchFrom, true)
@@ -426,30 +454,43 @@ libSrc = string.sub(libSrc, 1, p1 - 1) .. FONT_PATCHED .. string.sub(libSrc, p2 
 searchFrom = p1 + #FONT_PATCHED
 nPatched = nPatched + 1
 end
+end
 if nPatched > 0 then
-print("[Dara Hub] Patch font-capability diterapkan ke library UI (" .. nPatched .. " titik)")
+print("[JoblessHub] Patch font-capability diterapkan ke library UI (" .. nPatched .. " titik)")
 else
-warn("[Dara Hub] PERINGATAN: pola font di library UI tidak ditemukan - library dipasang tanpa patch (kemungkinan library upstream berubah)")
+warn("[JoblessHub] PERINGATAN: pola font di library UI tidak ditemukan - library dipasang tanpa patch (kemungkinan library upstream berubah)")
 end
 -- FIX v1.4.6 (LAPIS 2 - CADANGAN): hapus syarat "not au.IsPC" di fungsi Close library agar
 -- floating icon Show/Hide tetap dimunculkan setelah minimize di SEMUA perangkat. LAPIS 1
 -- (OnlyMobile = false di OpenButton) adalah jalur utama; patch ini cadangan bila jalur resmi
 -- berubah. Pola tidak ketemu = warning saja, TIDAK fatal (library tetap terpasang).
-local ICON_LINE = 'if au.OpenButtonMain and not au.Destroyed and not au.IsPC and au.IsOpenButtonEnabled then'
-local ICON_PATCHED = 'if au.OpenButtonMain and not au.Destroyed and au.IsOpenButtonEnabled then'
-local pI1, pI2 = string.find(libSrc, ICON_LINE, 1, true)
+-- FIX v1.5.0: DUA varian pola - library ASLI memakai variabel "aw.", WindUI-Moded lama "au.".
+-- Hapus syarat "not IsPC" di fungsi Close agar floating Show/Hide SELALU muncul setelah minimize.
+local ICON_PATTERNS = {
+{ 'if aw.OpenButtonMain and not aw.Destroyed and not aw.IsPC and aw.IsOpenButtonEnabled then',
+'if aw.OpenButtonMain and not aw.Destroyed and aw.IsOpenButtonEnabled then' },
+{ 'if au.OpenButtonMain and not au.Destroyed and not au.IsPC and au.IsOpenButtonEnabled then',
+'if au.OpenButtonMain and not au.Destroyed and au.IsOpenButtonEnabled then' },
+}
+local nIcon = 0
+for _, pat in ipairs(ICON_PATTERNS) do
+local pI1, pI2 = string.find(libSrc, pat[1], 1, true)
 if pI1 then
-libSrc = string.sub(libSrc, 1, pI1 - 1) .. ICON_PATCHED .. string.sub(libSrc, pI2 + 1)
-print("[Dara Hub] Patch floating-icon diterapkan ke library UI (syarat IsPC dihapus)")
+libSrc = string.sub(libSrc, 1, pI1 - 1) .. pat[2] .. string.sub(libSrc, pI2 + 1)
+nIcon = nIcon + 1
+end
+end
+if nIcon > 0 then
+print("[JoblessHub] Patch floating-icon diterapkan ke library UI (syarat IsPC dihapus)")
 else
-warn("[Dara Hub] PERINGATAN: pola floating-icon di library UI tidak ditemukan - patch dilewati (jalur utama OnlyMobile=false tetap aktif)")
+warn("[JoblessHub] PERINGATAN: pola floating-icon di library UI tidak ditemukan - patch dilewati (jalur utama OnlyMobile=false tetap aktif)")
 end
 return loadstring(libSrc)()
 end)
 if not okWindUI or type(WindUIMod) ~= "table" then
-        warn("[Dara Hub] Gagal memuat WindUI (WindUI-Moded/main.lua) - library UI tidak valid.")
+        warn("[JoblessHub] Gagal memuat WindUI (main.lua dari GitHub: WindUI by DaraHub/main.lua) - library UI tidak valid.")
         pcall(function()
-                game:GetService("Players").LocalPlayer:Kick("[Dara Hub] Gagal memuat WindUI - cek internet lalu eksekusi ulang. Detail di console.")
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat WindUI - cek internet lalu eksekusi ulang. Detail di console.")
         end)
         return
 end
@@ -673,30 +714,31 @@ DaraSectionDone("DRAG CONTROL")
 DaraSectionStart("WINDOW & LAYAR")
 Window = WindUI:CreateWindow({
 NewElements = true,
-Title = "Dara Hub | Evade 2.2",
-Icon = BaseURL .. "/icon.png",
-Author = "Made by: Pnsdg And Yomka",
-Folder = "DaraHub/Games/Evade",
+Title = "JoblessHub | Evade 2.2",
+-- v1.5.0: Icon (foto) DIHAPUS - window & floating Show/Hide tanpa foto sama sekali.
+Author = "JoblessHub",
+Folder = "JoblessHub/Games/Evade",
 Size = UDim2.fromOffset(580, 490),
 Theme = "Dark",
 HidePanelBackground = false,
 Acrylic = false,
 HideSearchBar = false,
 SideBarWidth = 200,
--- FIX v1.4.6 (TOMBOL SHOW/HIDE): OnlyMobile = false = opsi resmi library agar floating icon
--- Show/Hide SELALU dimunculkan lagi setelah window di-minimize, di SEMUA perangkat (HP/PC).
--- Library menganggap perangkat "PC" bila KeyboardEnabled terdeteksi (executor baru bisa
--- melaporkan itu walau di HP) dan TIDAK menampilkan icon lagi saat minimize - kini dipaksa
--- mode mobile. Icon tetap bisa di-drag; klik icon = buka UI kembali.
+-- FIX v1.5.0 (SHOW/HIDE TANPA FOTO): gaya BAWAAN WindUI - pill bertuliskan "JoblessHub" dengan
+-- garis gradient, TANPA foto sama sekali (catatan: ShowIconOnly tanpa foto = transparan total /
+-- tidak terlihat, karena itu dipakai gaya teks bawaan). Bisa di-drag; klik = buka UI kembali.
+-- FIX v1.4.6 (tetap aktif): OnlyMobile = false = floating icon SELALU dimunculkan lagi setelah
+-- window di-minimize, di SEMUA perangkat (HP/PC) walau KeyboardEnabled terdeteksi (executor
+-- baru bisa melaporkan itu walau di HP) - library menganggap "PC" dan tidak menampilkan icon.
 OpenButton = {
-ShowIconOnly = true,
+Title = "JoblessHub",
 OnlyMobile = false
 }})
 WindUI.TransparencyValue = 0.7
 pcall(function()
 Window:ToggleTransparency(true)
 Window:DisableTopbarButtons({ "Fullscreen" })
-Window:SetIconSize(48)
+-- v1.5.0: SetIconSize dihapus (icon window/foto sudah tidak ada).
 -- Show/Hide window memakai fitur native WindUI: OpenButton (di CreateWindow) + SetToggleKey.
 -- FIX: SetToggleKey dipindah keluar dari tab Settings yang dihapus (nilai default sama: RightControl)
 Window:SetToggleKey(Enum.KeyCode.RightControl)
@@ -728,7 +770,7 @@ Color = IsTouchDevice and Color3.fromHex("#30a2ff") or Color3.fromHex("#ffaa30")
 end)
 pcall(function()
 WindUI:Notify({
-Title = "Dara Hub | Evade 2.2",
+Title = "JoblessHub | Evade 2.2",
 Content = "Platform terdeteksi: " .. PlatformLabel .. ". Dukungan PC (Sensitivity, PC Keybinds, Top GUI on PC) ada di tab Settings.",
 Duration = 4
 })
@@ -753,7 +795,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.4.6",
+Title = "v1.5.0",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -775,7 +817,7 @@ end
 local function DaraSafeTab(cfg, tabName)
 	local okT, realTab = pcall(function() return Window:Tab(cfg) end)
 	if not okT or not realTab then
-		warn("[Dara Hub] Tab '" .. tabName .. "' GAGAL dibuat di library UI: " .. tostring(realTab))
+		warn("[JoblessHub] Tab '" .. tabName .. "' GAGAL dibuat di library UI: " .. tostring(realTab))
 		realTab = nil
 	end
 	local proxy = {}
@@ -794,7 +836,7 @@ local function DaraSafeTab(cfg, tabName)
 										return function(_s, ...)
 											local okM, errM = pcall(v, resEl, ...)
 											if not okM then
-												warn("[Dara Hub] " .. tabName .. ":" .. tostring(key) .. " error: " .. tostring(errM))
+												warn("[JoblessHub] " .. tabName .. ":" .. tostring(key) .. " error: " .. tostring(errM))
 											end
 										end
 									end
@@ -803,7 +845,7 @@ local function DaraSafeTab(cfg, tabName)
 								__newindex = function(_et, key, val)
 									local okS, errS = pcall(function() resEl[key] = val end)
 									if not okS then
-										warn("[Dara Hub] elemen " .. tabName .. " (set " .. tostring(key) .. ") gagal: " .. tostring(errS))
+										warn("[JoblessHub] elemen " .. tabName .. " (set " .. tostring(key) .. ") gagal: " .. tostring(errS))
 									end
 								end,
 							})
@@ -815,7 +857,7 @@ local function DaraSafeTab(cfg, tabName)
 					if type(config) == "table" and type(config.Title) == "string" then
 						titleTxt = config.Title
 					end
-					warn("[Dara Hub] UI '" .. tabName .. ":" .. method .. "' (" .. titleTxt .. ") GAGAL dibuat: " .. tostring(resEl) .. " - elemen dilewati, elemen berikutnya tetap dicoba.")
+					warn("[JoblessHub] UI '" .. tabName .. ":" .. method .. "' (" .. titleTxt .. ") GAGAL dibuat: " .. tostring(resEl) .. " - elemen dilewati, elemen berikutnya tetap dicoba.")
 					return DaraDummyElement()
 				end
 				return DaraDummyElement()
@@ -879,10 +921,10 @@ local demonOriginalSize = nil
 local ToolAction = ReplicatedStorage.Events:FindFirstChild("ToolAction")
 local UpdateCharacterDataRegistry = ReplicatedStorage.Events:FindFirstChild("UpdateCharacterDataRegistry")
 if not ToolAction then
-warn("[Dara Hub] ReplicatedStorage.Events.ToolAction tidak ditemukan - fitur Cola & Defibrillator tidak akan berfungsi")
+warn("[JoblessHub] ReplicatedStorage.Events.ToolAction tidak ditemukan - fitur Cola & Defibrillator tidak akan berfungsi")
 end
 if not UpdateCharacterDataRegistry then
-warn("[Dara Hub] ReplicatedStorage.Events.UpdateCharacterDataRegistry tidak ditemukan - fitur Defibrillator tidak akan berfungsi")
+warn("[JoblessHub] ReplicatedStorage.Events.UpdateCharacterDataRegistry tidak ditemukan - fitur Defibrillator tidak akan berfungsi")
 end
 
 -- require
@@ -902,7 +944,7 @@ node = ReplicatedStorage
 for _, p in ipairs(parts) do
 node = node:FindFirstChild(p)
 if not node then
-warn("[Dara Hub] '" .. tostring(name) .. "' tidak ditemukan (" .. table.concat(parts, ".") .. ") - fitur terkait tidak aktif")
+warn("[JoblessHub] '" .. tostring(name) .. "' tidak ditemukan (" .. table.concat(parts, ".") .. ") - fitur terkait tidak aktif")
 return nil
 end
 end
@@ -911,7 +953,7 @@ node = parts
 end
 local ok, result = pcall(require, node)
 if not ok then
-warn("[Dara Hub] Gagal require '" .. tostring(name) .. "': " .. tostring(result))
+warn("[JoblessHub] Gagal require '" .. tostring(name) .. "': " .. tostring(result))
 return nil
 end
 return result
@@ -964,7 +1006,7 @@ local userDataServices = {}
 local function pcallRequire(module)
 local ok, result = pcall(require, module)
 if not ok then
-warn("[Dara Hub] Gagal require service UserData '" .. tostring(module.Name) .. "': " .. tostring(result))
+warn("[JoblessHub] Gagal require service UserData '" .. tostring(module.Name) .. "': " .. tostring(result))
 return nil
 end
 return result
@@ -1030,7 +1072,7 @@ end
 function PlayerData.RedeemCode(code)
 local ok, err = call("Codes", "Redeem", code)
 if not ok then
-warn("[Dara Hub] RedeemCode gagal untuk " .. tostring(code) .. ": " .. tostring(err))
+warn("[JoblessHub] RedeemCode gagal untuk " .. tostring(code) .. ": " .. tostring(err))
 end
 return ok
 end
@@ -1161,7 +1203,7 @@ end
 function PlayerData.Exchange(to, amount)
 local ok, err = call("Event", "Exchange", to, amount)
 if not ok then
-warn("[Dara Hub] Exchange gagal untuk " .. tostring(to) .. " x" .. tostring(amount) .. ": " .. tostring(err))
+warn("[JoblessHub] Exchange gagal untuk " .. tostring(to) .. " x" .. tostring(amount) .. ": " .. tostring(err))
 end
 return ok
 end
@@ -1217,7 +1259,7 @@ Key = key,
 Down = bool
 })
 else
-warn("[Dara Hub] KeybindService.SendKeybindEvent tidak ditemukan - keybind layar tidak terkirim")
+warn("[JoblessHub] KeybindService.SendKeybindEvent tidak ditemukan - keybind layar tidak terkirim")
 end
 end
 
@@ -1457,7 +1499,7 @@ function MovementValueSet(MovementType, value)
 -- FIX (Task 19): guard nilai nil (mis. input bukan angka) - versi lama mengirim nil
 -- diam-diam ke game sehingga tidak ada efek sama sekali tanpa pesan apa pun.
 if value == nil then
-warn("[Dara Hub] MovementValueSet('" .. tostring(MovementType) .. "'): nilai tidak valid (nil) - dilewati")
+warn("[JoblessHub] MovementValueSet('" .. tostring(MovementType) .. "'): nilai tidak valid (nil) - dilewati")
 return
 end
 if not CharacterTag then
@@ -1501,9 +1543,9 @@ end)
 return
 end
 movementFallbackNotified = true
-warn("[Dara Hub] Gagal mengubah movement '" .. tostring(MovementType) .. "': " .. tostring(errFall))
+warn("[JoblessHub] Gagal mengubah movement '" .. tostring(MovementType) .. "': " .. tostring(errFall))
 pcall(WindUI.Notify, WindUI, {
-Title = "Dara Hub",
+Title = "JoblessHub",
 Content = "Gagal mengubah " .. tostring(MovementType) .. ": executor tidak mendukung getconnections dan jalur langsung juga gagal.",
 Duration = 5
 })
@@ -1587,7 +1629,7 @@ self:AttemptJump()
 end
 end
 else
-warn("[Dara Hub] Module Movement tidak ditemukan/gagal require - hook movement & bhop dinonaktifkan (script tetap jalan)")
+warn("[JoblessHub] Module Movement tidak ditemukan/gagal require - hook movement & bhop dinonaktifkan (script tetap jalan)")
 end
 
 function updateBhopEnabled()
@@ -1633,7 +1675,7 @@ Tabs.Main:Space()
 function CanBeCarried(value)
 -- FIX: guard InteractionTypes nil (bila require gagal) - tidak error saat toggle diklik
 if not InteractionTypes or not InteractionTypes.Revive or type(InteractionTypes.Revive.Interactions) ~= "table" then
-warn("[Dara Hub] InteractionTypes.Revive tidak ditemukan - Force Enable Carry tidak tersedia")
+warn("[JoblessHub] InteractionTypes.Revive tidak ditemukan - Force Enable Carry tidak tersedia")
 return
 end
 for _, interaction in ipairs(InteractionTypes.Revive.Interactions) do
@@ -1666,7 +1708,7 @@ local okBB, errBB = pcall(function()
 loadstring(game:HttpGet(BaseURL .. "/api/script/obfuscated/Fe/Boomboxs/EvadeOverhaul-RelicsXYZ.lua"))()
 end)
 if not okBB then
-warn("[Dara Hub] Gagal memuat FE Boombox: " .. tostring(errBB))
+warn("[JoblessHub] Gagal memuat FE Boombox: " .. tostring(errBB))
 end
 end)
 end
@@ -2260,7 +2302,7 @@ end
 
 local function StartReviveAura()
 if not UpdateCharacterDataRegistry or not ToolAction then
-warn("[Dara Hub] Defibrillator Aura butuh Events.UpdateCharacterDataRegistry & Events.ToolAction (tidak ditemukan)")
+warn("[JoblessHub] Defibrillator Aura butuh Events.UpdateCharacterDataRegistry & Events.ToolAction (tidak ditemukan)")
 return
 end
 if defibrillator.Connection then
@@ -2696,7 +2738,7 @@ Callback = function()
 if changePlayerMode then
 pcall(function() changePlayerMode:FireServer(true) end)
 else
-warn("[Dara Hub] Force Respawn: Events.SetPlayerMode tidak ditemukan di game ini")
+warn("[JoblessHub] Force Respawn: Events.SetPlayerMode tidak ditemukan di game ini")
 end
 end
 })
@@ -2731,7 +2773,7 @@ if buildHooked then
 return true
 end
 if not BuildModule or type(BuildModule.GetClientPosition) ~= "function" then
-warn("[Dara Hub] BuildModule tidak ditemukan - Build Offset tidak tersedia")
+warn("[JoblessHub] BuildModule tidak ditemukan - Build Offset tidak tersedia")
 pcall(function()
 WindUI:Notify({ Title = "Build Offset", Content = "BuildModule tidak ditemukan (game berubah?).", Duration = 3 })
 end)
@@ -2910,7 +2952,7 @@ end
 local Interact = ReplicatedStorage:FindFirstChild("Events")
 Interact = Interact and Interact:FindFirstChild("Interact")
 if not Interact then
-warn("[Dara Hub] ReplicatedStorage.Events.Interact tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
+warn("[JoblessHub] ReplicatedStorage.Events.Interact tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
 end
 
 Tabs.Auto:Section({ Title = "Auto Farm" })
@@ -3412,14 +3454,17 @@ DaraSectionStart("VIP CMD MACRO")
 local ok_VM, err_VM = pcall(function()
 -- ================= ADD: SECTION VIP CMD MACRO (kembali Task 22, keadaan awal MATI - skema config EvadeCMDMacroGUI asli) =================
 -- ADD: macro chat command VIP (!time / !specialround / !MapScale); config default
--- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke DaraHub/Games/Evade/VIPMacroConfig.json
+-- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke JoblessHub/Games/Evade/VIPMacroConfig.json
 -- FIX (Task 22): dikembalikan dalam keadaan MATI sesuai klarifikasi user ("keadaan mati bukan hilang"):
 -- Auto Run default OFF dan TIDAK auto-start saat load; nyalakan manual via toggle "Auto Run VIP Macro"
 -- atau tombol "Run All Macros Now".
 local HttpService = game:GetService("HttpService")
 local UIS = game:GetService("UserInputService")
 
-local VIP_MACRO_CONFIG_FILE = "DaraHub/Games/Evade/VIPMacroConfig.json"
+local VIP_MACRO_CONFIG_FILE = "JoblessHub/Games/Evade/VIPMacroConfig.json"
+-- v1.5.0: config lama di folder DaraHub otomatis dimigrasi (dibaca bila folder baru masih kosong).
+local VIP_MACRO_CONFIG_LEGACY = "DaraHub/Games/Evade/VIPMacroConfig.json"
+local VIP_MACRO_CONFIG_READ = VIP_MACRO_CONFIG_FILE
 local VIP_MACRO_DEFAULT_CONFIG = '{"AutoFarm":[{"keybind":"F","delayValue":3,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro","command":"!time 1","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":1,"delayUnit":"Ms","startRoundType":"Intermission","name":"Macro","command":"!specialround Plushie Hell","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":30,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro_1790151459","command":"!MapScale 0","startTimeType":"Any Time","stopMode":"indefinitely"}]}'
 
 local VIPMacros = {}
@@ -3443,7 +3488,7 @@ return nil
 end
 if status == nil and not VIPWarnedNoRoundStatus then
 VIPWarnedNoRoundStatus = true
-warn("[Dara Hub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
+warn("[JoblessHub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
 end
 if status == nil then
 return nil
@@ -3486,7 +3531,7 @@ sent = true
 end)
 end
 if not sent then
-warn("[Dara Hub] Gagal mengirim chat macro: " .. tostring(message))
+warn("[JoblessHub] Gagal mengirim chat macro: " .. tostring(message))
 end
 end
 
@@ -3570,7 +3615,7 @@ end
 task.wait(1)
 waited = waited + 1
 end
-warn("[Dara Hub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
+warn("[JoblessHub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
 end)
 end
 
@@ -3623,7 +3668,7 @@ local ok, data = pcall(function()
 return HttpService:JSONDecode(raw)
 end)
 if not ok or type(data) ~= "table" then
-warn("[Dara Hub] Config VIP Macro bukan JSON valid")
+warn("[JoblessHub] Config VIP Macro bukan JSON valid")
 pcall(function()
 WindUI:Notify({ Title = "VIP CMD Macro", Content = "JSON tidak valid!", Duration = 3 })
 end)
@@ -3646,8 +3691,17 @@ end
 local VIPMacroLoadedFromDisk = false
 if isfile and readfile then
 local okFile, exists = pcall(isfile, VIP_MACRO_CONFIG_FILE)
+if okFile and not exists then
+-- v1.5.0 MIGRASI: config belum ada di folder JoblessHub tapi ada di folder lama DaraHub =
+-- baca dari path lama agar config lama user tetap terpakai; simpan berikutnya ke folder baru.
+local okLegacy, legacyExists = pcall(isfile, VIP_MACRO_CONFIG_LEGACY)
+if okLegacy and legacyExists then
+VIP_MACRO_CONFIG_READ = VIP_MACRO_CONFIG_LEGACY
+exists = true
+end
+end
 if okFile and exists then
-local ok, content = pcall(readfile, VIP_MACRO_CONFIG_FILE)
+local ok, content = pcall(readfile, VIP_MACRO_CONFIG_READ)
 if ok and type(content) == "string" and content ~= "" then
 local ok2, data = pcall(function()
 return HttpService:JSONDecode(content)
@@ -3696,7 +3750,7 @@ Title = "Run All Macros Now",
 Icon = "play",
 Callback = function()
 if not VIPMacroIsVIP() then
-warn("[Dara Hub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
+warn("[JoblessHub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
 pcall(function()
 WindUI:Notify({ Title = "VIP CMD Macro", Content = "Kamu belum punya VIP Commands (coba di private server sendiri).", Duration = 4 })
 end)
@@ -3739,11 +3793,11 @@ end
 
 Tabs.Auto:Button({
 Title = "Save Config ke File",
-Desc = "Simpan config macro aktif ke DaraHub/Games/Evade/VIPMacroConfig.json",
+Desc = "Simpan config macro aktif ke JoblessHub/Games/Evade/VIPMacroConfig.json",
 Icon = "save",
 Callback = function()
 if not writefile then
-warn("[Dara Hub] Executor tidak mendukung writefile - config tidak bisa disimpan")
+warn("[JoblessHub] Executor tidak mendukung writefile - config tidak bisa disimpan")
 pcall(function()
 WindUI:Notify({ Title = "VIP CMD Macro", Content = "Executor tidak mendukung writefile.", Duration = 3 })
 end)
@@ -3751,9 +3805,9 @@ return
 end
 local ok = pcall(function()
 if isfolder and makefolder then
-if not isfolder("DaraHub") then makefolder("DaraHub") end
-if not isfolder("DaraHub/Games") then makefolder("DaraHub/Games") end
-if not isfolder("DaraHub/Games/Evade") then makefolder("DaraHub/Games/Evade") end
+if not isfolder("JoblessHub") then makefolder("JoblessHub") end
+if not isfolder("JoblessHub/Games") then makefolder("JoblessHub/Games") end
+if not isfolder("JoblessHub/Games/Evade") then makefolder("JoblessHub/Games/Evade") end
 end
 local list = {}
 for _, m in ipairs(VIPMacros) do
@@ -3775,7 +3829,7 @@ pcall(function()
 WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config tersimpan: " .. VIP_MACRO_CONFIG_FILE, Duration = 3 })
 end)
 else
-warn("[Dara Hub] Gagal menyimpan config VIP Macro")
+warn("[JoblessHub] Gagal menyimpan config VIP Macro")
 end
 end
 })
@@ -4075,7 +4129,7 @@ Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
 Tabs.Visuals:Divider()
 end)
 if not ok_VH then
-warn("[Dara Hub][SECTION ERROR] 'TAB VISUALS (header)' gagal: " .. tostring(err_VH))
+warn("[JoblessHub][SECTION ERROR] 'TAB VISUALS (header)' gagal: " .. tostring(err_VH))
 end
 end
 DaraSectionStart("FULL BRIGHT")
@@ -4714,7 +4768,7 @@ local okReg, reg = pcall(function()
 return ServerStateRegistryService and ServerStateRegistryService.Registry
 end)
 if not okReg or not reg then
-warn("[Dara Hub] ServerStateRegistryService.Registry tidak tersedia - Timer Display tidak bisa membaca data round")
+warn("[JoblessHub] ServerStateRegistryService.Registry tidak tersedia - Timer Display tidak bisa membaca data round")
 return
 end
 local lastTimer = reg.Time
@@ -4958,7 +5012,7 @@ mirrorEnabled = true
 task.spawn(function()
 local ok, err = pcall(startMirror)
 if not ok then
-warn("[Dara Hub] Player stats mirror gagal: " .. tostring(err))
+warn("[JoblessHub] Player stats mirror gagal: " .. tostring(err))
 end
 end)
 end
@@ -4970,17 +5024,17 @@ local myToken = mirrorToken
 local playerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 local homePage = waitForChild(playerGui, "HomePage", 20)
 if not homePage then
-warn("[Dara Hub] PlayerGui.HomePage tidak ditemukan - Show Player Stats tidak tersedia")
+warn("[JoblessHub] PlayerGui.HomePage tidak ditemukan - Show Player Stats tidak tersedia")
 return
 end
 local root = waitForChild(homePage, "Root", 15)
 if not root then
-warn("[Dara Hub] HomePage.Root tidak ditemukan - Show Player Stats tidak tersedia")
+warn("[JoblessHub] HomePage.Root tidak ditemukan - Show Player Stats tidak tersedia")
 return
 end
 local bottom = waitForChild(root, "Bottom", 15)
 if not bottom then
-warn("[Dara Hub] HomePage.Root.Bottom tidak ditemukan - Show Player Stats tidak tersedia")
+warn("[JoblessHub] HomePage.Root.Bottom tidak ditemukan - Show Player Stats tidak tersedia")
 return
 end
 
@@ -5222,7 +5276,7 @@ end)
 if okHook then
 isColaHooked = true
 else
-warn("[Dara Hub] Gagal memasang hook Cola: " .. tostring(hookErr))
+warn("[JoblessHub] Gagal memasang hook Cola: " .. tostring(hookErr))
 end
 end
 
@@ -5286,11 +5340,11 @@ end
 end
 })
 else
-warn("[Dara Hub] Struktur module Cola berubah (Info tidak ditemukan) - fitur Cola dinonaktifkan")
+warn("[JoblessHub] Struktur module Cola berubah (Info tidak ditemukan) - fitur Cola dinonaktifkan")
 Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
 end
 else
-warn("[Dara Hub] Fitur Cola butuh hookfunction/getrawmetatable/newcclosure/buffer + Events.ToolAction + Tools.Cola")
+warn("[JoblessHub] Fitur Cola butuh hookfunction/getrawmetatable/newcclosure/buffer + Events.ToolAction + Tools.Cola")
 Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
 end
 end
@@ -5365,7 +5419,7 @@ local ok, err = pcall(function()
 setfflag(flag, value)
 end)
 if not ok then
-warn("[Dara Hub] setfflag('" .. tostring(flag) .. "') gagal: " .. tostring(err))
+warn("[JoblessHub] setfflag('" .. tostring(flag) .. "') gagal: " .. tostring(err))
 end
 return ok
 end
@@ -5881,7 +5935,7 @@ JumpPadValue = num
 end
 })
 else
-warn("[Dara Hub] JumpPadModule tidak ditemukan - Jump Pad Bounce Modifier dinonaktifkan")
+warn("[JoblessHub] JumpPadModule tidak ditemukan - Jump Pad Bounce Modifier dinonaktifkan")
 Tabs.Utility:Paragraph({ Title = "Jump Pad Not Available" })
 end
 
@@ -6943,7 +6997,7 @@ local ok_TS, err_TS = pcall(function()
 local ItemsFolder = ReplicatedStorage:FindFirstChild("Items")
 local ItemRegistry = ItemsFolder and ItemsFolder:FindFirstChild("Registry")
 if not ItemRegistry then
-warn("[Dara Hub] ReplicatedStorage.Items.Registry tidak ditemukan - fitur shop terbatas")
+warn("[JoblessHub] ReplicatedStorage.Items.Registry tidak ditemukan - fitur shop terbatas")
 end
 
 -- ADD: Redeem Code (memakai PlayerData.RedeemCode dari service Codes - Client.Services.UserData)
@@ -7021,12 +7075,12 @@ local success, err = pcall(function()
 LoadAutoShop:Destroy()
 
 if not ItemRegistry then
-warn("[Dara Hub] ItemRegistry tidak ditemukan - Load Shop Automation dibatalkan")
+warn("[JoblessHub] ItemRegistry tidak ditemukan - Load Shop Automation dibatalkan")
 return
 end
 -- FIX: service Shops baru dicek lebih dulu; belum tersedia = warn (GUI tetap dibangun)
 if not PlayerData.Shop("Daily") and not PlayerData.Shop("Event") then
-warn("[Dara Hub] Service Shops (Client.Services.UserData) belum tersedia - slot shop mungkin kosong")
+warn("[JoblessHub] Service Shops (Client.Services.UserData) belum tersedia - slot shop mungkin kosong")
 end
 
 local loops = {}
@@ -7039,7 +7093,7 @@ end
 loops[key] = HeartbeatLoop(delaySeconds, function()
 local okLoop, loopErr = pcall(action)
 if not okLoop then
-warn("[Dara Hub] Shop loop " .. key .. ":", loopErr)
+warn("[JoblessHub] Shop loop " .. key .. ":", loopErr)
 end
 end)
 end
@@ -7418,7 +7472,7 @@ end)
 refreshAll()
 end)
 if not success then
-warn("[Dara Hub] LoadAutoShop callback error:", err)
+warn("[JoblessHub] LoadAutoShop callback error:", err)
 end
 end
 })
@@ -7872,7 +7926,7 @@ return rotation
 end
 end)
 if not ok then
-warn("[Dara Hub] Gagal hook Sensitivity: " .. tostring(err))
+warn("[JoblessHub] Gagal hook Sensitivity: " .. tostring(err))
 end
 return ok
 end
@@ -7990,7 +8044,7 @@ do
 -- FIX: pembuatan elemen dibungkus guard + pcall agar WindUI versi lama tanpa :Keybind
 -- hanya warn, tidak membuat tab Settings kosong.
 if type(Tabs.Settings.Keybind) ~= "function" then
-warn("[Dara Hub] WindUI versi ini tidak punya elemen :Keybind - Keybind asli dilewati")
+warn("[JoblessHub] WindUI versi ini tidak punya elemen :Keybind - Keybind asli dilewati")
 else
 SuperBounceKeybind = Tabs.Settings:Keybind({
 Title = "Trigger Super Bounce",
