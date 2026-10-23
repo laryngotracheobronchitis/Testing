@@ -1,0 +1,8695 @@
+--[[
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.0
+    Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
+
+    ============================ UPDATE v1.6.0 (FIX KAMERA KAKU/LAMBAT/ACAK + SENSITIVITAS MOBILE MATI) ============================
+    Analisis penuh terhadap DARAHUBBETA.txt (asli) vs script ini menemukan akar masalah berikut:
+    - FIX 1 (SENSITIVITAS MOBILE MATI - akar masalah ditemukan): di kamera Roblox modern yang
+      dipakai Evade, rotasi kamera dari MOUSE mengalir lewat modul CameraInput, sedangkan rotasi
+      dari SENTUH (mobile) mengalir lewat modul TouchInput yang TERPISAH - keduanya punya fungsi
+      getRotation() sendiri. Hook sensitivitas lama (warisan DaraHub BETA, sama persis) HANYA
+      membungkus CameraInput -> di mobile getRotation CameraInput mengembalikan (0,0) untuk input
+      sentuh -> (0,0) x nilai sensitivitas apa pun tetap (0,0) -> slider Touch Sensitivity tidak
+      pernah berefek. Kini SEMUA modul input di folder CameraModule yang punya getRotation
+      dibungkus: CameraInput memakai logika Mouse, TouchInput & modul lain memakai nilai Touch.
+    - FIX 2 (GERAKAN & KAMERA KAKU/LAMBAT/NGEBUG ACAK): pipeline pengiriman nilai movement
+      (MovementValueSet -> FireClient) dirombak jadi ANTRIAN TERSUSUN + PENGGABUNGAN dengan
+      hanya satu pengiriman aktif pada satu waktu. Pipeline lama berbahaya saat friction bhop
+      flip-flop beberapa kali per detik: tiap pengiriman jalan di task.spawn terpisah -> thread
+      BARENGAN -> bila handler game yield di dalam pcall, urutan penerapan TERBALIK -> nilai
+      Friction/BhopEnabled di game salah secara acak -> gerakan mendadak kaku & kamera pengikut
+      tersentak. FireClient juga kini tanpa alokasi closure per panggilan (dulu menumpuk sampah
+      GC -> GC pause -> frame terjeda -> kamera patah-patah, paling terasa di HP).
+    - FIX 3 (MAKIN LAMA MAIN MAKIN LEMOT - RE-EXECUTION LEAK): guard "Script Is Already Loaded"
+      sengaja dihapus sesuai permintaan (bisa eksekusi ulang kapan saja), tapi tiap eksekusi ulang
+      MENUMPUK: hook Movement.Update bertambah satu lapis (jalan tiap frame), loop Anti-Stuck &
+      Auto Refresh & VIP macro bertambah terus (tidak pernah mati), koneksi Timer/AutoFarm/AutoVote
+      dari eksekusi lama tetap hidup. Kini eksekusi ulang BERSIH: window lama dihancurkan dulu,
+      semua koneksi & thread eksekusi lama otomatis diputus/dibatalkan, hook Movement.Update
+      selalu dipasang di atas FUNGSI ASLI game (tidak pernah menumpuk).
+    - FIX 4: bug scoping lastFriction (reset di SetAccelerationMethod dulu membuat variabel GLOBAL
+      baru, bukan mereset upvalue hook -> perubahan friction bisa terlewat setelah ganti mode bhop).
+    - FIX 5: Timer Display tidak lagi membuat closure baru TIAP FRAME (sumber sampah GC halus).
+    - SINKRON DATA DARAHUB BETA: seluruh nilai data bersama diverifikasi baris-per-baris
+      (defaultMovementValues, bhop, token farm 0.84-4 detik, FullBright, Defib buffer, topbar,
+      keybind N/B/L, timer, gravity, cola) - semuanya sudah identik dengan Beta. JoblessHub tetap
+      LEBIH BARU pada: pola Catch NPC (UserData%.Event - cocok layout lama & baru, pola Beta hanya
+      cocok layout lama), bugfix roundStatus timer, redeem 2 jalur, throttle loop (hemat FPS).
+    - TIDAK ADA fitur DaraHub yang ditambahkan & TIDAK ADA fitur tambahan user yang dihapus.
+    Tab yang dipertahankan : Main, Player, Combat, Auto, Visuals, Utility, Teleport, Shop, Settings
+    Tab yang dihapus       : ESP, Misc, info, Larp, Others, Vehicle
+
+    ============================ UPDATE v1.5.2 (MINIMIZE BUTTON ASLI DARA HUB + MENU ROBLOX SELALU BISA DIBUKA) ============================
+    - MINIMIZE BUTTON KEMBALI KE MILIK ASLI DARA HUB (permintaan user - bukan lagi bawaan
+      WindUI): pill bawaan WindUI (icon "eye" + tulisan) DIHAPUS. Window Icon dikembalikan
+      (icon.png dari darahub.pages.dev) dan OpenButton kembali PERSIS konfigurasi ASLI
+      DaraHub yang terbaru: OpenButton = { ShowIconOnly = true } = tombol icon-only kecil
+      bergambar logo DaraHub, bisa di-drag, klik = buka UI kembali. SetIconSize(48) juga
+      dikembalikan (persis DaraHub asli).
+    - LIBRARY UI KEMBALI KE ASLI DARA HUB YANG TERBARU: WindUI-Moded langsung dari
+      darahub.pages.dev (MD5 diverifikasi identik dengan yang dipakai DaraHub asli saat
+      ini). Library inilah yang mendukung ShowIconOnly - library repo v1.6.65 TIDAK punya
+      opsi itu (field-nya berubah nama jadi OnlyIcon). Patch font-capability + patch
+      floating-icon dual-varian tetap aktif (pola library asli otomatis terpakai).
+    - FIX "TIDAK BISA MEMBUKA MENU ROBLOX / LEAVE GAME" (akar masalah ditemukan):
+      fitur Top GUI (tombol Zoom/Reload/Leaderboard versi mobile, warisan DaraHub asli)
+      mematikan topbar Roblox asli (SetCore TopbarEnabled=false) SEBELUM topbar pengganti
+      selesai dibuat. Di executor dengan pembatasan capability ("The current thread cannot
+      access 'Instance' - lacking capability Plugin") pembuatan topbar pengganti GAGAL di
+      tengah jalan (error ditelan pcall section) -> topbar asli sudah MATI + pengganti
+      tidak jadi -> TOMBOL MENU ROBLOX HILANG = tidak bisa leave game.
+      Kini (fail-safe): topbar pengganti DIBUAT DULU sepenuhnya; HANYA jika sukses topbar
+      asli dimatikan. Gagal = sisa build dihancurkan + topbar asli TETAP MENYALA. Plus
+      WATCHDOG: bila topbar pengganti hilang, topbar asli otomatis dinyalakan lagi. Saat
+      script dihancurkan (OnDestroy) topbar asli juga selalu dinyalakan kembali.
+    - Engine tombol layar bawaan (fallback ButtonLib): DisplayOrder 999999 -> 0 (sama
+      persis dengan ButtonLib ASLI DaraHub) supaya tidak pernah menutupi topbar/menu Roblox.
+
+    ============================ UPDATE v1.5.1 (FLOATING BUTTON FITUR SELALU MUNCUL + SHOW/HIDE BAWAAN WINDUI) ============================
+    - PENTING: ada DUA hal BERBEDA yang sebelumnya tercampur:
+        (1) Minimize/Show-Hide WindUI = tombol kecil yang muncul setelah UI di-minimize.
+        (2) Floating Button fitur (ButtonLib DaraHub) = Supper Bounce, Bunny Hop, Lag Switch,
+            Custom Gravity - tombol layar yang bisa di-drag untuk fitur.
+    - MINIMIZE/SHOW-HIDE: kini pakai fitur BAWAAN WindUI dengan ICON bawaan WindUI (lucide
+      "eye") - TANPA foto eksternal sama sekali. Bentuk = pill bawaan WindUI
+      [drag handle | icon mata | tulisan "JoblessHub"], jelas terlihat, klik = buka UI.
+      (v1.5.0 hanya teks; ShowIconOnly tanpa gambar = transparan tak terlihat.)
+      Fix lama tetap aktif: OnlyMobile = false + patch IsPC -> icon selalu muncul setelah minimize.
+    - FLOATING BUTTON FITUR (ButtonLib) TIDAK DIHAPUS - justru INI akar masalah "invisible":
+      LoadAll.lua lama memuat ButtonLib di BACKGROUND, jadi saat script membuat tombol,
+      ButtonLib masih nil -> error ditelan pcall -> 4 tombol fitur tidak pernah dibuat.
+      Kini: ButtonLib di-load SINKRON sebelum UI dibangun + DaraWaitButtonLib di tiap titik
+      create + ENGINE TOMBOL LAYAR BAWAAN (API kompatibel) bila link darahub.pages.dev gagal
+      -> Supper Bounce / Bunny Hop / Lag Switch / Gravity SELALU MUNCUL. Tidak ada fitur hilang.
+    - LoadAll.lua tidak lagi dipakai (NotifyToast/ErrorPrompt tidak pernah dipakai script).
+
+    ============================ UPDATE v1.5.0 (REBRAND JOBLESSHUB + WINDUI ASLI TANPA FOTO) ============================
+    - REBRAND: semua nama "Dara Hub"/"DaraHub" yang terlihat user (judul window, Author, notifikasi,
+      warn/print/kick, folder config) diganti "JoblessHub". Nama internal script tidak diubah (aman).
+    - LIBRARY UI GANTI SUMBER: WindUI kini di-load dari repo GitHub sendiri (WindUI ASLI Footagesus,
+      bukan lagi WindUI-Moded dari darahub.pages.dev):
+      raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/WindUI%20by%20DaraHub/main.lua
+      Diverifikasi baris-per-baris: API 100% kompatibel (Notify/Popup/Tag/DisableTopbarButtons/
+      SetToggleKey/SelectTab/semua elemen) - bedanya hanya wrapper callback keybind yang sudah
+      dikompensasi sejak v1.4.4. Opsi OnlyMobile (fix minimize) terverifikasi ada di library asli.
+    - SHOW/HIDE TANPA FOTO (bawaan WindUI): foto icon.png DIHAPUS dari window, SetIconSize dihapus.
+      Floating Show/Hide kini gaya BAWAAN WindUI: pill bertuliskan "JoblessHub" + garis gradient,
+      TANPA foto sama sekali, bisa di-drag, klik = buka UI. (ShowIconOnly tanpa foto = transparan
+      total / tidak terlihat, karena itu dipakai gaya teks bawaan.)
+    - SHOW/HIDE SELALU MUNCUL: fix v1.4.6 dipertahankan (OnlyMobile = false + patch syarat IsPC di
+      fungsi Close library; pola patch di-update ke variabel library asli "aw.", pola lama "au."
+      tetap dicoba). Patch font-capability diperluas: mendukung pola library v1.6.64 DAN v1.6.65.
+    - CONFIG MACRO: path config VIP Macro pindah ke JoblessHub/Games/Evade/VIPMacroConfig.json.
+      Config lama di folder DaraHub otomatis DIMIGRASI (dibaca dari path lama bila path baru kosong).
+
+    ============================ UPDATE v1.4.6 (FIX TOMBOL SHOW/HIDE HILANG SETELAH MINIMIZE) ============================
+    Gejala: setelah window di-minimize, floating icon (tombol Show/Hide) TIDAK MUNCUL SAMA SEKALI sehingga
+    UI tidak bisa dibuka lagi tanpa eksekusi ulang script. Dari bedah library WindUI-Moded ditemukan:
+    - Library menandai perangkat sebagai PC bila UserInputService.KeyboardEnabled = true. Executor yang
+      baru dipakai melaporkan KeyboardEnabled = true walau dipakai di HP, sehingga dianggap PC.
+    - Saat window di-minimize, library HANYA memunculkan kembali floating icon di perangkat mobile
+      (kondisi "not IsPC" di fungsi Close). Karena dianggap PC, icon tidak pernah dimunculkan lagi -
+      dan di HP tidak ada keyboard untuk menekan toggle key RightControl, jadi UI hilang total.
+    v1.4.6 memperbaiki dengan dua lapis (logika sendiri):
+    - LAPIS 1 (jalur utama - opsi resmi library): OpenButton kini dikirim "OnlyMobile = false", fitur
+      bawaan library yang memaksa IsPC = false sehingga floating icon SELALU dimunculkan kembali
+      setelah minimize di semua perangkat. Icon tetap bisa di-drag; klik icon = buka UI.
+    - LAPIS 2 (cadangan - patch library saat load): syarat "not au.IsPC" di fungsi Close library
+      dihapus lewat patch teks otomatis (pola sama dengan patch font v1.4.3). Bila pola tidak
+      ditemukan (library berubah), patch dilewati dengan warning - TIDAK fatal.
+
+    ============================ UPDATE v1.4.5 (ANTI TAB KOSONG TOTAL - SAFE TAB PROXY) ============================
+    Diperiksa terhadap DaraHub Beta ASLI (Evade 2.2): file asli sendiri BISA mengalami tab kosong!
+    Di file asli baris 3619 ada "if PlayerData.EventActive() then" TELANJANG (tanpa pcall) dieksekusi
+    saat load; jika service Event tidak ada / pindah path, script asli MATI di situ dan SEMUA tab
+    setelahnya (Auto Farm s/d Settings, termasuk Anti AFK di Misc) tidak pernah muncul - persis
+    gejala "Auto Farm ke bawah tidak muncul + tab Visual s/d Setting kosong".
+    v1.4.5 memperbaiki dengan logika sendiri (Luau):
+    - SAFE TAB PROXY: semua Tabs.<Tab>:<Method>() dibungkus pcall. SATU elemen UI gagal dibuat =
+      warn jelas (tab:method:judul) + elemen dilewati (dummy) + elemen BERIKUTNYA TETAP DIBUAT.
+      Tidak ada lagi "satu error membuat semuanya tidak ada".
+    - 6 SECTION TANPA PCALL KINI TERLINDUNGI: TAB PLAYER, TAB COMBAT, TIMER GUI, VISUALS:
+      STATS/DEATHFEED/COLA, TAB UTILITY, TAB TELEPORT (total 23 section terlindungi).
+    - Window method calls (ToggleTransparency/Tag/SetToggleKey/dll.) dibungkus pcall.
+    - Tombol "Force Respawn" aman bila remote SetPlayerMode tidak ada (pcall + warn).
+    - Sistem warning per section tetap: warn console + notif "SECTION ERROR" + laporan akhir load.
+
+    ============================ UPDATE v1.4.4 (SINKRON DATA DARAHUB BETA BARU / EVADE 2.2) ============================
+    Game sudah update ke Evade 2.2 dan DaraHub Beta ikut di-update; datanya disamakan dengan Beta terbaru:
+    - SINKRON 1 (REDEEM CODE): jalur redeem kini PERSIS DaraHub Beta - remote asli game
+      ReplicatedStorage.Shared.UserData.Remotes.RedeemCode:FireServer(code) dicoba DULU, lalu fallback ke
+      service Codes (Client.Services.UserData.Codes). Sebelumnya hanya lewat service - bila service pindah
+      di 2.2, redeem selalu gagal ("tidak ditemukan"). Kini dua jalur, dua-duanya pcall.
+    - SINKRON 2 (CATCH NPC / AUTO FARM): pola scan sumber NPC pemberi reward event di-update. Pola lama hanya
+      cocok "Services.UserData.EventService" (layout lama); game 2.2 memakai layout UserData baru
+      (Client.Services.UserData.Event). Pola baru "UserData.Event" cocok untuk KEDUANYA sehingga mode
+      Catch NPC tidak lagi "tidak menemukan" NPC di versi game baru.
+    - SINKRON 3 (VIP CMD MACRO 100% BUILT-IN): tombol "VIP CMD Macro" TIDAK lagi me-load GUI remote dari
+      darahub.pages.dev (aturan: dilarang load DaraHub asli). Tombol kini membuka tab Auto tempat section
+      "VIP CMD Macro" built-in berada. Semua fungsi macro tetap jalan 100% offline dari dalam script.
+    - SINKRON 4 (EVADE 2.2): judul window + basis data mengikuti Beta terbaru (Evade 2.2). Nilai movement
+      (Speed 1500, Friction 5, GroundedDistCheck 2.9, dll.), Auto Farm (Token Farm/Catch NPC/Auto Ticket,
+      delay 0.84-4), Self Revive, Auto Vote, Auto Whistle, Full Bright, Remove Fog, Shop & Auto Exchange
+      diverifikasi BARIS PER BARIS terhadap Beta baru - semua sudah identik, tidak ada yang diubah.
+    - ANTI ERROR (lanjutan): sistem warning per section tetap aktif - error satu section TIDAK mematikan
+      script; notif "SECTION ERROR" muncul di layar + laporan lengkap di akhir load (terlihat di HP).
+
+    ============================ UPDATE v1.4.3 (FIX CAPABILITY + ANTI "SATU ERROR MATI SEMUA") ============================
+    Dari error logs kamu (35 error / 20 warning):
+    - PENYEBAB UTAMA: error "The current thread cannot access 'Instance' (lacking capability Plugin)"
+      datangnya dari LIBRARY UI (WindUI) yang di-load remote, tepat di fungsi update font-nya
+      (UpdateFont -> FontFace). Library itu meng-update font SEMUA elemen UI yang pernah dibuat setiap
+      kali membuat elemen baru, jadi cukup SATU objek bermasalah -> SEMUA elemen berikutnya ikut gagal
+      (efek domino) -> banyak tab jadi kosong.
+    - FIX 1 (patch library saat load): teks library sekarang di-patch otomatis sebelum dipasang - loop
+      update font dibungkus pcall per-elemen, satu objek bermasalah TIDAK lagi menggagalkan yang lain.
+    - FIX 2 (VirtualUser lazy): GetService("VirtualUser") (service ber-security Plugin) tidak dipanggil
+      lagi di tengah load (diduga memicu kehilangan capability thread di sebagian executor); sekarang
+      diambil lazy saat toggle Anti AFK dinyalakan + dibungkus pcall.
+    - FIX 3 (anti "satu error mati semua"): baris telanjang antar-section yang tadinya TANPA pcall
+      (header tab Visuals - baris 3817 lama, Tabs.Visuals:Space di ujung TIMER GUI, Window:SelectTab)
+      sekarang dilindungi. Baris-baris inilah yang membuat FULL BRIGHT s/d PLATFORM PC + tab
+      Visuals/Utility/Teleport/Shop tidak pernah dimuat setelah error pertama.
+    - FIX 4 (5 section tambahan dibungkus pcall): TAB MAIN, TAB AUTO (BHOP), TAB SHOP, SETTINGS: DRAG
+      CONTROL, PLATFORM PC & SENSITIVITAS. Total 16 section terlindungi; satu gagal = sisanya jalan.
+    - FIX 5 (Movement retry): "Gagal mengubah movement 'BhopEnabled' - tabel Movement game tidak
+      ditemukan" saat load = tabel memang belum siap; sekarang diulang otomatis 3 detik kemudian
+      (hening) dan hanya menampilkan warn bila tetap gagal.
+
+    ============================ UPDATE v1.4.2 (FIX ERROR + SISTEM WARNING PER SECTION) ============================
+    FIX "script tidak bisa jalan":
+    - FIX FATAL: placeholder RAW_LINK_GITHUB sudah DIGANTI LINK WHITELIST ASLI GitHub-mu - script langsung
+      jalan tanpa perlu edit apa pun lagi. (Ini penyebab utama script diam saja saat dieksekusi.)
+    - Whitelist / library UI gagal dimuat sekarang TAMPIL JELAS: warn di console + KICK dengan alasan
+      lengkap (supaya kelihatan di HP, tidak lagi berhenti diam-diam tanpa pesan).
+    - Section Auto Revive (revive PEMAIN LAIN) DIHAPUS TOTAL sesuai permintaan. Self Revive kembali
+      persis semula: Auto Self Revive, Self Revive Method, Revive Delay (seconds), Manual Revive, Force Respawn.
+    - Input "Jump height", "Jump Speed Multiplier", "Walk Speed Multiplier" dihapus dari tab Player
+      (nilai default internal tetap ada di engine). Daftar input movement = persis permintaan:
+      Speed, Jump Cap, Air Strafe Acceleration, Air Acceleration, Sprint Acceleration, Sprint Cap,
+      Run Accel, Run Deaccel, Friction, Grounded Dist Check.
+
+    SISTEM WARNING PER SECTION (baru - agar tahu bagian mana yang error):
+    - Semua section dicatat statusnya di getgenv().DaraHubSections: OK / ERROR / RUNNING / CRASH.
+    - 11 section utama dibungkus pcall: bila SATU section error, script TIDAK MATI - muncul notifikasi
+      "SECTION ERROR: <nama>" + detail di console, lalu load lanjut ke section berikutnya.
+    - Semua section lain diberi phase marker: console mencetak "Memuat section: X" - baris terakhir
+      yang tercetak sebelum error = section penyebabnya.
+    - LAPORAN LOAD di akhir: ringkasan OK/gagal di console (print) + notifikasi WindUI.
+    - DETEKSI CRASH: bila eksekusi sebelumnya berhenti mendadak, saat dieksekusi ULANG muncul
+      peringatan nama section yang crash (status tertinggal "RUNNING" otomatis ditandai CRASH).
+
+    ============================ UPDATE v1.3.0 (PERBAIKAN & SINKRON BETA) ============================
+    FIX ERROR/WARNING (merah & kuning) yang ditemukan di versi Ringkas:
+    - FIX CRASH saat load: `local originalUse = JumpPadModule.Use` error "attempt to index nil"
+      bila module JumpPad berubah path (safeRequire mengembalikan nil) -> kini di-guard + warn.
+    - FIX CRASH saat load: hook Movement.Update dijalankan tanpa cek Movement nil -> kini di-guard.
+    - FIX error spam tiap frame: UpdateFromAttributes / StartAttributeMonitor (Timer Display) membaca
+      ServerStateRegistryService.Registry TANPA pcall -> service nil/berubah = error spam + FPS drop. Kini pcall + guard.
+    - FIX BUG LOGIKA: `elseif roundStatus == 1 or 0 then` SELALU TRUE (0 = truthy di Lua) sehingga
+      status selalu "Intermission" dan cabang else tidak pernah jalan -> kini `roundStatus == 1 or roundStatus == 0`.
+    - FIX error diam-diam: FireClient(ReplicatedStorage.Events.CharacterTask / SharedUISetType, ...) mengindeks
+      path langsung -> bila event hilang error di dalam task.spawn. Kini lewat helper SafeFireEvent (FindFirstChild).
+    - FIX: FEBoombox loadstring tanpa pcall (gagal koneksi = error langsung) -> dibungkus pcall + notify.
+    - FIX: CanBeCarried error bila InteractionTypes gagal di-require -> guard + notify.
+    - FIX: template Timer (ReplicatedStorage.Assets...RoundTimer) diindeks langsung -> pencarian bertahap
+      FindFirstChild; template hilang = fallback Frame buatan sendiri (Timer Display tetap jalan).
+    - FIX: loop GameTimerCheck memakai spawn()+wait() deprecated -> Heartbeat + throttle 0.1s (persis BETA) + pcall.
+    - FIX: loop objective dropdown (Heartbeat tiap frame + task.spawn(error) tiap gagal) - fitur "Select Objective /
+      Teleport to Objective / Refresh Objectives" DI-BLACKLIST sesuai permintaan (loop per-frame ikut hilang = FPS lebih aman).
+    - PERF: Auto Farm, Defib Aura, Timer check, FullBright -> di-throttle (10x-4x/detik)
+      tanpa mengubah hasil; warn() yang berulang dibatasi.
+    - PERF/FIX: input bukan angka tidak lagi dikirim nil diam-diam; SEMUA input kosong = otomatis SET DEFAULT.
+
+    SINKRON DATA & FITUR DARI DARAHUB BETA (diambil dari file asli, tanpa mengubah tambahan user):
+    - PlayerData: ditambah EventActive / EventTiers / EventExchanges / EventPhase / Exchange (dipakai Shop & Auto Farm).
+    - Auto Farm: mode "Catch NPC" dari Beta + "Auto Ticket" otomatis muncul saat event aktif (Token Offset user 0 -11 0 DIPERTAHANKAN).
+    - Auto Whistle (Beta) - tab Auto. Full Bright + Remove Fog (Beta) - tab Visuals.
+    - Custom Gravity (Beta, + tombol layar) - tab Utility. Section VIP COMMAND (Unlock VIP Commands,
+      VIP CMD Macro GUI, Add/Remove Map) - tab Utility, kini SELALU tampil (unlock, tidak di-gate VIP).
+    - Build Offset Multiplier (Beta, tab Combat) + Multiplier + tombol "Set Otomatis X/Y/Z" (bukan floating button).
+    - Shop: Load Shop Automation disinkron Beta (Event Shop dari EventTiers + live keys + ensureEventSection)
+      + section Auto Exchange + Redeem Code.
+    - Teleport: SEMUA fitur Beta KECUALI "Teleport to Objective", "Select Objective", "Refresh Objectives" (blacklist).
+    - Screen Button Size: kini PER TOMBOL (masing-masing floating button punya input X/Y/Z sendiri + tombol reset).
+    - BhopEnabled dipastikan terkirim: dikirim ulang otomatis saat respawn (game reset data movement saat spawn).
+    - Self Revive: tambahan "Revive Delay (seconds)" (0 = instan) + Manual Revive tetap ada.
+
+    ============================ WHITELIST ============================
+    Link whitelist asli SUDAH DIPASANG langsung di baris awal script (GitHub-mu, UserID 1371189933).
+    Bila whitelist gagal dimuat / UserId tidak terdaftar: console warn + KICK dengan alasan jelas
+    (fail-closed) - script berhenti. Tidak perlu mengedit apa pun lagi di bagian ini.
+]]
+
+-- ============================ WHITELIST (LETAKKAN PALING AWAL) ============================
+-- v1.4.2: LINK ASLI sudah terpasang - tidak perlu edit lagi.
+-- Gagal memuat = console warn + KICK dengan alasan jelas (terlihat di HP, tidak diam-diam).
+local okWhitelist, errWhitelist = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/laryngotracheobronchitis/Testing/refs/heads/main/Evade/Evade%20updated/Rework/Give%20me%20money/Whitelist"))()
+end)
+if not okWhitelist then
+        warn("[JoblessHub] WHITELIST GAGAL DIMUAT: " .. tostring(errWhitelist))
+        warn("[JoblessHub] Penyebab umum: koneksi internet / executor diblokir / GitHub down. Script berhenti (fail-closed).")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Whitelist gagal dimuat - cek internet lalu eksekusi ulang. Detail error di console. [" .. tostring(errWhitelist) .. "]")
+        end)
+        return
+end
+if getgenv().DaraHubWhitelisted ~= true then
+        warn("[JoblessHub] UserId TIDAK TERDAFTAR di whitelist - eksekusi dihentikan (fail-closed).")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] UserId kamu tidak terdaftar di whitelist JoblessHub Ringkas.")
+        end)
+        return
+end
+-- ============================ AKHIR WHITELIST ============================
+
+-- ===================== FIX v1.6.0 (RE-EXECUTION SAFETY) =====================
+-- Guard "Script Is Already Loaded" sengaja dihapus (permintaan user: bisa eksekusi
+-- ulang kapan saja tanpa rejoin). Tanpa perlindungan ini, SETIAP eksekusi ulang
+-- MENUMPUK beban: hook Movement.Update bertambah satu lapis (jalan tiap frame),
+-- loop Anti-Stuck / Auto Refresh / VIP macro bertambah terus (tidak pernah mati),
+-- koneksi Timer/AutoFarm/AutoVote/AutoWhistle dari eksekusi lama tetap hidup ->
+-- beban per frame naik terus -> KAMERA & GERAKAN makin kaku/lemot/ngebug secara
+-- acak, makin lama / makin sering re-execute makin parah. Kini eksekusi ulang
+-- BERSIH secara otomatis:
+--   (1) window lama dihancurkan DULU (OnDestroy-nya ikut membereskan ButtonLib,
+--       topbar Roblox, dan mouse state),
+--   (2) semua koneksi & thread yang tercatat dari eksekusi lama otomatis
+--       diputus (Disconnect) / dibatalkan (task.cancel),
+--   (3) hook Movement.Update selalu dipasang di atas FUNGSI ASLI game (lihat
+--       bagian MOVEMENT ENGINE) sehingga tidak pernah menumpuk lapisan hook.
+pcall(function()
+if getgenv().__JoblessHubWindow and getgenv().__JoblessHubWindow.Destroy then
+getgenv().__JoblessHubWindow:Destroy()
+end
+end)
+getgenv().__JoblessHubWindow = nil
+do
+local _oldConns = getgenv().__JoblessHubConns
+if type(_oldConns) == "table" then
+for _, _c in ipairs(_oldConns) do
+pcall(function()
+_c:Disconnect()
+end)
+end
+end
+local _oldThreads = getgenv().__JoblessHubThreads
+if type(_oldThreads) == "table" then
+for _, _t in ipairs(_oldThreads) do
+pcall(task.cancel, _t)
+end
+end
+end
+getgenv().__JoblessHubConns = {}
+getgenv().__JoblessHubThreads = {}
+-- FIX v1.6.0: mirror Player Stats dari eksekusi lama ikut dibersihkan (koneksi watch-nya
+-- sudah diputus oleh registry di atas, jadi handler "bangun ulang saat dihapus" tidak aktif;
+-- tanpa ini re-execute menumpuk HUD stats duplikat di layar).
+pcall(function()
+local _pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+local _oldStats = _pg and _pg:FindFirstChild("PlayerStats")
+if _oldStats then
+_oldStats:Destroy()
+end
+end)
+local function DaraTrackConn(c)
+if c then
+table.insert(getgenv().__JoblessHubConns, c)
+end
+return c
+end
+local function DaraTrackThread(t)
+if t then
+table.insert(getgenv().__JoblessHubThreads, t)
+end
+return t
+end
+-- ===================== AKHIR FIX v1.6.0 (RE-EXECUTION SAFETY) =====================
+-- ============================ LOAD DIAGNOSTICS v1.4.2 (SISTEM WARNING PER SECTION) ============================
+-- Status tiap section dicatat di getgenv().DaraHubSections: OK / ERROR / RUNNING / CRASH.
+-- - Section pcall : error TIDAK membunuh script -> notif "SECTION ERROR: <nama>" + load lanjut.
+-- - Phase marker  : console cetak "Memuat section: X" -> baris terakhir sebelum error = penyebabnya.
+-- - Deteksi crash : status "RUNNING" tersisa dari eksekusi sebelumnya = section yang CRASH kemarin.
+getgenv().DaraHubSections = getgenv().DaraHubSections or {}
+getgenv().DaraHubSectionOrder = getgenv().DaraHubSectionOrder or {}
+DaraHubErrorCount = 0
+DaraHubStaleCrash = nil
+do
+        local _prevSections = getgenv().DaraHubSections
+        getgenv().DaraHubSections = {}
+        getgenv().DaraHubSectionOrder = {}
+        if type(_prevSections) == "table" then
+                for _dn, _dst in pairs(_prevSections) do
+                        if type(_dst) == "table" and _dst.status == "RUNNING" then
+                                DaraHubStaleCrash = _dn
+                                getgenv().DaraHubSections[_dn] = { status = "CRASH", err = _dst.err }
+                        end
+                end
+        end
+end
+if DaraHubStaleCrash then
+        warn("[JoblessHub][PERINGATAN] Eksekusi sebelumnya CRASH di section: " .. tostring(DaraHubStaleCrash) .. " - nama ini adalah bagian yang error.")
+end
+
+function DaraSectionStart(name)
+        getgenv().DaraHubSections[name] = { status = "RUNNING", t0 = os.clock() }
+        local _listed = false
+        for _, _n in ipairs(getgenv().DaraHubSectionOrder) do
+                if _n == name then
+                        _listed = true
+                        break
+                end
+        end
+        if not _listed then
+                getgenv().DaraHubSectionOrder[#getgenv().DaraHubSectionOrder + 1] = name
+        end
+        getgenv().DaraHubCurrentSection = name
+        print("[JoblessHub] Memuat section: " .. name)
+end
+
+function DaraSectionDone(name)
+        local _st = getgenv().DaraHubSections[name]
+        if _st then
+                _st.status = "OK"
+                _st.ms = math.floor((os.clock() - (_st.t0 or os.clock())) * 1000)
+        end
+        if getgenv().DaraHubCurrentSection == name then
+                getgenv().DaraHubCurrentSection = nil
+        end
+end
+
+function DaraSectionFail(name, err)
+        getgenv().DaraHubSections[name] = { status = "ERROR", err = tostring(err) }
+        warn("[JoblessHub][SECTION ERROR] '" .. tostring(name) .. "' gagal dimuat: " .. tostring(err))
+        warn("[JoblessHub][SECTION ERROR] Script LANJUT ke section berikutnya - fitur '" .. tostring(name) .. "' mungkin tidak berfungsi.")
+        DaraHubErrorCount = (DaraHubErrorCount or 0) + 1
+        if WindUI and DaraHubErrorCount <= 4 then
+                pcall(function()
+                        WindUI:Notify({
+                                Title = "SECTION ERROR: " .. tostring(name),
+                                Content = "Section gagal dimuat lalu DILEWATI: " .. tostring(err),
+                                Duration = 6
+                        })
+                end)
+        end
+        if getgenv().DaraHubCurrentSection == name then
+                getgenv().DaraHubCurrentSection = nil
+        end
+end
+
+function DaraHubFinalReport()
+        local _okC, _errC, _runC, _crashC = 0, 0, 0, 0
+        local _errList, _crashList = {}, {}
+        for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
+                local _st = getgenv().DaraHubSections[_name]
+                if _st.status == "OK" then
+                        _okC = _okC + 1
+                elseif _st.status == "ERROR" then
+                        _errC = _errC + 1
+                        _errList[#_errList + 1] = _name
+                elseif _st.status == "RUNNING" then
+                        _runC = _runC + 1
+                        _errList[#_errList + 1] = _name .. " (terhenti)"
+                elseif _st.status == "CRASH" then
+                        _crashC = _crashC + 1
+                        _crashList[#_crashList + 1] = _name
+                end
+        end
+        local _total = #getgenv().DaraHubSectionOrder
+        print("[JoblessHub] ============ LAPORAN LOAD v1.6.0 ============")
+        print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
+        for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
+                local _st = getgenv().DaraHubSections[_name]
+                print("[JoblessHub]   [" .. _st.status .. "] " .. _name .. (_st.ms and (" (" .. _st.ms .. "ms)") or "") .. (_st.err and (" - " .. tostring(_st.err)) or ""))
+        end
+        print("[JoblessHub] ==============================================")
+        if WindUI then
+                pcall(function()
+                        if _errC > 0 then
+                                WindUI:Notify({
+                                        Title = "Load selesai: " .. _errC .. " section ERROR",
+                                        Content = "Gagal: " .. table.concat(_errList, ", ") .. ". Cek console (warn merah) untuk detail error per section.",
+                                        Duration = 8
+                                })
+                        else
+                                WindUI:Notify({
+                                        Title = "JoblessHub Ringkas v1.6.0 siap dipakai (Evade 2.2)",
+                                        Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
+                                        Duration = 5
+                                })
+                        end
+                end)
+        end
+end
+-- ============================ AKHIR LOAD DIAGNOSTICS ============================
+
+-- ADD: helper baca input angka - INPUT KOSONG / BUKAN ANGKA = OTOMATIS PAKAI DEFAULT (permintaan user).
+function parseNumberInput(value, default)
+if value == nil then return default end
+if type(value) == "number" then return value end
+local trimmed = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+if trimmed == "" then return default end
+local n = tonumber(trimmed)
+if n == nil then return default end
+return n
+end
+
+-- ADD: helper FireClient yang aman - event dicari dengan FindFirstChild dulu (tidak pernah error bila path berubah)
+function SafeFireEvent(eventsParent, eventName, ...)
+local ev = eventsParent and eventsParent:FindFirstChild(eventName)
+if not ev then
+return false
+end
+return FireClient(ev, ...)
+end
+
+
+
+-- FIX v1.6.0 (KAMERA/GERAKAN KAKU, LAMBAT, ACAK - pipeline nilai movement dirombak):
+-- Penyebab yang ditemukan pada pipeline lama (efeknya menumpuk jadi gerakan/kamera ngebug):
+-- (1) SAMPAH GC: banyak closure dibuat per panggilan (pcall(function() ...) di banyak titik,
+--     termasuk PER KONEKSI di tryFireConnection) - saat friction bhop flip-flop beberapa kali
+--     per detik, alokasi menumpuk -> GC pause -> frame terjeda -> kamera patah-patah (paling
+--     terasa di HP). Versi baru: semua aksesor di-HOIST (0 closure baru per panggilan) dan
+--     koneksi dikumpulkan sekali ke array Lua murni sebelum di-fire.
+-- (2) FALLBACK MENIMPA: FireClient lama mengembalikan false bila handler error (padahal handler
+--     SUDAH jalan) -> jalur tulis-langsung ikut jalan -> nilai diterapkan ganda/saling menimpa
+--     -> state movement kacau sekejap. Versi baru mempertahankan jalur c:Fire cadangan (varian
+--     executor PC, Task 20) TANPA closure, dan status "terkirim" kini diputuskan lebih akurat.
+-- (3) Kompabilitas antar executor tetap dipertahankan: table murni (ipairs), wrapper userdata
+--     (generic-for), dan pairs - dipakai berurutan tanpa fire ganda antar strategi.
+local function connGetFunction(c)
+return c.Function
+end
+local function connGetFire(c)
+return c.Fire
+end
+local function connFireMethod(c, ...)
+return c:Fire(...)
+end
+
+local function tryFireConnection(c, ...)
+-- akses c.Function lewat fungsi hoisted (pcall menangkap executor yang melarang akses
+-- properti langsung pada objek koneksi) - TANPA membuat closure baru per panggilan
+local okFn, fn = pcall(connGetFunction, c)
+if okFn and type(fn) == "function" then
+if pcall(fn, ...) then
+return true
+end
+-- handler terpanggil tapi melempar error / yield tidak didukung pcall executor:
+-- lanjut coba c:Fire (menjalankan callback di thread sendiri - varian executor PC,
+-- dipertahankan dari fix Task 20; ModifyMovement bersifat setter sehingga aman).
+end
+local okFire, fireMethod = pcall(connGetFire, c)
+if okFire and type(fireMethod) == "function" then
+return pcall(connFireMethod, c, ...)
+end
+return false
+end
+
+-- kumpulkan koneksi ke array Lua murni sekali per panggilan (kompatibel table biasa,
+-- wrapper userdata executor PC yang hanya bisa generic-for, maupun pairs)
+local function collectConnections(conns)
+local list = {}
+pcall(function()
+for _, c in ipairs(conns) do
+list[#list + 1] = c
+end
+end)
+if #list == 0 then
+pcall(function()
+for _, c in conns, nil, nil do
+list[#list + 1] = c
+end
+end)
+end
+if #list == 0 then
+pcall(function()
+for _, c in pairs(conns) do
+list[#list + 1] = c
+end
+end)
+end
+return list
+end
+
+local fireClientWarned = false
+function FireClient(path, ...)
+if not getconnections then
+if not fireClientWarned then
+fireClientWarned = true
+warn("[JoblessHub] Executor tidak mendukung 'getconnections' - nilai movement dikirim via jalur langsung")
+end
+return false
+end
+local okConns, conns = pcall(getconnections, path.OnClientEvent)
+if not okConns or conns == nil then
+return false
+end
+local nargs = select("#", ...)
+local args = {}
+for k = 1, nargs do
+args[k] = select(k, ...)
+end
+local unpackFn = table.unpack or unpack
+local list = collectConnections(conns)
+local fired = false
+local i = 1
+while i <= #list do
+if tryFireConnection(list[i], unpackFn(args, 1, nargs)) then
+fired = true
+end
+i = i + 1
+end
+return fired
+end
+-- HAPUS (permintaan user): sistem "Script Is Already Loaded" dihapus supaya script
+-- bisa dieksekusi ulang kapan saja tanpa harus rejoin (tidak ada lagi blokir eksekusi kedua).
+local BaseURL = "https://darahub.pages.dev"
+
+-- ===================== FIX v1.5.1 (FLOATING BUTTON / BUTTONLIB FITUR) =====================
+-- MASALAH LAMA: LoadAll.lua memuat ButtonLib di BACKGROUND (task.spawn). Saat script membuat
+-- tombol layar fitur (Supper Bounce / Bunny Hop / Lag Switch / Custom Gravity), global
+-- ButtonLib sering masih NIL (download background belum selesai) -> error "attempt to index
+-- nil with 'Create'" -> ditelan pcall section -> SEMUA floating button fitur tidak pernah
+-- dibuat (invisible / tidak ada). SOLUSI:
+--   (1) ButtonLib di-load SINKRON langsung di sini (bukan lagi lewat LoadAll background);
+--   (2) DaraWaitButtonLib dipasang di SETIAP titik pembuatan tombol (4 titik + wrapper
+--       Drag Control) dan guard OnDestroy;
+--   (3) Bila darahub.pages.dev tidak terjangkau, ENGINE TOMBOL LAYAR BAWAAN (API kompatibel
+--       dengan ButtonLib) otomatis dipakai -> floating button fitur SELALU MUNCUL.
+-- Script ini tidak pernah memakai toast/prompt lib LoadAll, jadi tidak dimuat lagi (lebih cepat).
+local function DaraLoadLibFile(fileName, tries)
+tries = tonumber(tries) or 2
+for i = 1, tries do
+local okGet, src = pcall(function()
+return game:HttpGet(BaseURL .. "/Module/Library/GUI/" .. fileName)
+end)
+if okGet and type(src) == "string" and #src > 0 then
+local okFn, fn = pcall(loadstring, src)
+if okFn and type(fn) == "function" then
+local okRun, runErr = pcall(fn)
+if okRun then return true end
+warn("[JoblessHub] Gagal menjalankan " .. fileName .. ": " .. tostring(runErr))
+return false
+end
+else
+warn("[JoblessHub] Percobaan " .. i .. ": gagal download " .. fileName .. " (" .. tostring(src) .. ")")
+end
+if i < tries then task.wait(0.3) end
+end
+return false
+end
+
+-- ENGINE TOMBOL LAYAR BAWAAN (fallback) - API kompatibel dengan ButtonLib DaraHub:
+-- Create:Button / Create:Toggle, SetVisible/SetText/SetCallback/Set/Get/Destroy,
+-- shortcut ButtonLib.<Flag>, ScreenGui "Darahub", Frame 250x90 bernama Flag + UIScale
+-- (kompatibel dengan fitur Drag Control & Screen Button Size).
+local function DaraBuildFallbackButtonLib()
+if getgenv().ButtonLib and getgenv().ButtonLib.Create then return getgenv().ButtonLib end
+local CoreGui = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+local BL = {}
+BL.Create = {}
+local gui = nil
+pcall(function() gui = CoreGui:FindFirstChild("Darahub") end)
+if not gui then
+pcall(function()
+local g = Instance.new("ScreenGui")
+g.Name = "Darahub"
+g.IgnoreGuiInset = true
+g.ResetOnSpawn = false
+g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+g.DisplayOrder = 0 -- FIX v1.5.2: sama persis ButtonLib ASLI (default 0) - tidak menutupi topbar/menu Roblox
+g.Parent = CoreGui
+gui = g
+end)
+end
+if not gui then
+pcall(function()
+local g = Instance.new("ScreenGui")
+g.Name = "Darahub"
+g.IgnoreGuiInset = true
+g.ResetOnSpawn = false
+g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+g.DisplayOrder = 0 -- FIX v1.5.2: sama persis ButtonLib ASLI (default 0) - tidak menutupi topbar/menu Roblox
+g.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+gui = g
+end)
+end
+if not gui then
+warn("[JoblessHub] Engine tombol layar bawaan gagal membuat ScreenGui.")
+return nil
+end
+local function dpiScale()
+local okVp, vp = pcall(function()
+return workspace.CurrentCamera.ViewportSize.Y
+end)
+if okVp and vp and vp > 0 then return vp / 1080 end
+return 1
+end
+local function baseFrame(config)
+local flag = tostring(config.Flag or config.Text or "Element")
+local frame = Instance.new("Frame")
+frame.Name = flag
+frame.Visible = config.Visible ~= false
+frame.Active = true
+frame.Size = UDim2.new(0, 250, 0, 90)
+frame.Position = config.Position or UDim2.new(0.5, -125, 0.5, -45)
+frame.BackgroundColor3 = Color3.new(1, 1, 1)
+frame.BackgroundTransparency = 0.2
+frame.ZIndex = config.ZIndex or 1
+frame.Parent = gui
+local scale = Instance.new("UIScale", frame)
+scale.Scale = dpiScale()
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 10)
+local strokeB = Instance.new("UIStroke", frame)
+strokeB.Thickness = 2
+strokeB.Color = Color3.new(0, 0, 0)
+strokeB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local strokeW = Instance.new("UIStroke", frame)
+strokeW.Thickness = 1
+strokeW.Color = Color3.new(1, 1, 1)
+strokeW.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local grad = Instance.new("UIGradient", frame)
+grad.Rotation = 90
+grad.Color = ColorSequence.new(Color3.fromRGB(47, 47, 47), Color3.new(0, 0, 0))
+local textButton = Instance.new("TextButton", frame)
+textButton.Name = "Button"
+textButton.Size = UDim2.new(1, 0, 1, 0)
+textButton.Position = UDim2.new(0, 0, 0, 0)
+textButton.BackgroundTransparency = 1
+textButton.Text = ""
+textButton.AutoButtonColor = false
+textButton.ZIndex = 10
+local label = Instance.new("TextLabel", frame)
+label.Name = "Label"
+label.Size = UDim2.new(1, -20, 1, 0)
+label.Position = UDim2.new(0, 10, 0, 0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.Font = Enum.Font.FredokaOne
+label.ZIndex = 5
+label.Text = config.Text or "Button"
+return frame, textButton, label, flag
+end
+-- Drag + klik persis gaya ButtonLib asli: klik = posisi tidak berubah sejak ditekan.
+local function makeDraggable(frame, textButton, callbacks)
+local startPosition = nil
+textButton.MouseButton1Down:Connect(function()
+startPosition = frame.Position
+end)
+textButton.MouseButton1Up:Connect(function()
+if startPosition then
+if frame.Position == startPosition and callbacks.OnClick then
+pcall(callbacks.OnClick)
+end
+startPosition = nil
+end
+end)
+local dragStart, startPos = nil, nil
+textButton.InputBegan:Connect(function(input)
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+dragStart = input.Position
+startPos = frame.Position
+end
+end)
+UIS.InputEnded:Connect(function(input)
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+dragStart = nil
+end
+end)
+UIS.InputChanged:Connect(function(moveInput)
+local t = moveInput.UserInputType
+if dragStart and startPos and (t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseMovement) then
+local delta = moveInput.Position - dragStart
+frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+end)
+end
+function BL:DestroyScreengui()
+pcall(function() gui:Destroy() end)
+gui = nil
+getgenv().ButtonLib = nil
+end
+function BL.Create:Button(config)
+config = config or {}
+local frame, textButton, label, flag = baseFrame(config)
+local api = {}
+local callback = config.Callback or config[1] or function() end
+function api:SetVisible(v) frame.Visible = v and true or false end
+function api:SetText(txt) label.Text = tostring(txt) end
+function api:GetText() return label.Text end
+function api:SetCallback(cb) if type(cb) == "function" then callback = cb end end
+function api:SetZIndex(z) frame.ZIndex = z end
+function api:GetZIndex() return frame.ZIndex end
+function api:GetFlag() return flag end
+function api:Destroy() pcall(function() frame:Destroy() end) if BL[flag] == api then BL[flag] = nil end end
+makeDraggable(frame, textButton, { OnClick = function() pcall(callback) end })
+BL[flag] = api
+return api
+end
+function BL.Create:Toggle(config)
+config = config or {}
+local frame, textButton, label, flag = baseFrame(config)
+local api = {}
+local callback = config.Callback or config[1] or function() end
+local baseText = config.Text or "Toggle"
+local state = config.Default and true or false
+local function updateUI()
+label.Text = baseText .. (state and " : ON" or " : OFF")
+end
+updateUI()
+function api:SetVisible(v) frame.Visible = v and true or false end
+function api:SetText(txt) baseText = tostring(txt) updateUI() end
+function api:GetText() return baseText end
+function api:SetCallback(cb) if type(cb) == "function" then callback = cb end end
+function api:Set(v) state = v and true or false updateUI() pcall(callback, state) end
+function api:Get() return state end
+function api:SetZIndex(z) frame.ZIndex = z end
+function api:GetZIndex() return frame.ZIndex end
+function api:GetFlag() return flag end
+function api:Destroy() pcall(function() frame:Destroy() end) if BL[flag] == api then BL[flag] = nil end end
+makeDraggable(frame, textButton, { OnClick = function() api:Set(not state) end })
+BL[flag] = api
+return api
+end
+getgenv().ButtonLib = BL
+return BL
+end
+
+-- Menunggu ButtonLib siap; dipasang di SETIAP titik pembuatan floating button fitur.
+-- Timeout habis -> coba download sekali lagi -> tetap gagal -> engine bawaan dipakai.
+local function DaraWaitButtonLib(timeout)
+timeout = tonumber(timeout) or 10
+local deadline = os.clock() + timeout
+while os.clock() < deadline do
+if getgenv().ButtonLib and getgenv().ButtonLib.Create then return getgenv().ButtonLib end
+task.wait(0.05)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraLoadLibFile("ButtonLib.lua", 1)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraBuildFallbackButtonLib()
+end
+return getgenv().ButtonLib
+end
+
+-- MUAT ButtonLib SINKRON SEKARANG (sebelum UI dibangun) supaya floating button pasti jadi.
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+DaraLoadLibFile("ButtonLib.lua", 2)
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+warn("[JoblessHub] ButtonLib (darahub.pages.dev) tidak terjangkau - memakai engine tombol layar BAWAAN. Floating button fitur TETAP muncul.")
+DaraBuildFallbackButtonLib()
+end
+if not (getgenv().ButtonLib and getgenv().ButtonLib.Create) then
+pcall(function()
+game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat BUTTONLIB (tombol layar fitur) DAN engine bawaan gagal - cek internet lalu eksekusi ulang.")
+end)
+return
+end
+-- =================== AKHIR FIX v1.5.1 (FLOATING BUTTON / BUTTONLIB FITUR) ===================
+
+local okWindUI, WindUIMod = pcall(function()
+-- FIX v1.4.3 (CAPABILITY PATCH): teks library di-download dulu, di-patch, BARU dipasang.
+-- Loop update font di WindUI (UpdateFont) dibungkus pcall per-elemen agar SATU objek UI
+-- bermasalah ("lacking capability Plugin" di sebagian executor/Roblox terbaru) TIDAK
+-- menggagalkan pembuatan semua elemen berikutnya (efek domino = banyak tab kosong).
+-- FIX v1.5.2 (KEMBALI KE ASLI DARA HUB - permintaan user): library WindUI kembali di-load
+-- dari SUMBER ASLI DaraHub yang TERBARU: darahub.pages.dev (WindUI-Moded; MD5 diverifikasi
+-- identik dengan yang dipakai DaraHub asli saat ini). Library inilah yang mendukung tombol
+-- minimize ASLI DaraHub (OpenButton ShowIconOnly + icon.png) - library repo v1.6.65 tidak
+-- punya opsi ShowIconOnly (field-nya berubah nama jadi OnlyIcon).
+local WINDUI_URL = "https://darahub.pages.dev/Module/Library/GUI/WindUI-Moded/main.lua"
+local libSrc = game:HttpGet(WINDUI_URL)
+-- FIX v1.5.0: DUA pola font - library v1.6.64 (repo skrg) pakai pola lama, v1.6.65 pola baru.
+-- Kalau repo di-update ke versi baru, patch tetap jalan. Tidak ketemu = warning, TIDAK fatal.
+local FONT_LINES = {
+'v.FontFace=Font.new(r,v.FontFace.Weight,v.FontFace.Style)',
+'x.FontFace=Font.new(u,x.FontFace.Weight,x.FontFace.Style)',
+}
+local nPatched = 0
+for _, FONT_LINE in ipairs(FONT_LINES) do
+local FONT_PATCHED = 'pcall(function() ' .. FONT_LINE .. ' end)'
+local searchFrom = 1
+while true do
+local p1, p2 = string.find(libSrc, FONT_LINE, searchFrom, true)
+if not p1 then break end
+libSrc = string.sub(libSrc, 1, p1 - 1) .. FONT_PATCHED .. string.sub(libSrc, p2 + 1)
+searchFrom = p1 + #FONT_PATCHED
+nPatched = nPatched + 1
+end
+end
+if nPatched > 0 then
+print("[JoblessHub] Patch font-capability diterapkan ke library UI (" .. nPatched .. " titik)")
+else
+warn("[JoblessHub] PERINGATAN: pola font di library UI tidak ditemukan - library dipasang tanpa patch (kemungkinan library upstream berubah)")
+end
+-- FIX v1.4.6 (LAPIS 2 - CADANGAN): hapus syarat "not au.IsPC" di fungsi Close library agar
+-- floating icon Show/Hide tetap dimunculkan setelah minimize di SEMUA perangkat. LAPIS 1
+-- (OnlyMobile = false di OpenButton) adalah jalur utama; patch ini cadangan bila jalur resmi
+-- berubah. Pola tidak ketemu = warning saja, TIDAK fatal (library tetap terpasang).
+-- FIX v1.5.0: DUA varian pola - library ASLI memakai variabel "aw.", WindUI-Moded lama "au.".
+-- Hapus syarat "not IsPC" di fungsi Close agar floating Show/Hide SELALU muncul setelah minimize.
+local ICON_PATTERNS = {
+{ 'if aw.OpenButtonMain and not aw.Destroyed and not aw.IsPC and aw.IsOpenButtonEnabled then',
+'if aw.OpenButtonMain and not aw.Destroyed and aw.IsOpenButtonEnabled then' },
+{ 'if au.OpenButtonMain and not au.Destroyed and not au.IsPC and au.IsOpenButtonEnabled then',
+'if au.OpenButtonMain and not au.Destroyed and au.IsOpenButtonEnabled then' },
+}
+local nIcon = 0
+for _, pat in ipairs(ICON_PATTERNS) do
+local pI1, pI2 = string.find(libSrc, pat[1], 1, true)
+if pI1 then
+libSrc = string.sub(libSrc, 1, pI1 - 1) .. pat[2] .. string.sub(libSrc, pI2 + 1)
+nIcon = nIcon + 1
+end
+end
+if nIcon > 0 then
+print("[JoblessHub] Patch floating-icon diterapkan ke library UI (syarat IsPC dihapus)")
+else
+warn("[JoblessHub] PERINGATAN: pola floating-icon di library UI tidak ditemukan - patch dilewati (jalur utama OnlyMobile=false tetap aktif)")
+end
+return loadstring(libSrc)()
+end)
+if not okWindUI or type(WindUIMod) ~= "table" then
+        warn("[JoblessHub] Gagal memuat WindUI (WindUI-Moded dari darahub.pages.dev - sumber asli DaraHub) - library UI tidak valid.")
+        pcall(function()
+                game:GetService("Players").LocalPlayer:Kick("[JoblessHub] Gagal memuat WindUI - cek internet lalu eksekusi ulang. Detail di console.")
+        end)
+        return
+end
+WindUI = WindUIMod
+
+-- v1.4.2: peringatan dini bila eksekusi sebelumnya crash (terlihat langsung di layar)
+if DaraHubStaleCrash then
+        pcall(function()
+                WindUI:Notify({
+                        Title = "PERINGATAN: crash terdeteksi",
+                        Content = "Eksekusi terakhir berhenti di section: " .. tostring(DaraHubStaleCrash) .. ". Bila berulang, catat nama ini.",
+                        Duration = 8
+                })
+        end)
+end
+
+DaraSectionStart("DRAG CONTROL")
+-- ================= ADD (Task 24): DRAG CONTROL - lock/unlock drag tombol layar =================
+-- Toggle "Drag Control (Lock/Unlock Button)" ada di tab Settings. Saat fitur aktif:
+-- TAHAN tombol layar ButtonLib (Supper Bounce / Bunny Hop / Lag Switch) selama 5 detik
+-- untuk lock atau unlock drag tombol itu. LOCK = tombol tidak bisa di drag (posisi
+-- langsung dikembalikan otomatis), UNLOCK = bisa di drag lagi. Notifikasi WindUI muncul
+-- setiap keadaan berubah (lock/unlock). Klik normal tombol tetap jalan saat locked
+-- (yang dikunci hanya drag-nya). Fitur dimatikan = semua lock dibuka.
+-- Engine disimpan di getgenv().DaraDragControl agar aman saat script dieksekusi ulang
+-- (wrapper ButtonLib.Create tidak pernah di-wrap ganda; engine di-resolve dinamis).
+local DC = { Enabled = false, HoldTime = 5, Locks = {} }
+getgenv().DaraDragControl = DC
+
+local function dragControlNotify(label, locked)
+pcall(function()
+WindUI:Notify({
+Title = "Drag Control",
+Content = label .. (locked and " LOCKED - tidak bisa di drag (tahan 5 detik untuk unlock)" or " UNLOCKED - bisa di drag lagi"),
+Duration = 3
+})
+end)
+end
+
+local function setButtonDragLock(flag, locked, silent)
+local info = DC.Locks[flag]
+if not info or not info.frame then return end
+info.locked = locked
+if locked then
+info.pos = info.frame.Position
+if info.conn then
+pcall(function() info.conn:Disconnect() end)
+info.conn = nil
+end
+local okConn, conn = pcall(function()
+return info.frame:GetPropertyChangedSignal("Position"):Connect(function()
+if not info.locked or not info.frame then return end
+if info.frame.Position ~= info.pos then
+info.dragAttempted = true
+info.frame.Position = info.pos
+end
+end)
+end)
+if okConn then info.conn = conn end
+else
+if info.conn then
+pcall(function() info.conn:Disconnect() end)
+info.conn = nil
+end
+info.dragAttempted = false
+end
+if not silent then
+dragControlNotify(info.label, locked)
+end
+end
+
+local function unlockAllDragControl()
+local anyLocked = false
+for _, info in pairs(DC.Locks) do
+if info.locked then
+anyLocked = true
+setButtonDragLock(info.flag, false, true)
+end
+end
+if anyLocked then
+pcall(function()
+WindUI:Notify({
+Title = "Drag Control",
+Content = "Fitur dimatikan - semua tombol kembali bisa di drag (unlock).",
+Duration = 3
+})
+end)
+end
+end
+
+local function findDragTarget(frame)
+local btn = frame:FindFirstChildWhichIsA("TextButton")
+if not btn then
+btn = frame:FindFirstChildWhichIsA("ImageButton")
+end
+return btn or frame
+end
+
+local function attachDragControl(config, api)
+if type(config) ~= "table" or not config.Flag then return end
+local flag = tostring(config.Flag)
+local okFrame, frame = pcall(function()
+local gui = game:GetService("CoreGui"):FindFirstChild("Darahub")
+return gui and gui:FindFirstChild(flag)
+end)
+if not okFrame or not frame then return end
+-- kalau ada info lama (script dieksekusi ulang), lepas koneksi lamanya dulu
+local old = DC.Locks[flag]
+if old and old.conn then
+pcall(function() old.conn:Disconnect() end)
+end
+local info = {
+flag = flag,
+label = tostring(config.Text or flag),
+frame = frame,
+locked = false,
+justLocked = false,
+dragAttempted = false,
+conn = nil,
+}
+DC.Locks[flag] = info
+-- Supresi klik: aksi tombol tidak boleh terpicu saat finger dilepas setelah tahan
+-- 5 detik (OnClick ButtonLib terpicu bila posisi tidak berubah) maupun setelah gagal
+-- drag di keadaan locked (posisi langsung dikembalikan -> dianggap tidak berubah).
+pcall(function()
+if config.Type == "Toggle" and api and api.Set then
+local origSet = api.Set
+api.Set = function(self, v)
+if info.justLocked or info.dragAttempted then
+info.justLocked = false
+info.dragAttempted = false
+return
+end
+return origSet(self, v)
+end
+elseif api and api.SetCallback then
+local origCb = config.Callback or config[1]
+api:SetCallback(function()
+if info.justLocked or info.dragAttempted then
+info.justLocked = false
+info.dragAttempted = false
+return
+end
+if origCb then origCb() end
+end)
+end
+end)
+-- deteksi tahan 5 detik memakai InputBegan/InputEnded tombol yang sama dengan drag ButtonLib
+pcall(function()
+local target = findDragTarget(frame)
+local holding = false
+local holdStart = 0
+target.InputBegan:Connect(function(input)
+if not DC.Enabled then return end
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+holding = true
+holdStart = os.clock()
+info.dragAttempted = false
+info.justLocked = false
+task.delay(DC.HoldTime, function()
+if holding and DC.Enabled and (os.clock() - holdStart) >= DC.HoldTime then
+info.justLocked = true
+setButtonDragLock(flag, not info.locked)
+end
+end)
+end
+end)
+target.InputEnded:Connect(function(input)
+local t = input.UserInputType
+if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+holding = false
+task.defer(function()
+info.dragAttempted = false
+end)
+end
+end)
+end)
+end
+
+DC.Attach = attachDragControl
+DC.SetLock = setButtonDragLock
+DC.UnlockAll = unlockAllDragControl
+
+-- Wrapper: semua tombol/toggle layar ButtonLib yang dibuat SETELAH titik ini otomatis
+-- dapat sistem drag control. DraggingSystem milik ButtonLib lokal (tidak bisa dipatch
+-- dari luar), jadi lock/unlock diterapkan dari luar: pengembalian posisi (locked) +
+-- supresi klik + deteksi tahan 5 detik. Guard anti double-wrap agar aman dieksekusi ulang.
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap sebelum wrap
+pcall(function()
+if ButtonLib and ButtonLib.Create then
+if not ButtonLib.Create.__daraDragWrapped then
+local origCreateButton = ButtonLib.Create.Button
+local origCreateToggle = ButtonLib.Create.Toggle
+if type(origCreateButton) == "function" then
+ButtonLib.Create.Button = function(self, config)
+local api = origCreateButton(self, config)
+local eng = getgenv().DaraDragControl
+if eng and eng.Attach then
+pcall(eng.Attach, config, api)
+end
+return api
+end
+end
+if type(origCreateToggle) == "function" then
+ButtonLib.Create.Toggle = function(self, config)
+local api = origCreateToggle(self, config)
+local eng = getgenv().DaraDragControl
+if eng and eng.Attach then
+pcall(eng.Attach, config, api)
+end
+return api
+end
+end
+ButtonLib.Create.__daraDragWrapped = true
+end
+end
+end)
+-- ================= AKHIR ADD (Task 24): DRAG CONTROL ENGINE =================
+
+DaraSectionDone("DRAG CONTROL")
+DaraSectionStart("WINDOW & LAYAR")
+Window = WindUI:CreateWindow({
+NewElements = true,
+Title = "JoblessHub | Evade 2.2",
+-- FIX v1.5.2 (MINIMIZE BUTTON ASLI DARA HUB): icon ASLI DaraHub dikembalikan - dipakai
+-- window topbar DAN floating minimize button (ShowIconOnly), persis seperti DaraHub asli.
+Icon = BaseURL .. "/icon.png",
+Author = "JoblessHub",
+Folder = "JoblessHub/Games/Evade",
+Size = UDim2.fromOffset(580, 490),
+Theme = "Dark",
+HidePanelBackground = false,
+Acrylic = false,
+HideSearchBar = false,
+SideBarWidth = 200,
+-- FIX v1.5.2 (TOMBOL MINIMIZE KEMBALI KE ASLI DARA HUB - permintaan user): pill bawaan
+-- WindUI (icon "eye" + tulisan "JoblessHub") DIHAPUS. OpenButton kembali PERSIS konfigurasi
+-- ASLI DaraHub yang terbaru: ShowIconOnly = true = tombol icon-only bergambar logo DaraHub
+-- (icon.png dari darahub.pages.dev), bisa di-drag, klik = buka UI kembali.
+-- OnlyMobile = false tetap dipasang (fix v1.4.6, tidak mengubah tampilan): floating icon
+-- SELALU dimunculkan lagi setelah window di-minimize, di SEMUA perangkat (HP/PC) walau
+-- KeyboardEnabled terdeteksi (executor baru bisa melaporkan itu walau di HP) - library
+-- menganggap "PC" dan tidak menampilkan icon.
+OpenButton = {
+ShowIconOnly = true,
+OnlyMobile = false
+}})
+-- FIX v1.6.0: handle window disimpan global - eksekusi ulang otomatis menghancurkan window
+-- lama (lihat blok RE-EXECUTION SAFETY di atas) sehingga tidak menumpuk jendela/ikon.
+getgenv().__JoblessHubWindow = Window
+WindUI.TransparencyValue = 0.7
+pcall(function()
+Window:ToggleTransparency(true)
+Window:DisableTopbarButtons({ "Fullscreen" })
+-- FIX v1.5.2: SetIconSize(48) dikembalikan - persis DaraHub asli (ukuran icon window topbar).
+Window:SetIconSize(48)
+-- Show/Hide window memakai mekanisme ASLI DaraHub: OpenButton ShowIconOnly + SetToggleKey.
+Window:SetToggleKey(Enum.KeyCode.RightControl)
+end)
+
+-- ================= UPDATE PC: deteksi platform =================
+-- Mendeteksi perangkat (Mobile / PC / Unknown) dari UserInputService; hasilnya dipakai
+-- untuk memilih perilaku default (top GUI otomatis di mobile) dan ditampilkan sebagai
+-- Tag di jendela. Semua pembacaan properti dibungkus pcall karena executor lama bisa
+-- melempar error saat membaca properti UserInputService.
+local UIService = game:GetService("UserInputService")
+local IsTouchDevice = false
+local IsKeyboardDevice = false
+local IsMouseDevice = false
+pcall(function() IsTouchDevice = UIService.TouchEnabled end)
+pcall(function() IsKeyboardDevice = UIService.KeyboardEnabled end)
+pcall(function() IsMouseDevice = UIService.MouseEnabled end)
+local PlatformLabel = "Unknown"
+if IsTouchDevice then
+PlatformLabel = "Mobile"
+elseif IsKeyboardDevice or IsMouseDevice then
+PlatformLabel = "PC"
+end
+pcall(function()
+Window:Tag({
+Title = PlatformLabel,
+Color = IsTouchDevice and Color3.fromHex("#30a2ff") or Color3.fromHex("#ffaa30")
+})
+end)
+pcall(function()
+WindUI:Notify({
+Title = "JoblessHub | Evade 2.2",
+Content = "Platform terdeteksi: " .. PlatformLabel .. ". Dukungan PC (Sensitivity, PC Keybinds, Top GUI on PC) ada di tab Settings.",
+Duration = 4
+})
+end)
+
+-- FIX: identifyexecutor dibungkus pcall (tidak semua executor menyediakan fungsi ini)
+local okExec, executor = pcall(function()
+return identifyexecutor()
+end)
+if okExec and type(executor) == "table" then
+for key, value in pairs(executor) do
+print(key .. ": " .. tostring(value))
+end
+elseif okExec and type(executor) == "string" then
+pcall(function()
+Window:Tag({
+Title = "" .. executor
+})
+end)
+else
+print("The injector does not support identifyexecutor()")
+end
+pcall(function()
+Window:Tag({
+Title = "v1.6.0",
+Color = Color3.fromHex("#30ff6a")
+})
+end)
+-- ================= v1.4.5: SAFE TAB PROXY (anti "satu error mati semua") =================
+-- SEMUA pembuatan elemen UI lewat proxy: setiap Tabs.<Tab>:<Method>(config) dibungkus pcall.
+-- Bila SATU elemen gagal dibuat (contoh: bug font library, capability, elemen error), error
+-- DITANGKAP di sini: warn jelas (tab:method:judul), elemen DUMMY dikembalikan, dan pembuatan
+-- elemen BERIKUTNYA TETAP DICOBA -> tab tidak lagi kosong total karena satu elemen error.
+local function DaraDummyElement()
+        local dummy = {}
+        dummy.Value = ""
+        dummy.Set = function() end
+        dummy.SetVisible = function() end
+        dummy.SetText = function() end
+        dummy.SetValue = function() end
+        dummy.Destroy = function() end
+        return dummy
+end
+local function DaraSafeTab(cfg, tabName)
+        local okT, realTab = pcall(function() return Window:Tab(cfg) end)
+        if not okT or not realTab then
+                warn("[JoblessHub] Tab '" .. tabName .. "' GAGAL dibuat di library UI: " .. tostring(realTab))
+                realTab = nil
+        end
+        local proxy = {}
+        setmetatable(proxy, {
+                __index = function(_t, method)
+                        return function(_self, config)
+                                if realTab then
+                                        local okEl, resEl = pcall(function() return realTab[method](realTab, config) end)
+                                        if okEl then
+                                                if type(resEl) == "table" or type(resEl) == "userdata" then
+                                                        local elProxy
+                                                        elProxy = setmetatable({}, {
+                                                                __index = function(_et, key)
+                                                                        local v = resEl[key]
+                                                                        if type(v) == "function" then
+                                                                                return function(_s, ...)
+                                                                                        local okM, errM = pcall(v, resEl, ...)
+                                                                                        if not okM then
+                                                                                                warn("[JoblessHub] " .. tabName .. ":" .. tostring(key) .. " error: " .. tostring(errM))
+                                                                                        end
+                                                                                end
+                                                                        end
+                                                                        return v
+                                                                end,
+                                                                __newindex = function(_et, key, val)
+                                                                        local okS, errS = pcall(function() resEl[key] = val end)
+                                                                        if not okS then
+                                                                                warn("[JoblessHub] elemen " .. tabName .. " (set " .. tostring(key) .. ") gagal: " .. tostring(errS))
+                                                                        end
+                                                                end,
+                                                        })
+                                                        return elProxy
+                                                end
+                                                return resEl
+                                        end
+                                        local titleTxt = "?"
+                                        if type(config) == "table" and type(config.Title) == "string" then
+                                                titleTxt = config.Title
+                                        end
+                                        warn("[JoblessHub] UI '" .. tabName .. ":" .. method .. "' (" .. titleTxt .. ") GAGAL dibuat: " .. tostring(resEl) .. " - elemen dilewati, elemen berikutnya tetap dicoba.")
+                                        return DaraDummyElement()
+                                end
+                                return DaraDummyElement()
+                        end
+                end,
+        })
+        return proxy
+end
+Tabs = {
+Main = DaraSafeTab({ Title = "Main", Icon = "layout-grid" }, "Main"),
+Player = DaraSafeTab({ Title = "Player", Icon = "user" }, "Player"),
+Combat = DaraSafeTab({ Title = "Combat", Icon = "sword" }, "Combat"),
+Auto = DaraSafeTab({ Title = "Auto", Icon = "repeat-2" }, "Auto"),
+Visuals = DaraSafeTab({ Title = "Visuals", Icon = "camera" }, "Visuals"),
+Utility = DaraSafeTab({ Title = "Utility", Icon = "wrench" }, "Utility"),
+Teleport = DaraSafeTab({ Title = "Teleport", Icon = "navigation" }, "Teleport"),
+Shop = DaraSafeTab({ Title = "Shop", Icon = "shopping-cart" }, "Shop"),
+Settings = DaraSafeTab({ Title = "Settings", Icon = "settings" }, "Settings")
+}
+
+function mouseUnlock(enabled)
+local success, err = pcall(function()
+local uiService = game:GetService("ReplicatedStorage"):FindFirstChild("Services"):FindFirstChild("UI"):FindFirstChild("SharedUIService")
+uiService.SetMouseActive:Fire("WindUI", enabled)
+end)
+
+if not success then
+warn("Failed to set mouse active state: " .. tostring(err))
+end
+end
+mouseUnlock(true)
+Window:OnOpen(function()
+mouseUnlock(true)
+end)
+Window:OnClose(function()
+mouseUnlock(false)
+end)
+local stopRampBooster
+Window:OnDestroy(function()
+if ButtonLib then ButtonLib:DestroyScreengui() end -- FIX v1.5.1: guard nil
+mouseUnlock(false)
+if stopRampBooster then stopRampBooster() end
+-- FIX v1.5.2: JAMINAN menu Roblox - topbar Roblox asli SELALU dinyalakan lagi saat script
+-- dihancurkan (kalau Top GUI sempat mematikannya), supaya menu/leave game tidak pernah hilang.
+pcall(function() game:GetService("StarterGui"):SetCore("TopbarEnabled", true) end)
+end)
+
+-- Services & Variable
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ADD: state bersama untuk Lag Switch/Demon & Anti Stuck (dideklarasikan awal agar bisa diakses
+-- dari blok tab Player maupun tab Utility sekaligus)
+local isLagActive = false
+local demonResizeActive = false
+local demonOriginalSize = nil
+
+-- ADD: remote event yang dipakai fitur Cola (hook ToolAction.FireServer) & Defibrillator Aura.
+-- FIX: dipakai FindFirstChild + warn agar penyebab jelas jika event tidak ditemukan
+local ToolAction = ReplicatedStorage.Events:FindFirstChild("ToolAction")
+local UpdateCharacterDataRegistry = ReplicatedStorage.Events:FindFirstChild("UpdateCharacterDataRegistry")
+if not ToolAction then
+warn("[JoblessHub] ReplicatedStorage.Events.ToolAction tidak ditemukan - fitur Cola & Defibrillator tidak akan berfungsi")
+end
+if not UpdateCharacterDataRegistry then
+warn("[JoblessHub] ReplicatedStorage.Events.UpdateCharacterDataRegistry tidak ditemukan - fitur Defibrillator tidak akan berfungsi")
+end
+
+-- require
+-- FIX: pcall saja TIDAK cukup: argumen seperti ReplicatedStorage.Shared.UserData.ClientHooks.useCurrency
+-- dievaluasi SEBELUM safeRequire dipanggil, sehingga bila instance di tengah path hilang
+-- (kasus nyata: UserData/ClientHooks dihapus -> "ClientHooks is not a valid member of Folder")
+-- script langsung crash saat load. Kini path dikirim sebagai daftar nama dan dicari bertahap
+-- dengan FindFirstChild -> module yang hilang hanya menghasilkan warn + fitur terkait nonaktif.
+local function safeRequire(parts, name)
+-- FIX: dukung DUA gaya pemanggilan: daftar path ({"Services", "Data", ...}) dan
+-- instance langsung (safeRequire(ReplicatedStorage.Tools.Cola, "Cola") dipakai blok Cola).
+-- Sebelumnya ipairs(parts) pada Instance/userdata melempar "table expected, got userdata"
+-- -> Cola gagal dimuat dan script crash saat load.
+local node = nil
+if type(parts) == "table" then
+node = ReplicatedStorage
+for _, p in ipairs(parts) do
+node = node:FindFirstChild(p)
+if not node then
+warn("[JoblessHub] '" .. tostring(name) .. "' tidak ditemukan (" .. table.concat(parts, ".") .. ") - fitur terkait tidak aktif")
+return nil
+end
+end
+else
+node = parts
+end
+local ok, result = pcall(require, node)
+if not ok then
+warn("[JoblessHub] Gagal require '" .. tostring(name) .. "': " .. tostring(result))
+return nil
+end
+return result
+end
+local ServerStateRegistryService = safeRequire({"Services", "Data", "ServerStateRegistryService"}, "ServerStateRegistryService")
+local CharacterService = safeRequire({"Services", "Asset", "CharacterService"}, "CharacterService")
+local InteractionTypes = safeRequire({"Services", "Asset", "InteractionService", "InteractionTypes"}, "InteractionTypes")
+local Movement = safeRequire({"Objects", "Game", "Character", "Client", "Movement"}, "Movement")
+local Portal = safeRequire({"Objects", "Game", "Tool", "Tasks", "Types", "Portal"}, "Portal")
+local DeathFeed = safeRequire({"Services", "UI", "GameUIService", "Types", "DeathFeed"}, "DeathFeed")
+local JumpPadModule = safeRequire({"Items", "BaseItems", "Loadout", "Deployables", "JumpPad", "Modules", "Client"}, "JumpPadModule")
+local BuildModule = safeRequire({"Objects", "Game", "Tool", "Tasks", "Types", "Build"}, "BuildModule")
+-- ADD: helper HeartbeatLoop (port dari DaraHub BETA) - loop Heartbeat dengan interval + guard busy;
+-- dipakai Auto Revive / Auto Whistle / Shop loop / Auto Exchange agar tidak jalan tiap frame (hemat FPS).
+-- FIX v1.6.0: koneksi didaftarkan ke registry global - eksekusi ulang otomatis memutus loop
+-- lama (dulu loop HeartbeatLoop dari eksekusi sebelumnya tetap hidup dan menumpuk).
+function HeartbeatLoop(interval, fn)
+local last = 0
+local busy = false
+return DaraTrackConn(RunService.Heartbeat:Connect(function()
+if busy then
+return
+end
+local now = os.clock()
+if now - last < interval then
+return
+end
+last = now
+busy = true
+pcall(fn)
+busy = false
+end))
+end
+
+-- ============================================================
+-- ADD (UPDATE BETA): PlayerData - lapisan data baru pengganti Shared.UserData.ClientHooks.
+-- Game versi terbaru MEMINDAHKAN UserData dari ReplicatedStorage.Shared.UserData ke
+-- ReplicatedStorage.Client.Services.UserData (service: Currency, Event, Progression,
+-- Codes, Inventory, Shops) dan MENGHAPUS ClientHooks, sehingga fitur HUD/Shop lama yang
+-- memakai useCurrency/useProgression/useEvent/useInventory kehilangan sumber data.
+-- Port dari DaraHub BETA: semua akses lewat service baru ini, di-cache, dibungkus pcall
+-- -> service hilang/berubah hanya menghasilkan nilai kosong, tidak pernah crash.
+-- ============================================================
+DaraSectionDone("WINDOW & LAYAR")
+DaraSectionStart("PLAYERDATA")
+local PlayerData = {}
+do
+local userDataServices = {}
+
+-- FIX: safeRequire versi Ringkas menerima daftar path, sedangkan module sudah berupa
+-- instance - beri wrapper pcall(require) sendiri + warn agar penyebab jelas.
+local function pcallRequire(module)
+local ok, result = pcall(require, module)
+if not ok then
+warn("[JoblessHub] Gagal require service UserData '" .. tostring(module.Name) .. "': " .. tostring(result))
+return nil
+end
+return result
+end
+
+local function loadUserDataService(name)
+-- FIX: pencarian bertahap FindFirstChild (path BARU: ReplicatedStorage.Client.Services.UserData)
+local root = game:GetService("ReplicatedStorage")
+local client = root:FindFirstChild("Client")
+local services = client and client:FindFirstChild("Services")
+local userData = services and services:FindFirstChild("UserData")
+local module = userData and userData:FindFirstChild(name)
+if not module then
+return nil
+end
+return pcallRequire(module)
+end
+
+local function serviceTable(name)
+local service = userDataServices[name]
+if service == nil then
+service = loadUserDataService(name)
+userDataServices[name] = service
+end
+return service
+end
+
+local function call(serviceName, method, ...)
+local service = userDataServices[serviceName]
+if service == nil then
+service = loadUserDataService(serviceName)
+userDataServices[serviceName] = service
+end
+if not service or type(service[method]) ~= "function" then
+return false, "missing " .. serviceName .. "." .. method
+end
+return pcall(service[method], ...)
+end
+
+function PlayerData.Balance(currencyName)
+local ok, value = call("Currency", "Balance", currencyName)
+return ok and tonumber(value) or 0
+end
+
+function PlayerData.Tickets()
+local ok, value = call("Event", "Balance")
+return ok and tonumber(value) or 0
+end
+
+function PlayerData.Progression()
+local ok, value = call("Progression", "Get")
+if ok and type(value) == "table" then
+return value
+end
+return { XP = 0, Level = 0 }
+end
+
+function PlayerData.IsRedeemed(code)
+local ok, value = call("Codes", "HasRedeemed", code)
+return ok and value == true
+end
+
+function PlayerData.RedeemCode(code)
+local ok, err = call("Codes", "Redeem", code)
+if not ok then
+warn("[JoblessHub] RedeemCode gagal untuk " .. tostring(code) .. ": " .. tostring(err))
+end
+return ok
+end
+
+function PlayerData.Owns(itemId)
+local ok, value = call("Inventory", "Owns", itemId)
+return ok and value == true
+end
+
+function PlayerData.OwnedIds()
+local ok, ids = call("Inventory", "OwnedIds")
+if ok and type(ids) == "table" then
+return ids
+end
+return {}
+end
+
+function PlayerData.Shop(name)
+local shops = serviceTable("Shops")
+return shops and shops[name] or nil
+end
+
+function PlayerData.Stock()
+local shops = serviceTable("Shops")
+if shops and shops.Stock then
+local ok, all = pcall(shops.Stock.All)
+if ok and type(all) == "table" then
+return all
+end
+end
+return {}
+end
+
+function PlayerData.StockRecord(key)
+local shops = serviceTable("Shops")
+if shops and shops.Stock then
+local ok, record = pcall(shops.Stock.Get, key)
+if ok then
+return record
+end
+end
+return nil
+end
+
+function PlayerData.PriceOf(key)
+local shops = serviceTable("Shops")
+if shops and shops.Pricing then
+local ok, price = pcall(shops.Pricing.PriceOf, key)
+if ok then
+return price
+end
+end
+return nil
+end
+
+function PlayerData.OwnsStock(key)
+local shops = serviceTable("Shops")
+if shops and shops.Ownership then
+local ok, owned = pcall(shops.Ownership.Owns, key)
+return ok and owned == true
+end
+return false
+end
+
+function PlayerData.Observe(serviceName, callback)
+local ok, disconnect = call(serviceName, "Observe", callback)
+if ok then
+return disconnect
+end
+return nil
+end
+
+function PlayerData.Buy(stockKey, amount)
+local ok, value = call("Shops", "Buy", stockKey, amount)
+return ok and value == true
+end
+
+function PlayerData.WaitUntilLoaded(timeout)
+local deadline = os.clock() + (timeout or 15)
+repeat
+local ok, loaded = call("Codes", "IsLoaded")
+if ok and loaded == true then
+return true
+end
+task.wait(0.25)
+until os.clock() > deadline
+return false
+end
+-- ============================================================
+-- ADD (UPDATE BETA): fungsi Event pada PlayerData - port dari DaraHub BETA.
+-- Dipakai Auto Farm (Auto Ticket saat event aktif) & Shop (Event Shop + Auto Exchange).
+-- ============================================================
+
+function PlayerData.EventActive()
+local ok, active = call("Event", "IsActive")
+if ok and active == true then
+return true
+end
+local shop = PlayerData.Shop("Event")
+if shop and type(shop.IsOpen) == "function" then
+local okOpen, open = pcall(shop.IsOpen)
+return okOpen and open == true
+end
+return false
+end
+
+function PlayerData.EventTiers()
+local ok, tiers = call("Event", "GetTiers")
+if ok and type(tiers) == "table" then
+return tiers
+end
+return {}
+end
+
+function PlayerData.EventExchanges()
+local ok, _, event = call("Event", "GetCurrent")
+if ok and type(event) == "table" and type(event.Exchanges) == "table" then
+return event.Exchanges
+end
+return {}
+end
+
+function PlayerData.EventPhase()
+local ok, phase = call("Event", "GetPhase")
+return ok and phase or nil
+end
+
+function PlayerData.Exchange(to, amount)
+local ok, err = call("Event", "Exchange", to, amount)
+if not ok then
+warn("[JoblessHub] Exchange gagal untuk " .. tostring(to) .. " x" .. tostring(amount) .. ": " .. tostring(err))
+end
+return ok
+end
+
+
+end
+
+DaraSectionDone("PLAYERDATA")
+DaraSectionStart("MOVEMENT ENGINE")
+
+-- Force Enable Lookback and zoom on mobile
+for _, n in {"LookBack", "ADS"} do
+    pcall(function()
+        require(ReplicatedStorage.Objects.Game.Actions.ActionTypes[n]).Requirements.Mobile = nil
+    end)
+end
+
+local Character
+local Humanoid
+local HumanoidRootPart
+local CharacterTag
+
+function GetCharacterTag(Character)
+if not Character then return nil end
+return Character:GetAttribute("Tag")
+end
+
+function setupCharacter(character)
+Character = character
+Humanoid = character:FindFirstChildOfClass("Humanoid")
+HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+CharacterTag = GetCharacterTag(character)
+end
+
+if LocalPlayer.Character then
+setupCharacter(LocalPlayer.Character)
+end
+
+DaraTrackConn(LocalPlayer.CharacterAdded:Connect(function(character)
+setupCharacter(character)
+end))
+
+-- Top bar buttons (Custom Top GUI: Zoom, Front View/Reload, Leaderboard)
+function SendKeybindEvent(key, bool)
+-- FIX: pencarian bertahap + warn; tanpa ini, menghapus folder game membuat tombol zoom/POV error
+local kb = ReplicatedStorage:FindFirstChild("Services")
+kb = kb and kb:FindFirstChild("Client")
+kb = kb and kb:FindFirstChild("KeybindService")
+kb = kb and kb:FindFirstChild("SendKeybindEvent")
+if kb then
+kb:Fire({
+Key = key,
+Down = bool
+})
+else
+warn("[JoblessHub] KeybindService.SendKeybindEvent tidak ditemukan - keybind layar tidak terkirim")
+end
+end
+
+-- ================= UPDATE PC: TOP GUI kini tersedia di PC juga =================
+-- Sebelumnya seluruh blok ini hanya jalan bila TouchEnabled (mobile), sehingga di PC
+-- tombol layar Zoom / Front View-Reload / Leaderboard tidak dibuat sama sekali.
+-- Sekarang dibungkus ensureTopGUI(): otomatis dijalankan di perangkat mobile (perilaku
+-- lama tetap sama), dan di PC bisa dinyalakan lewat toggle "Show Top GUI on PC"
+-- (tab Settings). destroyTopGUI() mematikan dengan bersih: melepas keybind yang masih
+-- tertahan, menghancurkan tombol/ScreenGui buatan script, lalu mengembalikan topbar Roblox.
+local TopGUICreated = false
+local TopGuiHandles = { screenGui = nil, injected = {}, releaseHolds = nil, topbarDisabled = false }
+local function destroyTopGUI()
+if TopGuiHandles.releaseHolds then
+pcall(TopGuiHandles.releaseHolds)
+end
+if TopGuiHandles.screenGui then
+pcall(function() TopGuiHandles.screenGui:Destroy() end)
+TopGuiHandles.screenGui = nil
+end
+for _, btn in ipairs(TopGuiHandles.injected) do
+pcall(function()
+if btn and btn.Parent then
+btn:Destroy()
+end
+end)
+end
+TopGuiHandles.injected = {}
+TopGUICreated = false
+TopGuiHandles.topbarDisabled = false -- FIX v1.5.2: flag topbar-asli-dimatikan direset
+pcall(function() game:GetService("StarterGui"):SetCore("TopbarEnabled", true) end)
+end
+local function ensureTopGUI()
+if TopGUICreated then
+return
+end
+TopGUICreated = true
+-- FIX v1.6.0 (RE-EXECUTION SAFETY): bersihkan dulu tombol injeksi (Zoom / Front View-Reload /
+-- Leaderboard) dari eksekusi sebelumnya di TopbarStandard mana pun yang ada - tanpa ini
+-- re-execute menumpuk tombol duplikat di topbar (guard "Already Loaded" sudah dihapus).
+pcall(function()
+local _oldTopbar = PlayerGui:FindFirstChild("TopbarStandard")
+if _oldTopbar then
+for _, _d in ipairs(_oldTopbar:GetDescendants()) do
+if _d.Name == "SecondaryButton" or _d.Name == "ReloadButton" or _d.Name == "LeaderboardButton" then
+_d:Destroy()
+end
+end
+end
+end)
+local isButtonLocked, currentMouseHold, activeKeybinds, createdButtons = {}, {}, {}, {} 
+
+function UpdateAllButtons() 
+for key, _ in pairs(currentMouseHold) do 
+if currentMouseHold[key] then 
+SendKeybindEvent(key, false)
+end 
+currentMouseHold[key] = nil 
+end 
+for key, buttonData in pairs(createdButtons) do 
+if buttonData and buttonData.updateVisualState then 
+pcall(buttonData.updateVisualState) 
+end 
+end 
+end 
+
+local LocalPlayer, starterGui, PlayerGui = game.Players.LocalPlayer, game:GetService("StarterGui"), game.Players.LocalPlayer:WaitForChild("PlayerGui") 
+local topbarStandard, targetParent = PlayerGui:FindFirstChild("TopbarStandard"), nil 
+
+if topbarStandard then 
+local main = topbarStandard:FindFirstChild("Main") 
+if main then 
+local holders = main:FindFirstChild("Holders") 
+if holders then 
+targetParent = holders:FindFirstChild("Left") 
+if targetParent then 
+for _, child in ipairs(targetParent:GetChildren()) do 
+if child.Name == "TopbarStandard" then 
+child:Destroy() 
+end 
+end 
+end 
+end 
+end 
+end 
+
+-- FIX v1.5.2: config tombol + pembuatnya dipindah ke ATUR supaya bisa dipakai jalur baru.
+local keybindButtonsConfig = { 
+{ name = "SecondaryButton", layoutOrder = 999, icon = "rbxassetid://126943351764139", label = "Zoom", key = "Secondary", enablesLockValue = false }, 
+{ name = "ReloadButton", layoutOrder = 997, icon = "rbxassetid://78648212535999", label = "Front View/Reload", key = "Reload", enablesLockValue = false }, 
+{ name = "LeaderboardButton", layoutOrder = 998, icon = "rbxassetid://5107166345", label = "Leaderboard", key = "Leaderboard", enablesLockValue = false } 
+} 
+
+function createKeybindButton(config, parent) 
+local Button = Instance.new("Frame") 
+Button.Name, Button.Parent, Button.BackgroundTransparency, Button.ClipsDescendants, Button.LayoutOrder, Button.Size, Button.ZIndex = config.name, parent, 1, true, config.layoutOrder, UDim2.new(0, 44, 0, 44), 20 
+
+local IconButton = Instance.new("Frame") 
+IconButton.Name, IconButton.Parent, IconButton.BackgroundColor3, IconButton.BackgroundTransparency, IconButton.BorderSizePixel, IconButton.ClipsDescendants, IconButton.Size, IconButton.ZIndex = "IconButton", Button, Color3.fromRGB(0, 0, 0), 0.3, 0, true, UDim2.new(1, 0, 1, 0), 2 
+
+local UICorner = Instance.new("UICorner") 
+UICorner.CornerRadius, UICorner.Parent = UDim.new(1, 0), IconButton 
+
+local IconImage = Instance.new("ImageLabel") 
+IconImage.Parent, IconImage.AnchorPoint, IconImage.BackgroundTransparency, IconImage.Position, IconImage.Size, IconImage.ZIndex, IconImage.Image = IconButton, Vector2.new(0.5, 0.5), 1, UDim2.new(0.5, 0, 0.5, 0), UDim2.new(0.5, 0, 0.5, 0), 15, config.icon 
+
+local IconImageRatio = Instance.new("UIAspectRatioConstraint") 
+IconImageRatio.Parent, IconImageRatio.DominantAxis = IconImage, Enum.DominantAxis.Height 
+
+local ClickRegion = Instance.new("TextButton") 
+ClickRegion.Parent, ClickRegion.BackgroundTransparency, ClickRegion.Size, ClickRegion.ZIndex, ClickRegion.Text = IconButton, 1, UDim2.new(1, 0, 1, 0), 20, "" 
+
+local IconOverlay = Instance.new("Frame") 
+IconOverlay.Parent, IconOverlay.BackgroundColor3, IconOverlay.BackgroundTransparency, IconOverlay.Size, IconOverlay.Visible, IconOverlay.ZIndex = IconButton, Color3.fromRGB(255, 255, 255), 0.925, UDim2.new(1, 0, 1, 0), false, 6 
+
+local UICorner_Overlay = Instance.new("UICorner") 
+UICorner_Overlay.CornerRadius, UICorner_Overlay.Parent = UDim.new(1, 0), IconOverlay 
+
+function getIsActive() 
+return currentMouseHold[config.key] or false 
+end 
+
+function updateVisualState() 
+IconOverlay.Visible = getIsActive() 
+end 
+
+ClickRegion.MouseButton1Down:Connect(function() 
+currentMouseHold[config.key] = true 
+SendKeybindEvent(config.key, true) 
+updateVisualState() 
+end) 
+
+ClickRegion.MouseButton1Up:Connect(function() 
+if currentMouseHold[config.key] then 
+currentMouseHold[config.key] = false 
+SendKeybindEvent(config.key, false) 
+updateVisualState() 
+end 
+end) 
+
+createdButtons[config.key] = { Button = Button, updateVisualState = updateVisualState } 
+end 
+
+-- Membuat semua tombol keybind + mencatat handle-nya (dipakai kedua jalur).
+local function injectKeybindButtons(parent) 
+for _, config in ipairs(keybindButtonsConfig) do 
+createKeybindButton(config, parent) 
+end 
+for _, config in ipairs(keybindButtonsConfig) do 
+local data = createdButtons[config.key] 
+if data and data.Button then 
+table.insert(TopGuiHandles.injected, data.Button) 
+end 
+end 
+end 
+
+-- ================== FIX v1.5.2 (MENU ROBLOX SELALU BISA DIBUKA) ==================
+-- MASALAH (urutan lama): topbar Roblox asli DIMATIKAN DULU (SetCore TopbarEnabled=false),
+-- BARU topbar pengganti (Top GUI) dibuat. Di executor dengan pembatasan capability
+-- ("The current thread cannot access 'Instance' - lacking capability Plugin"), pembuatan
+-- topbar pengganti GAGAL di tengah jalan dan error-nya DITELAN pcall section -> topbar
+-- asli sudah MATI + pengganti tidak jadi -> TOMBOL MENU ROBLOX HILANG -> tidak bisa
+-- membuka menu Roblox / leave game.
+-- SOLUSI (urutan dibalik, fail-safe): topbar pengganti DIBUAT DULU sepenuhnya dalam pcall;
+-- HANYA bila sukses topbar asli dimatikan. Bila gagal -> sisa build dihancurkan + topbar
+-- asli DINYALAKAN (tetap ada) -> menu Roblox selalu bisa dibuka. Plus WATCHDOG: bila
+-- topbar pengganti hilang (dihancurkan game/executor), topbar asli otomatis dinyalakan lagi.
+if not targetParent then 
+if PlayerGui:FindFirstChild("TopbarStandard") then 
+PlayerGui:FindFirstChild("TopbarStandard"):Destroy() 
+end 
+local buildOK, buildErr = pcall(function()
+local screenGui = Instance.new("ScreenGui") 
+screenGui.Name, screenGui.IgnoreGuiInset, screenGui.ScreenInsets, screenGui.DisplayOrder, screenGui.ResetOnSpawn, screenGui.Parent = "TopbarStandard", false, Enum.ScreenInsets.TopbarSafeInsets, 100, false, PlayerGui 
+TopGuiHandles.screenGui = screenGui 
+
+local holders = Instance.new("Frame") 
+holders.Name, holders.BackgroundTransparency, holders.BorderSizePixel, holders.Position, holders.Size, holders.Parent = "Holders", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, -2), screenGui 
+
+local frame = Instance.new("Frame") 
+frame.Name, frame.BackgroundTransparency, frame.BorderSizePixel, frame.Position, frame.Size, frame.Parent = "Main", 1, 0, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0), holders 
+
+local scrollingFrame = Instance.new("ScrollingFrame") 
+scrollingFrame.Name, scrollingFrame.Parent, scrollingFrame.BackgroundTransparency, scrollingFrame.BorderSizePixel, scrollingFrame.Position, scrollingFrame.Size, scrollingFrame.CanvasSize, scrollingFrame.AutomaticCanvasSize, scrollingFrame.ScrollBarThickness, scrollingFrame.ScrollingDirection, scrollingFrame.ScrollingEnabled = "Right", frame, 1, 0, UDim2.new(0, 12, 0, 0), UDim2.new(1, -24, 1, 0), UDim2.new(0, 0, 0, 0), Enum.AutomaticSize.X, 0, Enum.ScrollingDirection.X, false 
+
+local uiListLayout = Instance.new("UIListLayout") 
+uiListLayout.Parent, uiListLayout.Padding, uiListLayout.SortOrder, uiListLayout.FillDirection, uiListLayout.HorizontalAlignment, uiListLayout.VerticalAlignment = scrollingFrame, UDim.new(0, 12), Enum.SortOrder.LayoutOrder, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Bottom 
+targetParent = scrollingFrame 
+
+injectKeybindButtons(targetParent) 
+end)
+if buildOK then 
+-- Build topbar pengganti SUKSES -> BARULAH topbar asli dimatikan (perilaku asli DaraHub).
+starterGui:SetCore("TopbarEnabled", false) 
+TopGuiHandles.topbarDisabled = true 
+-- WATCHDOG v1.5.2: bila topbar pengganti hilang tapi topbar asli masih dimatikan,
+-- NYALAKAN lagi topbar asli -> menu Roblox tidak pernah hilang selamanya.
+task.delay(8, function()
+if TopGuiHandles.topbarDisabled then
+local sg = TopGuiHandles.screenGui
+if not sg or not sg.Parent then
+TopGuiHandles.topbarDisabled = false
+pcall(function() starterGui:SetCore("TopbarEnabled", true) end)
+warn("[JoblessHub] Top GUI hilang - topbar Roblox asli otomatis DINYALAKAN lagi (menu Roblox selalu bisa dibuka).")
+end
+end
+end)
+else 
+-- Build GAGAL (mis. capability executor) -> topbar Roblox ASLI TETAP MENYALA.
+warn("[JoblessHub] Top GUI gagal dibuat (" .. tostring(buildErr) .. ") - topbar Roblox ASLI tetap dipakai (menu Roblox aman).")
+TopGuiHandles.screenGui = nil 
+pcall(function() starterGui:SetCore("TopbarEnabled", true) end) 
+end 
+else 
+-- TopbarStandard milik game ditemukan -> tombol di-INJECT ke dalamnya, topbar asli tetap menyala.
+starterGui:SetCore("TopbarEnabled", true) 
+injectKeybindButtons(targetParent) 
+end 
+
+TopGuiHandles.releaseHolds = function() 
+for key, held in pairs(currentMouseHold) do 
+if held then 
+SendKeybindEvent(key, false) 
+end 
+currentMouseHold[key] = nil 
+end 
+end 
+end
+-- UPDATE PC: perilaku default tetap sama seperti versi lama (mobile = top GUI langsung dibuat);
+-- di PC top GUI TIDAK dibuat otomatis, nyalakan via toggle "Show Top GUI on PC" di tab Settings.
+if IsTouchDevice then 
+ensureTopGUI() 
+end
+
+if not workspace:FindFirstChild("SecurityPart") then
+SecurityPart = Instance.new("Part")
+SecurityPart.Name = "SecurityPart"
+SecurityPart.Size = Vector3.new(10, 1, 10)
+SecurityPart.Position = Vector3.new(50000, 50000, 50000)
+SecurityPart.Anchored = true
+SecurityPart.CanCollide = true
+SecurityPart.Parent = workspace
+end
+-----------------------------------------Modification Stuffs-----------------------------------------------------
+local defaultMovementValues = {
+SprintAcceleration = 1,
+SprintCap = 2,
+RunAccel = 1,
+Friction = 5,
+RunDeaccel = 700,
+AirStrafeAcceleration = 182,
+AirAcceleration = 1,
+Speed = 1500,
+JumpHeight = 3,
+JumpCap = 1,
+WalkSpeedMultiplier = 1,
+JumpSpeedMultiplier = 1.45,
+BhopEnabled = false,
+GroundedDistCheck = 2.9
+}
+local AutowallHop = false
+local autoJumpEnabled = false
+local autoJumpType = "Simulation"
+local bhopHoldEnabled = false
+local accelerationMethod = "Acceleration"
+local accelerationValue = -0.2
+local customFriction = nil -- FIX: menyimpan Friction kustom dari input tab Player agar restore saat bhop berhenti kembali ke nilai yang benar (bukan selalu default)
+function getCurrentSpeed(character)
+if not character then return 0 end
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not hrp then return 0 end
+for _, child in ipairs(hrp:GetChildren()) do
+if child:IsA("LinearVelocity") and child.Name:find("LinearVelocity") then
+local pv = child.PlaneVelocity
+return (pv.X * pv.X + pv.Y * pv.Y) ^ 0.5
+end
+end
+local velocity = hrp.AssemblyLinearVelocity
+return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
+end
+local movementFallbackNotified = false
+-- FIX v1.6.0 (GERAKAN & KAMERA KAKU/LAMBAT/NGEBUG SECARA ACAK): pengiriman nilai
+-- movement dirombak jadi ANTRIAN TERSUSUN + PENGGABUNGAN (coalescing), hanya SATU
+-- pengiriman aktif pada satu waktu. Versi lama menjalankan tiap pengiriman di
+-- task.spawn terpisah: saat friction bhop flip-flop cepat (tiap lompat/mendarat,
+-- beberapa kali per detik) beberapa thread berjalan BARENG; begitu handler game
+-- yield di dalam pcall, urutan penerapan bisa TERBALIK -> nilai Friction /
+-- BhopEnabled di game salah secara acak -> gerakan mendadak kaku/aneh dan kamera
+-- pengikut ikut tersentak (gejala "kaku, lambat, ngebug, secara acak bahkan sering").
+-- Antrian baru: urutan selalu terjaga, nilai berulang untuk MovementType yang sama
+-- digabung (nilai terakhir menang - persis semantik ModifyMovement game), dan jumlah
+-- thread/alokasi jauh lebih hemat -> frame lebih stabil (terasa terutama di HP).
+local movementPending = {}
+local movementPendingOrder = {}
+local movementQueueBusy = false
+local movementLastRequested = {}
+-- FIX v1.4.3 (dipertahankan): tabel Movement game sering BELUM siap saat script baru
+-- load (karakter belum spawn) - retry otomatis 3 detik kemudian, warn hanya bila tetap gagal.
+local movementRetryScheduled = {}
+-- FIX (Task 20): cache tabel Movement game yang valid; diisi hook Movement.Update
+-- berkala saat data tersedia, dipakai fallback pengiriman di bawah.
+local cachedMovementData = nil
+
+local function movementSendValue(movementType, value)
+-- Jalur 1 (persis DaraHub asli): fire event CharacterTask milik game lewat getconnections
+local sent = false
+if CharacterTag then
+sent = SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", CharacterTag, "ModifyMovement", {movementType, value})
+end
+if sent then return end
+-- Jalur 2 (fallback tanpa getconnections, dipertahankan dari Task 19): tulis langsung ke
+-- tabel Movement milik game via CharacterService (script membaca tabel yang sama untuk
+-- state/mirror) - membuat Jump Cap & Air Strafe tetap bekerja walau executor tidak
+-- mendukung getconnections, sekaligus menutup kasus CharacterTag nil.
+local okFall, errFall = pcall(function()
+local data = CharacterService and CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local movement = (data and data.Movement) or cachedMovementData
+if not movement then
+error("tabel Movement game tidak ditemukan")
+end
+movement[movementType] = value
+cachedMovementData = movement
+end)
+if not okFall and not movementFallbackNotified then
+if not movementRetryScheduled[movementType] then
+movementRetryScheduled[movementType] = true
+task.delay(3, function()
+movementRetryScheduled[movementType] = nil
+-- FIX v1.6.0: kirim ulang memakai nilai TERAKHIR yang diminta, BUKAN nilai basi dari
+-- 3 detik lalu (versi lama bisa memakai nilai basi yang menimpa nilai baru dan
+-- mematikan bhop/movement secara acak).
+local latest = movementLastRequested[movementType]
+if latest ~= nil then
+MovementValueSet(movementType, latest)
+end
+end)
+return
+end
+movementFallbackNotified = true
+warn("[JoblessHub] Gagal mengubah movement '" .. tostring(movementType) .. "': " .. tostring(errFall))
+pcall(WindUI.Notify, WindUI, {
+Title = "JoblessHub",
+Content = "Gagal mengubah " .. tostring(movementType) .. ": executor tidak mendukung getconnections dan jalur langsung juga gagal.",
+Duration = 5
+})
+end
+end
+
+local function movementDequeue()
+while true do
+local movementType = table.remove(movementPendingOrder, 1)
+if not movementType then
+break
+end
+local value = movementPending[movementType]
+movementPending[movementType] = nil
+if value ~= nil then
+movementSendValue(movementType, value)
+end
+end
+movementQueueBusy = false
+end
+
+function MovementValueSet(MovementType, value)
+-- FIX (Task 19, dipertahankan): guard nilai nil - versi lama mengirim nil diam-diam
+-- ke game sehingga tidak ada efek sama sekali tanpa pesan apa pun.
+if value == nil then
+warn("[JoblessHub] MovementValueSet('" .. tostring(MovementType) .. "'): nilai tidak valid (nil) - dilewati")
+return
+end
+if not CharacterTag then
+CharacterTag = GetCharacterTag(LocalPlayer.Character)
+end
+movementLastRequested[MovementType] = value
+movementPending[MovementType] = value
+local alreadyQueued = false
+for i = 1, #movementPendingOrder do
+if movementPendingOrder[i] == MovementType then
+alreadyQueued = true
+break
+end
+end
+if not alreadyQueued then
+movementPendingOrder[#movementPendingOrder + 1] = MovementType
+end
+-- hanya satu worker aktif; worker yang sedang yield akan mengambil nilai baru pada
+-- iterasi berikutnya (urutan terjaga, tidak pernah dua pengiriman berjalan bareng)
+if not movementQueueBusy then
+movementQueueBusy = true
+task.spawn(movementDequeue)
+end
+end
+local originalMovementUpdate = nil
+-- FIX v1.6.0 (BUG SCOPING): lastFriction kini di scope MOVEMENT ENGINE. Dulu ia lokal
+-- DI DALAM blok if di bawah, sehingga reset `lastFriction = nil` pada SetAccelerationMethod
+-- justru membuat variabel GLOBAL baru dan hook tetap memakai nilai lamanya -> perubahan
+-- friction bisa terlewat -> gerakan/kamera kaku setelah ganti-ganti mode bhop.
+local lastFriction = nil
+-- FIX CRASH saat load: versi lama `local originalMovementUpdate = Movement.Update` langsung
+-- mengindeks Movement tanpa cek nil - bila module Movement gagal di-require (path berubah),
+-- seluruh script mati saat load. Kini di-guard: script tetap jalan, fitur bhop/hook saja nonaktif.
+if Movement and type(Movement.Update) == "function" then
+-- FIX v1.6.0 (RE-EXECUTION SAFETY): fungsi asli disimpan di getgenv BERDAMPINGAN dengan
+-- identitas tabel Movement. Tanpa ini, tiap eksekusi ulang memasang hook di ATAS hook
+-- eksekusi lama (menumpuk lapisan hook yang semuanya jalan tiap frame = beban makin
+-- berat = makin lama main makin kaku/lemot). Identitas tabel Movement dipakai sebagai
+-- penanda: setelah REJOIN (module baru di-require), nilai asli otomatis di-refresh ke
+-- fungsi game yang benar, bukan sisa sesi sebelumnya.
+if getgenv().__JoblessHub_MovementModule ~= Movement or type(getgenv().__JoblessHub_MovementOriginal) ~= "function" then
+getgenv().__JoblessHub_MovementModule = Movement
+getgenv().__JoblessHub_MovementOriginal = Movement.Update
+end
+originalMovementUpdate = getgenv().__JoblessHub_MovementOriginal
+-- FIX (Task 24): penyebab kamera mobile "delay/patah-patah/lambat sekali" - hook ini
+-- jalan TIAP FRAME dan dulu setiap frame: (1) memanggil game:GetService, (2) membuat
+-- closure baru untuk pcall (alokasi garbage per frame -> GC mobile sering jeda ->
+-- frame drop -> input sentuh kamera terasa patah-patah), (3) memanggil service game
+-- tiap frame walau tidak ada fitur bhop yang aktif. Kini: referensi di-hoist sekali,
+-- pcall memakai function ref (tanpa alokasi per frame), dan baca data game di-throttle
+-- 4x/detik bila tidak ada fitur yang butuh data per-frame (bhop/hold/wallhop aktif ->
+-- tetap tiap frame, perilaku sama seperti sebelumnya).
+local hookGetCharacterFromPlayer = CharacterService and CharacterService.GetCharacterFromPlayer
+local hookLastFetch = 0
+Movement.Update = function(self, ...)
+originalMovementUpdate(self, ...)
+local humanoid = self.Character and self.Character:FindFirstChild("Humanoid")
+if not humanoid then return end
+-- FIX (Task 20): GetCharacterFromPlayer dibungkus pcall - kalau service call
+-- melempar error di executor tertentu, hook tidak lagi error TIAP FRAME (sumber
+-- gerakan/kamera tersendat). Data Movement yang valid di-cache untuk fallback.
+local movementData = nil
+if autoJumpEnabled or bhopHoldEnabled or AutowallHop or (os.clock() - hookLastFetch) >= 0.25 then
+hookLastFetch = os.clock()
+if hookGetCharacterFromPlayer then
+local okHookData, hookData = pcall(hookGetCharacterFromPlayer, CharacterService, LocalPlayer)
+movementData = (okHookData and hookData) and hookData.Movement or nil
+end
+if movementData then
+cachedMovementData = movementData
+end
+else
+movementData = cachedMovementData
+end
+local state = movementData and movementData.State
+if not state then
+state = self.State
+end
+local grounded = self.DataRegistry:Get("Grounded")
+local desiredFriction = nil
+-- FIX/ADD: Bhop Mode kini punya 3 pilihan.
+--  "Acceleration"                    -> override Friction hanya saat TIDAK grounded (perilaku asli)
+--  "Acceleration (No Ground Check)"  -> override Friction berlaku di udara, di tanah, dan di ramp (tanpa cek grounded)
+--  "No Acceleration"                 -> tanpa override Friction
+if desiredFriction == nil and accelerationMethod ~= "No Acceleration" then
+local isBhopActive = autoJumpEnabled or (bhopHoldEnabled and humanoid.Jump == true)
+if isBhopActive and (accelerationMethod == "Acceleration (No Ground Check)" or not grounded) then
+desiredFriction = accelerationValue
+end
+end
+if desiredFriction ~= lastFriction then
+if desiredFriction ~= nil then
+MovementValueSet("Friction", desiredFriction)
+else
+-- FIX: restore memakai customFriction dulu (nilai dari input Friction tab Player), baru default, agar tidak saling menimpa diam-diam dengan input Player
+MovementValueSet("Friction", customFriction or defaultMovementValues.Friction)
+end
+lastFriction = desiredFriction
+end
+if (state == "WallrunRight" or state == "WallrunLeft") and AutowallHop then
+self:AttemptJump()
+end
+if autoJumpEnabled and grounded then
+if autoJumpType == "Realistic" then
+self:AttemptJump()
+else
+humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+end
+end
+if bhopHoldEnabled and grounded and humanoid.Jump == true then
+self:AttemptJump()
+end
+end
+else
+warn("[JoblessHub] Module Movement tidak ditemukan/gagal require - hook movement & bhop dinonaktifkan (script tetap jalan)")
+end
+
+function updateBhopEnabled()
+-- FIX: kedua mode "Acceleration" dianggap aktif untuk BhopEnabled (sebelumnya hanya "Acceleration")
+local shouldEnable = (autoJumpEnabled or bhopHoldEnabled) and (accelerationMethod == "Acceleration" or accelerationMethod == "Acceleration (No Ground Check)")
+MovementValueSet("BhopEnabled", shouldEnable)
+end
+function ToggleBhop(state)
+autoJumpEnabled = state
+updateBhopEnabled()
+end
+function ToggleBhopHold(state)
+bhopHoldEnabled = state
+updateBhopEnabled()
+end
+function SetAccelerationMethod(method)
+accelerationMethod = method
+updateBhopEnabled()
+if not (autoJumpEnabled or bhopHoldEnabled) then
+-- FIX: restore memakai customFriction dulu, baru default (sama seperti alasan di Movement.Update)
+MovementValueSet("Friction", customFriction or defaultMovementValues.Friction)
+lastFriction = nil
+end
+end
+-- ADD (permintaan user): pastikan BhopEnabled TERKIRIM & DITEMUKAN game - dikirim ulang otomatis
+-- saat respawn karena game me-reset data movement pada karakter baru.
+-- FIX v1.6.0: didaftarkan ke registry global (re-execute memutus koneksi lama).
+DaraTrackConn(LocalPlayer.CharacterAdded:Connect(function()
+task.delay(1, function()
+if autoJumpEnabled or bhopHoldEnabled then
+updateBhopEnabled()
+end
+end)
+end))
+---------------------------------------------------------------------------------------------------------------------------
+
+DaraSectionDone("MOVEMENT ENGINE")
+DaraSectionStart("TAB MAIN")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_TM, err_TM = pcall(function()
+-- ================= TAB MAIN =================
+Tabs.Main:Space()
+
+function CanBeCarried(value)
+-- FIX: guard InteractionTypes nil (bila require gagal) - tidak error saat toggle diklik
+if not InteractionTypes or not InteractionTypes.Revive or type(InteractionTypes.Revive.Interactions) ~= "table" then
+warn("[JoblessHub] InteractionTypes.Revive tidak ditemukan - Force Enable Carry tidak tersedia")
+return
+end
+for _, interaction in ipairs(InteractionTypes.Revive.Interactions) do
+if interaction.Name == "Carry" then
+interaction.Requirements.CanBeCarried = value
+end
+end
+end
+
+Tabs.Main:Toggle({
+Title = "Force Enable Everyone's Carry",
+Desc = [[Are you tired of those cornballs always turning off carry for their dada/Eboy?
+This toggle is for you. No matter how they try to disable carry, you will still be able to carry them, but they will still be able to uncarry when they turn off their carry.]],
+Callback = function(s)
+if s then
+CanBeCarried(nil)
+else
+CanBeCarried(true)
+end
+end
+})
+Tabs.Main:Space()
+FEBoombox = Tabs.Main:Button({
+Title = "Get Free FE Boombox Sound Player",
+Callback = function()
+FEBoombox:Destroy()
+task.spawn(function()
+-- FIX: loadstring dibungkus pcall (gagal koneksi tidak lagi error langsung)
+local okBB, errBB = pcall(function()
+loadstring(game:HttpGet(BaseURL .. "/api/script/obfuscated/Fe/Boomboxs/EvadeOverhaul-RelicsXYZ.lua"))()
+end)
+if not okBB then
+warn("[JoblessHub] Gagal memuat FE Boombox: " .. tostring(errBB))
+end
+end)
+end
+})
+
+end)
+if ok_TM then
+DaraSectionDone("TAB MAIN")
+else
+DaraSectionFail("TAB MAIN", err_TM)
+end
+DaraSectionStart("TAB PLAYER")
+local ok_TP, err_TP = pcall(function()
+-- ================= TAB PLAYER =================
+Tabs.Player:Section({ Title = "Player", TextSize = 40 })
+Tabs.Player:Divider()
+Tabs.Player:Section({Title="Modify Bounce",TextSize=20})
+
+local bounceConnection = nil
+local BounceSpeed = 0
+
+Tabs.Player:Toggle({
+Title="Modify Multiplier",
+Flag="BounceEnabled", 
+Value=false,
+Callback = function(state)
+if bounceConnection then
+bounceConnection:Disconnect()
+bounceConnection = nil
+end
+
+if state then
+bounceConnection = DaraTrackConn(game:GetService("RunService").RenderStepped:Connect(function()
+local char = LocalPlayer.Character
+if not char then return end
+
+local humanoid = char:FindFirstChild("Humanoid")
+if not humanoid then return end
+
+if humanoid.Health <= 0 then return end
+
+humanoid.WalkSpeed = BounceSpeed
+end))
+else
+local char = LocalPlayer.Character
+if char then
+local humanoid = char:FindFirstChild("Humanoid")
+if humanoid then
+humanoid.WalkSpeed = 0
+end
+end
+end
+end
+})
+
+Tabs.Player:Input({
+Title="Multiplier value", 
+Flag="VelocityMultiplier", 
+Placeholder="80", 
+NumbersOnly=true,
+Callback = function(value)
+BounceSpeed = tonumber(value) or 0
+end
+})
+
+Tabs.Player:Section({ Title = "Supper Bounce", TextSize = 20 })
+Tabs.Player:Divider()
+
+BounceHeight = 190
+
+BounceInput = Tabs.Player:Input({
+Title = "Bounce Height",
+Placeholder = "190",
+Callback = function(value)
+BounceHeight = tonumber(value) or 50
+end
+})
+
+function triggerSuperBounce()
+if not LocalPlayer.Character then return end
+local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+if humanoid and rootPart then
+humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+rootPart.Velocity = Vector3.new(rootPart.Velocity.X, BounceHeight, rootPart.Velocity.Z)
+end
+end
+
+SuperBounceToggle = Tabs.Player:Toggle({
+Title = "Supper Bounce",
+Flag = "SuperBounceToggle",
+Value = false,
+Callback = function(state)
+SuperBounceEnabled = state
+
+if SuperBounceButton then
+SuperBounceButton:SetVisible(state)
+end
+end
+})
+
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
+SuperBounceButton = ButtonLib.Create:Button({
+Text = "Supper Bounce",
+Flag = "SuperBounce",
+Position = UDim2.new(0.5, -125, 0.2, 0),
+Visible = false,
+Callback = function()
+triggerSuperBounce()
+end
+})
+if ButtonLib.SuperBounce then
+ButtonLib.SuperBounce:SetText("Supper Bounce")
+end
+
+Tabs.Player:Space()
+
+do
+local rampBoostMultiplier = 2
+local rampBoostConnection = nil
+
+stopRampBooster = function()
+if rampBoostConnection then
+rampBoostConnection:Disconnect()
+rampBoostConnection = nil
+end
+end
+
+local function startRampBooster()
+stopRampBooster()
+local armed = true
+rampBoostConnection = DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+local character = LocalPlayer.Character
+local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+local root = humanoid and (humanoid.RootPart or character.PrimaryPart)
+if not root then return end
+
+local velocity = root.AssemblyLinearVelocity
+local vy = velocity.Y
+local gravity = workspace.Gravity
+local jumpSpeed = humanoid.UseJumpPower and humanoid.JumpPower or math.sqrt(2 * gravity * humanoid.JumpHeight)
+local limit = jumpSpeed + gravity * dt
+
+if not armed and vy <= 0 then
+armed = true
+end
+
+if armed and vy > limit then
+armed = false
+root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy * rampBoostMultiplier, velocity.Z)
+end
+end))
+end
+
+Tabs.Player:Toggle({
+Title = "Ramp Booster",
+Desc = "Multiplies your upward speed when a ramp launches you",
+Flag = "RampBoosterToggle",
+Value = false,
+Callback = function(state)
+if state then
+startRampBooster()
+else
+stopRampBooster()
+end
+end
+})
+
+Tabs.Player:Input({
+Title = "Ramp Booster Multiplier",
+Flag = "RampBoosterMultiplierInput",
+Placeholder = "2",
+NumbersOnly = false,
+Value = "2",
+Callback = function(v)
+local n = tonumber(v)
+if n and n > 0 then
+rampBoostMultiplier = n
+end
+end
+})
+end
+
+Tabs.Player:Space()
+Tabs.Player:Section({Title="Modification"})
+
+-- ================= SECTION MODIFICATION (LENGKAP SYNC DARAHUB BETA) =================
+-- Semua nilai movement dari Beta tersedia sebagai input:
+-- Speed, Jump Cap, Air Strafe Acceleration, Air Acceleration, Sprint Acceleration, Sprint Cap,
+-- Run Accel, Run Deaccel, Friction, Grounded Dist Check. (v1.4.2: Jump height / Jump Speed Multiplier /
+-- Walk Speed Multiplier dihapus dari input sesuai permintaan - nilai default internal tetap ada.)
+-- FIX + ADD (permintaan user): INPUT KOSONG / BUKAN ANGKA = OTOMATIS SET KE DEFAULT (tidak dikirim nil diam-diam).
+-- ADD: BhopEnabled dipastikan terkirim ulang saat respawn (game me-reset data movement pada karakter baru).
+
+local autoRefreshJumpCap = false
+local lastJumpCapValue = nil
+local autoRefreshAirStrafe = false
+local lastAirStrafeValue = nil
+
+BaseSpeedInput = Tabs.Player:Input({
+Title="Speed",
+Placeholder=tostring(defaultMovementValues.Speed),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.Speed)
+})
+BaseSpeedInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.Speed)
+MovementValueSet("Speed", num)
+end
+
+Tabs.Player:Space()
+
+JumpCapInput = Tabs.Player:Input({
+Title="Jump Cap",
+Placeholder=tostring(defaultMovementValues.JumpCap),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.JumpCap)
+})
+JumpCapInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.JumpCap)
+lastJumpCapValue = num
+MovementValueSet("JumpCap", num)
+end
+
+-- ADD: toggle Auto Refresh Jump Cap (kirim ulang otomatis tiap 2 detik) - fitur lama dipertahankan
+Tabs.Player:Toggle({
+Title = "Auto Refresh Jump Cap (2s)",
+Desc = "Kirim ulang nilai Jump Cap otomatis tiap 2 detik agar tidak reset sendiri.",
+Flag = "AutoRefreshJumpCap",
+Value = false,
+Callback = function(state)
+autoRefreshJumpCap = state
+if state and lastJumpCapValue ~= nil then
+MovementValueSet("JumpCap", lastJumpCapValue)
+end
+end
+})
+
+Tabs.Player:Space()
+
+AirStrafeAccelerationInput = Tabs.Player:Input({
+Title="Air Strafe Acceleration",
+Placeholder=tostring(defaultMovementValues.AirStrafeAcceleration),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.AirStrafeAcceleration)
+})
+AirStrafeAccelerationInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.AirStrafeAcceleration)
+lastAirStrafeValue = num
+MovementValueSet("AirStrafeAcceleration", num)
+end
+
+-- ADD: toggle Auto Refresh Air Strafe (kirim ulang otomatis tiap 2 detik) - fitur lama dipertahankan
+Tabs.Player:Toggle({
+Title = "Auto Refresh Air Strafe (2s)",
+Desc = "Kirim ulang nilai Air Strafe Acceleration otomatis tiap 2 detik agar tidak reset sendiri.",
+Flag = "AutoRefreshAirStrafe",
+Value = false,
+Callback = function(state)
+autoRefreshAirStrafe = state
+if state and lastAirStrafeValue ~= nil then
+MovementValueSet("AirStrafeAcceleration", lastAirStrafeValue)
+end
+end
+})
+
+AirAccelerationInput = Tabs.Player:Input({
+Title="Air Acceleration",
+Placeholder=tostring(defaultMovementValues.AirAcceleration),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.AirAcceleration)
+})
+AirAccelerationInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.AirAcceleration)
+MovementValueSet("AirAcceleration", num)
+end
+
+Tabs.Player:Space()
+
+SprintCapInput = Tabs.Player:Input({
+Title="Sprint Cap",
+Placeholder=tostring(defaultMovementValues.SprintCap),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.SprintCap)
+})
+SprintCapInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.SprintCap)
+MovementValueSet("SprintCap", num)
+end
+
+SprintAccelerationInput = Tabs.Player:Input({
+Title="Sprint Acceleration",
+Placeholder=tostring(defaultMovementValues.SprintAcceleration),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.SprintAcceleration)
+})
+SprintAccelerationInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.SprintAcceleration)
+MovementValueSet("SprintAcceleration", num)
+end
+
+Tabs.Player:Space()
+
+RunAccelInput = Tabs.Player:Input({
+Title="Run Acceleration",
+Placeholder=tostring(defaultMovementValues.RunAccel),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.RunAccel)
+})
+RunAccelInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.RunAccel)
+MovementValueSet("RunAccel", num)
+end
+
+RunDeaccelInput = Tabs.Player:Input({
+Title="Run Deacceleration",
+Placeholder=tostring(defaultMovementValues.RunDeaccel),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.RunDeaccel)
+})
+RunDeaccelInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.RunDeaccel)
+MovementValueSet("RunDeaccel", num)
+end
+
+FrictionInput = Tabs.Player:Input({
+Title="Friction",
+Placeholder=tostring(defaultMovementValues.Friction),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.Friction)
+})
+FrictionInput.Callback = function(value)
+-- FIX: simpan nilai custom agar restore friction (saat bhop berhenti) kembali ke nilai ini, bukan default
+customFriction = parseNumberInput(value, defaultMovementValues.Friction)
+MovementValueSet("Friction", customFriction)
+end
+
+GroundedDistCheckInput = Tabs.Player:Input({
+Title="Grounded Distance Check",
+Placeholder=tostring(defaultMovementValues.GroundedDistCheck),
+NumbersOnly=true,
+Value=tostring(defaultMovementValues.GroundedDistCheck)
+})
+GroundedDistCheckInput.Callback = function(value)
+local num = parseNumberInput(value, defaultMovementValues.GroundedDistCheck)
+MovementValueSet("GroundedDistCheck", num)
+end
+
+-- ADD (permintaan user): pastikan BhopEnabled TERKIRIM & DITEMUKAN game - dikirim ulang saat respawn
+-- (data movement game di-reset pada karakter baru, jadi tanpa resend BhopEnabled bisa "hilang" setelah mati/respawn).
+-- FIX v1.6.0: koneksi didaftarkan ke registry global + cache tabel Movement game dibersihkan saat
+-- respawn (cache lama menunjuk karakter lama - fallback bisa salah menulis ke instance yang sudah mati).
+DaraTrackConn(LocalPlayer.CharacterAdded:Connect(function()
+cachedMovementData = nil
+task.delay(1, function()
+if autoJumpEnabled or bhopHoldEnabled then
+updateBhopEnabled()
+end
+end)
+end))
+
+-- ADD: loop latar belakang Auto Refresh - kirim ulang Jump Cap & Air Strafe tiap 2 detik
+-- (hanya jika toggle-nya ON dan ada nilai yang tersimpan; sangat ringan, hanya 2 FireClient per 2 detik)
+-- FIX v1.6.0: thread didaftarkan ke registry global - eksekusi ulang membatalkan loop lama
+-- (dulu menumpuk: tiap re-execute menambah satu infinite loop yang tidak pernah mati).
+DaraTrackThread(task.spawn(function()
+while true do
+if autoRefreshJumpCap and lastJumpCapValue ~= nil then
+pcall(MovementValueSet, "JumpCap", lastJumpCapValue)
+end
+if autoRefreshAirStrafe and lastAirStrafeValue ~= nil then
+pcall(MovementValueSet, "AirStrafeAcceleration", lastAirStrafeValue)
+end
+task.wait(2)
+end
+end))
+
+
+
+-- FIX (anti stuck): memperbaiki hitbox yang sempat macet sesaat saat karakter hendak menabrak objek/dinding di depan.
+-- Penyebab: kecepatan gerak yang sangat tinggi (Bounce/Bhop Acceleration) membuat fisika Roblox sesaat "tersangkut"
+-- di tepi objek. Cara kerja: jika pemain menekan arah jalan tapi kecepatan horizontal ~0 sementara ada objek di depan
+-- selama 0.35 detik, karakter diberi dorongan kecil (maju + lompat kecil) agar hitbox lepas.
+-- Ringan: raycast hanya jalan saat karakter nyaris diam; otomatis nonaktif saat Lag Switch/Demon aktif.
+do
+local antiStuckEnabled = true
+local antiStuckTimer = 0
+local AntiStuckRayParams = RaycastParams.new()
+AntiStuckRayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+AntiStuckToggle = Tabs.Player:Toggle({
+Title = "Anti Stuck (Fix Hitbox Stuck)",
+Desc = "Perbaiki hitbox yang macet sesaat saat hendak menabrak objek di depan (sering terjadi saat kecepatan sangat tinggi). Matikan jika terasa aneh.",
+Flag = "AntiStuckToggle",
+Value = true,
+Callback = function(state)
+antiStuckEnabled = state
+antiStuckTimer = 0
+end
+})
+
+DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+if not antiStuckEnabled then return end
+if isLagActive or demonResizeActive then return end
+
+local char = LocalPlayer.Character
+if not char then antiStuckTimer = 0 return end
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+local hrp = char:FindFirstChild("HumanoidRootPart")
+if not humanoid or not hrp or humanoid.Health <= 0 then antiStuckTimer = 0 return end
+if humanoid.FloorMaterial == Enum.Material.Air then antiStuckTimer = 0 return end
+if humanoid.SeatPart then antiStuckTimer = 0 return end
+
+-- FIX (Task 18): pemanggilan service GetCharacterFromPlayer dipindah KE BELAKANG -
+-- sebelumnya dipanggil tiap frame (60x/detik) bahkan saat lari normal; kini hanya
+-- dipanggil saat pemain menekan arah tapi nyaris diam (kandidat stuck). Cek murah
+-- (MoveDirection/kecepatan) dievaluasi lebih dulu sehingga service call hampir tidak pernah jalan.
+local moveDir = humanoid.MoveDirection
+if moveDir.Magnitude <= 0.05 then antiStuckTimer = 0 return end
+
+local vel = hrp.AssemblyLinearVelocity
+local horizSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
+if horizSpeed > 2.5 then antiStuckTimer = 0 return end
+
+local okData, charData = pcall(function()
+return CharacterService:GetCharacterFromPlayer(LocalPlayer)
+end)
+if okData and charData and charData.DataRegistry and charData.DataRegistry:Get("Downed") then
+antiStuckTimer = 0
+return
+end
+
+AntiStuckRayParams.FilterDescendantsInstances = {char}
+local wallAhead = nil
+pcall(function()
+wallAhead = workspace:Raycast(hrp.Position + Vector3.new(0, 1.5, 0), moveDir * 3, AntiStuckRayParams)
+end)
+if not wallAhead then antiStuckTimer = 0 return end
+
+antiStuckTimer = antiStuckTimer + dt
+if antiStuckTimer >= 0.35 then
+antiStuckTimer = 0
+hrp.AssemblyLinearVelocity = Vector3.new(vel.X + moveDir.X * 14, math.max(vel.Y, 20), vel.Z + moveDir.Z * 14)
+end
+end))
+end
+
+end)
+if ok_TP then
+DaraSectionDone("TAB PLAYER")
+else
+DaraSectionFail("TAB PLAYER", err_TP)
+end
+DaraSectionStart("TAB COMBAT")
+local ok_TC, err_TC = pcall(function()
+-- ================= TAB COMBAT =================
+Tabs.Combat:Button({
+Title = "Infinite Range",
+Callback = function()
+function setInfiniteRange(data)
+if type(data) ~= "table" then return end
+for key, value in pairs(data) do
+if (key == "Range" or key == "LungeRange" or key == "HearingRange") and type(value) == "number" then
+data[key] = math.huge
+elseif key == "DamageDistanceInterval" and type(value) == "table" and #value >= 2 then
+value[2] = math.huge
+elseif type(value) == "table" then
+setInfiniteRange(value)
+end
+end
+end
+
+for _, tool in pairs(ReplicatedStorage.Tools:GetChildren()) do
+if tool:IsA("ModuleScript") then
+local success, toolData = pcall(require, tool)
+if success and type(toolData) == "table" and toolData.Tasks then
+for _, task in ipairs(toolData.Tasks) do
+for _, func in ipairs(task.Functions or {}) do
+for _, activation in ipairs(func.Activations or {}) do
+for _, method in ipairs(activation.Methods or {}) do
+if method.Info then setInfiniteRange(method.Info) end
+end
+end
+end
+for _, autoFunc in ipairs(task.AutomaticFunctions or {}) do
+for _, method in ipairs(autoFunc.Methods or {}) do
+if method.Info then setInfiniteRange(method.Info) end
+end
+end
+end
+end
+end
+end
+end
+})
+Tabs.Combat:Space()
+
+Tabs.Combat:Button({
+Title = "Portal bypass",
+Callback = function()
+Portal.IsPortalPossible = function(...)
+return true
+end
+end
+})
+Tabs.Combat:Space()
+
+Tabs.Combat:Button({
+Title = "Bypass \\\"TooMany\\\" Consumables item limit",
+Callback = function()
+for i = 1, 4 do
+local a = PlayerGui:FindFirstChild("Shared")
+if a then a = a:FindFirstChild("HUD") end
+if a then a = a:FindFirstChild("Interactors") end
+if a then a = a:FindFirstChild("Popups") end
+if a then a = a:FindFirstChild("Usables") end
+if a then a = a:FindFirstChild("Wheel") end
+if a then
+local b = a:FindFirstChild("Item" .. i)
+if b then b = b:FindFirstChild("Icon") end
+if b then b = b:FindFirstChild("TooMany") end
+if b then b:Destroy() end
+end
+end
+
+for i = 1, 4 do
+local a = ReplicatedStorage:FindFirstChild("Misc")
+if a then a = a:FindFirstChild("UI") end
+if a then a = a:FindFirstChild("Shared") end
+if a then a = a:FindFirstChild("HUD") end
+if a then a = a:FindFirstChild("Interactors") end
+if a then a = a:FindFirstChild("Popups") end
+if a then a = a:FindFirstChild("Usables") end
+if a then a = a:FindFirstChild("Wheel") end
+if a then
+local b = a:FindFirstChild("Item" .. i)
+if b then b = b:FindFirstChild("Icon") end
+if b then b = b:FindFirstChild("TooMany") end
+if b then b:Destroy() end
+end
+end
+end
+})
+
+Tabs.Combat:Space()
+
+-- ADD: Defibrillator Aura - otomatis memasang defibrillator lalu menghidupkan (revive) pemain terdekat
+-- yang sedang DOWNED (fitur revive PEMAIN LAIN, bukan diri sendiri). Port dari file asli (tab Combat);
+-- helper GetStatus / isPlayerDowned dibuat lokal agar tidak bentrok dengan helper teleport.
+do
+local defibrillator = {
+Equipped = false,
+AuraEnabled = false,
+AuraRange = 20,
+Connection = nil,
+EquipDelay = 0,
+ReviveDelay = 0
+}
+
+local function GetStatus(player)
+local character = player.Character
+if not character then
+return "DEAD"
+end
+
+local charData = CharacterService:GetCharacterFromPlayer(player)
+if charData and charData.DataRegistry:Get("Downed") then
+return "DOWNED"
+end
+
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+if humanoid and humanoid.Health > 0 then
+return "ALIVE"
+end
+
+return "DEAD"
+end
+
+local function isPlayerDowned(player)
+return GetStatus(player) == "DOWNED"
+end
+
+local function StopReviveAura()
+defibrillator.AuraEnabled = false
+if defibrillator.Connection then
+defibrillator.Connection:Disconnect()
+defibrillator.Connection = nil
+end
+if defibrillator.Equipped then
+pcall(function()
+UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\8\0"), buffer.fromstring("\1")})
+end)
+defibrillator.Equipped = false
+end
+end
+
+local function StartReviveAura()
+if not UpdateCharacterDataRegistry or not ToolAction then
+warn("[JoblessHub] Defibrillator Aura butuh Events.UpdateCharacterDataRegistry & Events.ToolAction (tidak ditemukan)")
+return
+end
+if defibrillator.Connection then
+StopReviveAura()
+end
+
+defibrillator.AuraEnabled = true
+
+-- FIX (Task 18): scan sebelumnya berjalan tiap frame (RenderStepped ~60x/detik) dan
+-- memanggil GetStatus (service call) untuk SETIAP pemain -> makan FPS saat pemain banyak.
+-- Kini scan dibatasi 10x/detik (akumulator 0.1s) - revive tetap responsif, beban turun ~6x.
+local auraScanAcc = 0
+defibrillator.Connection = DaraTrackConn(RunService.RenderStepped:Connect(function(dt)
+if not defibrillator.AuraEnabled then return end
+
+auraScanAcc = auraScanAcc + dt
+if auraScanAcc < 0.1 then return end
+auraScanAcc = 0
+
+local found = false
+local localChar = LocalPlayer.Character
+local localPos = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
+if not localPos then return end
+
+for _, player in pairs(Players:GetPlayers()) do
+if isPlayerDowned(player) then
+local character = player.Character
+-- FIX: guard "character and" agar aman jika karakter target terputus di tengah loop
+local targetHRP = character and character:FindFirstChild("HumanoidRootPart")
+if targetHRP then
+local distance = (localPos.Position - targetHRP.Position).Magnitude
+local range = defibrillator.AuraRange
+
+if range == "inf" or (type(range) == "number" and distance <= range) then
+found = true
+local tag = character:GetAttribute("Tag")
+
+if tag then
+if not defibrillator.Equipped then
+if defibrillator.EquipDelay > 0 then
+task.wait(defibrillator.EquipDelay)
+end
+pcall(function()
+UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\008\000"), buffer.fromstring("\003")})
+end)
+defibrillator.Equipped = true
+end
+
+if defibrillator.ReviveDelay > 0 then
+task.wait(defibrillator.ReviveDelay)
+end
+pcall(function()
+ToolAction:FireServer(buffer.fromstring("\001\001\001\001"), tag)
+end)
+end
+end
+end
+end
+end
+if not found and defibrillator.Equipped then
+pcall(function()
+UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\8\0"), buffer.fromstring("\1")})
+end)
+defibrillator.Equipped = false
+end
+end))
+end
+
+Tabs.Combat:Toggle({
+Title = "Defibrillator Aura",
+Desc = "Otomatis revive pemain lain (paling dekat yang DOWNED) selama berada dalam Aura Range.",
+Value = false,
+Callback = function(state)
+if state then
+StartReviveAura()
+else
+StopReviveAura()
+end
+end
+})
+
+Tabs.Combat:Input({
+Title = "Aura Range",
+Placeholder = "20 or inf",
+Value = "20",
+Callback = function(value)
+if value == "inf" then
+defibrillator.AuraRange = "inf"
+else
+local num = tonumber(value)
+if num then defibrillator.AuraRange = num end
+end
+end
+})
+
+Tabs.Combat:Input({
+Title = "Equip Delay (seconds)",
+Value = "0",
+Callback = function(value)
+defibrillator.EquipDelay = tonumber(value) or 0
+end
+})
+
+Tabs.Combat:Input({
+Title = "Revive Delay (seconds)",
+Value = "0",
+Callback = function(value)
+defibrillator.ReviveDelay = tonumber(value) or 0
+end
+})
+end
+
+end)
+if ok_TC then
+DaraSectionDone("TAB COMBAT")
+else
+DaraSectionFail("TAB COMBAT", err_TC)
+end
+DaraSectionStart("TAB AUTO (BHOP)")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_AB, err_AB = pcall(function()
+-- ================= TAB AUTO =================
+Tabs.Auto:Section({Title="Bhop"})
+
+BhopToggle = Tabs.Auto:Toggle({
+Title = "Bhop",
+Flag = "BhopToggle",
+Value = false,
+Callback = function(state)
+ToggleBhop(state)
+end
+})
+
+BhopHoldToggle = Tabs.Auto:Toggle({
+Title = "Bhop Hold Jump",
+Flag = "BhopHoldToggle",
+Value = false,
+Callback = function(state)
+ToggleBhopHold(state)
+end
+})
+
+-- ADD: pilihan ketiga "Acceleration (No Ground Check)" pada Bhop Mode.
+-- Mode ini menerapkan override Friction tanpa cek grounded (berlaku di udara, di tanah, dan di ramp),
+-- sehingga acceleration tetap jalan saat menempel tanah/ramp.
+AccelerationDropdown = Tabs.Auto:Dropdown({
+Title = "Bhop Mode",
+Flag = "AccelerationDropdown",
+Values = { "No Acceleration", "Acceleration", "Acceleration (No Ground Check)" },
+Value = "Acceleration",
+Callback = function(value)
+SetAccelerationMethod(value)
+end
+})
+
+AccelerationInput = Tabs.Auto:Input({
+Title = "Bhop Acceleration (Negative Only)",
+Flag = "AccelerationInput",
+Placeholder = "-0.2",
+Numeric = true,
+Value = "-0.2",
+Callback = function(value)
+local n = tonumber(value)
+if n then
+accelerationValue = n
+end
+end
+})
+
+AutoJumpTypeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Jump Mode",
+Flag = "AutoJumpTypeDropdown",
+Values = {  "Simulation", "Realistic" },
+Value = "Simulation",
+Callback = function(value)
+autoJumpType = value
+-- FIX: pemanggilan unloadBhop()/loadBhop() dihapus - kedua fungsi ini tidak pernah didefinisikan
+-- di file asli sehingga memanggilnya hanya menghasilkan error; mode baru berlaku pada update berikutnya.
+end
+})
+
+AutoWallHop = Tabs.Auto:Toggle({
+Title = "Auto Wall Hop",
+Flag = "AutoWallHop",
+Value = false,
+Type = "Checkbox",
+Callback = function(state)
+AutowallHop = state
+end
+})
+ShowBunnyHopButtonToggle = Tabs.Auto:Toggle({
+Title = "Show Bhop Button",
+Flag = "ShowBunnyHopButton",
+Value = false,
+Callback = function(state)
+if ButtonLib and ButtonLib.BunnyHopToggle then
+ButtonLib.BunnyHopToggle:SetVisible(state)
+end
+end
+})
+
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
+ButtonLib.Create:Toggle({
+Text = "Bunny Hop",
+Flag = "BunnyHopToggle",
+Default = false,
+Visible = false,
+Callback = function(s) 
+if BhopToggle then
+BhopToggle:Set(s)
+end
+end
+}).Position = UDim2.new(0.5, -125, 0.4, 0)
+
+end)
+if ok_AB then
+DaraSectionDone("TAB AUTO (BHOP)")
+else
+DaraSectionFail("TAB AUTO (BHOP)", err_AB)
+end
+DaraSectionStart("SELF REVIVE")
+local ok_SR, err_SR = pcall(function()
+Tabs.Auto:Space()
+Tabs.Auto:Section({ Title = "Auto" })
+
+-- FIX: lookup aman (Events/SetPlayerMode hilang = tidak crash saat load)
+local _eventsRS = ReplicatedStorage:FindFirstChild("Events")
+local changePlayerMode = _eventsRS and _eventsRS:FindFirstChild("SetPlayerMode")
+
+SelfRevive = {
+Method = "Spawnpoint",
+Enabled = false,
+HasRevived = false,
+LastSavedPosition = nil,
+IsProcessing = false,
+LastRespawnTime = 0,
+Connections = {
+Heartbeat = nil,
+Character = nil,
+}
+}
+
+function SelfRevive:Respawn()
+local now = tick()
+if now - SelfRevive.LastRespawnTime < 0.5 then
+return
+end
+SelfRevive.LastRespawnTime = now
+
+if SelfRevive.IsProcessing then
+return
+end
+
+local char = LocalPlayer.Character
+if not char then
+return
+end
+
+local charData = CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local isDowned = charData and charData.DataRegistry:Get("Downed")
+if not isDowned then
+return
+end
+
+SelfRevive.IsProcessing = true
+
+local hrp = char:FindFirstChild("HumanoidRootPart")
+
+if SelfRevive.Method == "Spawnpoint" then
+if not SelfRevive.HasRevived then
+self.HasRevived = true
+pcall(function()
+changePlayerMode:FireServer(true)
+end)
+SelfRevive.IsProcessing = false
+task.delay(10, function()
+self.HasRevived = false
+end)
+else
+SelfRevive.IsProcessing = false
+end
+elseif self.Method == "Fake Revive" then
+local savedPos = nil
+if hrp then
+savedPos = hrp.CFrame.Position
+end
+
+task.spawn(function()
+pcall(function()
+changePlayerMode:FireServer(true)
+end)
+
+local newCharacter
+repeat
+newCharacter = LocalPlayer.Character
+task.wait()
+until newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") and newCharacter ~= char
+
+if newCharacter then
+local newHRP = newCharacter:FindFirstChild("HumanoidRootPart")
+if savedPos and newHRP then
+task.wait(0.1)
+newHRP.CFrame = CFrame.new(savedPos + Vector3.new(0, 0, 0))
+end
+end
+
+SelfRevive.IsProcessing = false
+end)
+else
+SelfRevive.IsProcessing = false
+end
+end
+
+function SelfRevive:Start()
+if SelfRevive.Connections.Heartbeat then
+return
+end
+SelfRevive.Enabled = true
+-- FIX (Task 18): loop sebelumnya memanggil service GetCharacterFromPlayer TANPA pcall
+-- TIAP FRAME (60x/detik) - bila service nil/berubah path, error spam tiap frame = FPS drop.
+-- Kini: guard CharacterService nil + pcall + throttle 4x/detik (0.25s) - deteksi downed
+-- tetap cepat, beban turun ~15x dan tidak mungkin error spam.
+-- ADD (permintaan user): REVIVE DELAY - tunggu X detik sejak DOWNED sebelum revive otomatis
+-- (0 = instan). Auto revive TIDAK wajib menyala: bisa juga revive manual lewat tombol
+-- "Manual Revive" (langsung tanpa delay) atau "Force Respawn".
+local selfReviveAcc = 0
+local downedSince = nil
+SelfRevive.Connections.Heartbeat = DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+if not SelfRevive.Enabled then return end
+local char = LocalPlayer.Character
+if not char then downedSince = nil return end
+if not CharacterService then return end
+selfReviveAcc = selfReviveAcc + dt
+if selfReviveAcc < 0.25 then return end
+selfReviveAcc = 0
+local okDown, charData = pcall(CharacterService.GetCharacterFromPlayer, CharacterService, LocalPlayer)
+local isDowned = okDown and charData and charData.DataRegistry and charData.DataRegistry:Get("Downed")
+if isDowned then
+if (SelfRevive.Delay or 0) <= 0 then
+downedSince = nil
+self:Respawn()
+else
+if downedSince == nil then
+downedSince = os.clock()
+end
+if os.clock() - downedSince >= SelfRevive.Delay then
+downedSince = nil
+self:Respawn()
+end
+end
+else
+downedSince = nil
+end
+end))
+SelfRevive.Connections.Character = DaraTrackConn(LocalPlayer.CharacterAdded:Connect(function(newChar)
+SelfRevive.HasRevived = false
+SelfRevive.IsProcessing = false
+SelfRevive.LastSavedPosition = nil
+downedSince = nil
+end))
+end
+
+
+
+function SelfRevive:Stop()
+SelfRevive.Enabled = false
+SelfRevive.HasRevived = false
+SelfRevive.IsProcessing = false
+SelfRevive.LastSavedPosition = nil
+
+for name, conn in pairs(SelfRevive.Connections) do
+if conn then
+conn:Disconnect()
+SelfRevive.Connections[name] = nil
+end
+end
+end
+
+Tabs.Auto:Space()
+
+AutoSelfReviveToggle = Tabs.Auto:Toggle({
+Title = "Auto Self Revive",
+Flag = "AutoSelfReviveToggle",
+Value = false,
+Callback = function(state)
+if state then
+SelfRevive:Start()
+else
+SelfRevive:Stop()
+end
+end
+})
+
+SelfReviveMethodDropdown = Tabs.Auto:Dropdown({
+Title = "Self Revive Method",
+Flag = "SelfReviveMethodDropdown",
+Values = {"Spawnpoint","Fake Revive"},
+Value = "Spawnpoint",
+Callback = function(value)
+SelfRevive.Method = value
+end
+})
+-- ADD (permintaan user): REVIVE DELAY untuk Auto Self Revive (0 = instan).
+SelfRevive.Delay = SelfRevive.Delay or 0
+SelfReviveDelayInput = Tabs.Auto:Input({
+Title = "Revive Delay (seconds)",
+Flag = "SelfReviveDelayInput",
+Desc = "Tunggu X detik sejak DOWNED sebelum Auto Self Revive jalan (0 = langsung revive). Revive manual lewat tombol di bawah tidak terpengaruh delay.",
+Placeholder = "0",
+NumbersOnly = true,
+Value = "0",
+Callback = function(value)
+SelfRevive.Delay = parseNumberInput(value, 0)
+if SelfRevive.Delay < 0 then SelfRevive.Delay = 0 end
+end
+})
+
+
+
+Tabs.Auto:Button({
+Title = "Manual Revive",
+Desc = "Manually revive yourself",
+Icon = "heart",
+Callback = function()
+SelfRevive:Respawn()
+end
+})
+
+Tabs.Auto:Button({
+Title = "Force Respawn",
+Icon = "heart",
+Callback = function()
+if changePlayerMode then
+pcall(function() changePlayerMode:FireServer(true) end)
+else
+warn("[JoblessHub] Force Respawn: Events.SetPlayerMode tidak ditemukan di game ini")
+end
+end
+})
+end)
+if ok_SR then
+        DaraSectionDone("SELF REVIVE")
+else
+        DaraSectionFail("SELF REVIVE", err_SR)
+end
+
+DaraSectionStart("BUILD OFFSET")
+local ok_BO, err_BO = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): BUILD OFFSET MULTIPLIER (port dari DaraHub BETA, tab Combat).
+-- Menggeser posisi preview bangunan (Build tool) sesuai Offset X/Y/Z x Multiplier.
+-- ADD (permintaan user): tombol (bukan floating button) "Set Otomatis X/Y/Z" - menerapkan
+-- nilai offset tiap sumbu secara otomatis tanpa perlu matikan/nyalakan toggle.
+-- ============================================================
+Tabs.Combat:Space()
+Tabs.Combat:Section({ Title = "Build Offset", TextSize = 20 })
+Tabs.Combat:Divider()
+do
+local buildHooked = false
+local oldGetClientPosition = nil
+local buildMultiplier = 1
+getgenv().BuildOffsetX = getgenv().BuildOffsetX or 0
+getgenv().BuildOffsetY = getgenv().BuildOffsetY or 0
+getgenv().BuildOffsetZ = getgenv().BuildOffsetZ or 0
+
+local function ensureBuildHook()
+if buildHooked then
+return true
+end
+if not BuildModule or type(BuildModule.GetClientPosition) ~= "function" then
+warn("[JoblessHub] BuildModule tidak ditemukan - Build Offset tidak tersedia")
+pcall(function()
+WindUI:Notify({ Title = "Build Offset", Content = "BuildModule tidak ditemukan (game berubah?).", Duration = 3 })
+end)
+return false
+end
+buildHooked = true
+oldGetClientPosition = BuildModule.GetClientPosition
+BuildModule.GetClientPosition = function(self, ...)
+local valid, cframe = oldGetClientPosition(self, ...)
+if cframe then
+cframe = cframe * CFrame.new(
+(getgenv().BuildOffsetX or 0) * buildMultiplier,
+(getgenv().BuildOffsetY or 0) * buildMultiplier,
+(getgenv().BuildOffsetZ or 0) * buildMultiplier
+)
+end
+return valid, cframe
+end
+return true
+end
+
+local function releaseBuildHook()
+if buildHooked and BuildModule and oldGetClientPosition then
+pcall(function()
+BuildModule.GetClientPosition = oldGetClientPosition
+end)
+end
+buildHooked = false
+end
+
+BuildOffsetToggle = Tabs.Combat:Toggle({
+Title = "Build Offset Multiplier",
+Desc = "Nyalakan lalu letakkan bangunan: posisinya digeser Offset X/Y/Z (dikali Multiplier).",
+Value = false,
+Callback = function(state)
+if state then
+if not ensureBuildHook() then
+BuildOffsetToggle:Set(false)
+end
+else
+releaseBuildHook()
+end
+end
+})
+
+BuildMultiplierInput = Tabs.Combat:Input({
+Title = "Offset Multiplier",
+Flag = "BuildOffsetMultiplier",
+Placeholder = "1",
+NumbersOnly = true,
+Value = "1",
+Callback = function(value)
+buildMultiplier = parseNumberInput(value, 1)
+if buildMultiplier == 0 then buildMultiplier = 1 end
+end
+})
+
+BuildOffsetXInput = Tabs.Combat:Input({
+Title = "Offset X",
+Flag = "BuildOffsetXInput",
+Placeholder = "0",
+NumbersOnly = true,
+Value = "0",
+Callback = function(value)
+getgenv().BuildOffsetX = parseNumberInput(value, 0)
+end
+})
+
+BuildOffsetYInput = Tabs.Combat:Input({
+Title = "Offset Y",
+Flag = "BuildOffsetYInput",
+Placeholder = "0",
+NumbersOnly = true,
+Value = "0",
+Callback = function(value)
+getgenv().BuildOffsetY = parseNumberInput(value, 0)
+end
+})
+
+BuildOffsetZInput = Tabs.Combat:Input({
+Title = "Offset Z",
+Flag = "BuildOffsetZInput",
+Placeholder = "0",
+NumbersOnly = true,
+Value = "0",
+Callback = function(value)
+getgenv().BuildOffsetZ = parseNumberInput(value, 0)
+end
+})
+
+-- ADD (permintaan user): tombol SET OTOMATIS per sumbu - mengunci nilai offset sumbu itu
+-- dari input di atas dan memastikan hook aktif, tanpa perlu toggle manual.
+Tabs.Combat:Button({
+Title = "Set Otomatis X",
+Icon = "move-horizontal",
+Callback = function()
+getgenv().BuildOffsetX = parseNumberInput(BuildOffsetXInput and BuildOffsetXInput.Value, getgenv().BuildOffsetX or 0)
+if ensureBuildHook() then
+pcall(function() BuildOffsetToggle:Set(true) end)
+pcall(function()
+WindUI:Notify({ Title = "Build Offset", Content = "Offset X otomatis di-set: " .. tostring(getgenv().BuildOffsetX) .. " (x" .. tostring(buildMultiplier) .. ")", Duration = 2 })
+end)
+end
+end
+})
+Tabs.Combat:Button({
+Title = "Set Otomatis Y",
+Icon = "move-vertical",
+Callback = function()
+getgenv().BuildOffsetY = parseNumberInput(BuildOffsetYInput and BuildOffsetYInput.Value, getgenv().BuildOffsetY or 0)
+if ensureBuildHook() then
+pcall(function() BuildOffsetToggle:Set(true) end)
+pcall(function()
+WindUI:Notify({ Title = "Build Offset", Content = "Offset Y otomatis di-set: " .. tostring(getgenv().BuildOffsetY) .. " (x" .. tostring(buildMultiplier) .. ")", Duration = 2 })
+end)
+end
+end
+})
+Tabs.Combat:Button({
+Title = "Set Otomatis Z",
+Icon = "move-diagonal",
+Callback = function()
+getgenv().BuildOffsetZ = parseNumberInput(BuildOffsetZInput and BuildOffsetZInput.Value, getgenv().BuildOffsetZ or 0)
+if ensureBuildHook() then
+pcall(function() BuildOffsetToggle:Set(true) end)
+pcall(function()
+WindUI:Notify({ Title = "Build Offset", Content = "Offset Z otomatis di-set: " .. tostring(getgenv().BuildOffsetZ) .. " (x" .. tostring(buildMultiplier) .. ")", Duration = 2 })
+end)
+end
+end
+})
+Tabs.Combat:Button({
+Title = "Reset Offset (0, 0, 0)",
+Icon = "rotate-ccw",
+Callback = function()
+getgenv().BuildOffsetX, getgenv().BuildOffsetY, getgenv().BuildOffsetZ = 0, 0, 0
+pcall(function()
+BuildOffsetXInput:Set("0")
+BuildOffsetYInput:Set("0")
+BuildOffsetZInput:Set("0")
+end)
+pcall(function()
+WindUI:Notify({ Title = "Build Offset", Content = "Semua offset dikembalikan ke 0, 0, 0.", Duration = 2 })
+end)
+end
+})
+end
+
+
+end)
+if ok_BO then
+        DaraSectionDone("BUILD OFFSET")
+else
+        DaraSectionFail("BUILD OFFSET", err_BO)
+end
+DaraSectionStart("AUTO FARM")
+local ok_AF, err_AF = pcall(function()
+-- ================= ADD: SECTION AUTO FARM (port dari DaraHub 2.2, fitur auto farm lengkap) =================
+-- ADD: Anti AFK (tab Misc versi asli tidak dibawa ke Ringkas; Auto Farm menyalakannya otomatis saat mulai)
+local AntiAFKConnection = nil
+-- FIX v1.4.3 (CAPABILITY): GetService("VirtualUser") TIDAK dipanggil lagi saat load.
+-- Service ber-security Plugin yang disentuh di tengah load diduga melepaskan capability
+-- thread di sebagian executor -> SEMUA pembuatan UI sesudahnya gagal
+-- "lacking capability Plugin" (tab Auto/Visuals/Utility/Teleport/Shop jadi kosong).
+-- Sekarang diambil lazy di callback Anti AFK + dibungkus pcall.
+local VirtualUser = nil
+local function getVirtualUser()
+if VirtualUser then return VirtualUser end
+local okVU, resVU = pcall(game.GetService, game, "VirtualUser")
+if okVU then VirtualUser = resVU end
+return VirtualUser
+end
+
+-- FIX: akses Events.Interact memakai FindFirstChild bertingkat + warn agar tidak error saat load
+-- jika game mengubah struktur Events (pola sama dengan fix UserData di bagian Shop)
+local Interact = ReplicatedStorage:FindFirstChild("Events")
+Interact = Interact and Interact:FindFirstChild("Interact")
+if not Interact then
+warn("[JoblessHub] ReplicatedStorage.Events.Interact tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
+end
+
+Tabs.Auto:Section({ Title = "Auto Farm" })
+
+AntiAfkToggle = Tabs.Auto:Toggle({
+Title = "Anti AFK",
+Desc = "Wajib aktif agar Auto Farm tidak berhenti karena AFK",
+Flag = "AntiAfkToggle",
+Value = false,
+Callback = function(state)
+if state then
+if AntiAFKConnection then
+AntiAFKConnection:Disconnect()
+end
+AntiAFKConnection = DaraTrackConn(LocalPlayer.Idled:Connect(function()
+local vuAFK = getVirtualUser()
+if not vuAFK then return end
+pcall(function()
+vuAFK:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+task.wait(1)
+vuAFK:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+end))
+else
+if AntiAFKConnection then
+AntiAFKConnection:Disconnect()
+AntiAFKConnection = nil
+end
+end
+end
+})
+
+Tabs.Auto:Space()
+
+-- ADD: state Auto Farm - UPDATE BETA: mode kini mengikuti DaraHub BETA (Token Farm + Catch NPC,
+-- dan "Auto Ticket" otomatis ditambahkan saat event aktif). Token Offset milik user (0 -11 0) DIPERTAHANKAN.
+local TicketsFolder = workspace:FindFirstChild("Effects") and workspace.Effects:FindFirstChild("Tickets")
+AutoFarmType = { "Token Farm", "Catch NPC" }
+pcall(function()
+if PlayerData.EventActive() then
+table.insert(AutoFarmType, "Auto Ticket")
+end
+end)
+local AutoFarm = {
+Enabled = false,
+Modes = {},
+Connection = nil,
+WarningShown = false,
+ReviveTarget = nil,
+LastTokenFire = 0,
+TokenDelay = 2,
+TokenOffset = Vector3.new(0, -11, 0),
+CatchTargets = {},
+CatchTarget = nil,
+LastCatchScan = 0,
+LastCatchFire = 0,
+CatchDelay = 0.5,
+CatchOffset = Vector3.new(0, 0, 0),
+}
+local AutoObjective = {
+Enabled = false,
+Thread = nil,
+Delay = 0.2,
+}
+
+
+
+function isTokenFarmLocalPlayerModel(model)
+if not model then
+return true
+end
+if model == LocalPlayer.Character then
+return true
+end
+if model.Name == LocalPlayer.Name then
+return true
+end
+if model.Name == tostring(LocalPlayer.UserId) then
+return true
+end
+local attrName = model:GetAttribute("Name")
+if attrName == LocalPlayer.Name or attrName == LocalPlayer.DisplayName then
+return true
+end
+local attrTag = model:GetAttribute("Tag")
+if attrTag == LocalPlayer.Name or attrTag == LocalPlayer.DisplayName then
+return true
+end
+local userId = model:GetAttribute("UserId") or model:GetAttribute("PlayerUserId")
+if typeof(userId) == "number" and userId == LocalPlayer.UserId then
+return true
+end
+return false
+end
+
+function isValidTokenFarmTarget(model)
+if not model or not model.Parent or not model:IsA("Model") then
+return false
+end
+if model.Parent.Name ~= "Players" then
+return false
+end
+if isTokenFarmLocalPlayerModel(model) then
+return false
+end
+if not model:FindFirstChild("HumanoidRootPart") then
+return false
+end
+if model:GetAttribute("Tag") == nil then
+return false
+end
+return true
+end
+
+function pickRandomTokenFarmTarget()
+local playersFolder = workspace:FindFirstChild("Players")
+if not playersFolder then
+return nil
+end
+local valid = {}
+for _, model in ipairs(playersFolder:GetChildren()) do
+if isValidTokenFarmTarget(model) then
+table.insert(valid, model)
+end
+end
+if #valid == 0 then
+return nil
+end
+return valid[math.random(1, #valid)]
+end
+
+function StartAutoObjective()
+if AutoObjective.Enabled then
+return
+end
+AutoObjective.Enabled = true
+AutoObjective.Thread = DaraTrackThread(task.spawn(function()
+while AutoObjective.Enabled do
+local objectivesContainer = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parts") and workspace.Map.Parts:FindFirstChild("Objectives")
+if objectivesContainer then
+local anyCompleted = false
+for _, obj in pairs(objectivesContainer:GetChildren()) do
+if obj:GetAttribute("Completed") == true then
+anyCompleted = true
+break
+end
+end
+if not anyCompleted then
+for _, objective in pairs(objectivesContainer:GetChildren()) do
+if not AutoObjective.Enabled then
+break
+end
+if objective:FindFirstChild("WhenActivated") then
+local tagValue = objective:GetAttribute("Tag")
+if tagValue and Interact then
+pcall(function()
+Interact:FireServer("Dynamic", tagValue)
+end)
+task.wait(AutoObjective.Delay)
+end
+end
+end
+end
+end
+task.wait(0.2)
+end
+end))
+end
+
+function StopAutoObjective()
+AutoObjective.Enabled = false
+if AutoObjective.Thread then
+pcall(task.cancel, AutoObjective.Thread)
+AutoObjective.Thread = nil
+end
+end
+
+-- ============================================================
+-- ADD (UPDATE BETA): helper Catch NPC - port dari DaraHub BETA (decompile/source scan
+-- NPC yang memberi reward event, lalu dipakai mode "Catch NPC" Auto Farm).
+-- ============================================================
+function getModuleSource(module)
+local src = nil
+if decompile then
+local ok, result = pcall(decompile, module)
+if ok and type(result) == "string" then
+src = result
+end
+end
+if not src then
+local ok, result = pcall(function()
+return module.Source
+end)
+if ok and type(result) == "string" then
+src = result
+end
+end
+return src
+end
+
+function npcHasEventReward(module)
+local cached = module:GetAttribute("CatchRewarded")
+if cached ~= nil then
+return cached
+end
+local src = getModuleSource(module)
+-- UPDATE v1.4.4 (SINKRON BETA): pola sumber di-update - game 2.2 memakai layout UserData baru
+-- (Client.Services.UserData.Event); pola lama hanya cocok "Services.UserData.EventService". Pola
+-- baru "UserData%.Event" cocok untuk KEDUANYA (EventService & Event) - Catch NPC tetap menemukan
+-- NPC pemberi reward baik di layout lama maupun baru.
+local rewarded = src ~= nil and src:find("UserData%.Event") ~= nil
+pcall(module.SetAttribute, module, "CatchRewarded", rewarded)
+return rewarded
+end
+
+function getCatchTargets()
+local targets = {}
+local npcFolder = ReplicatedStorage:FindFirstChild("NPCs")
+if not npcFolder then
+return targets
+end
+for _, obj in ipairs(workspace:GetDescendants()) do
+if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
+local module = npcFolder:FindFirstChild(obj.Name)
+if module and module:IsA("ModuleScript") and npcHasEventReward(module) then
+table.insert(targets, obj)
+end
+end
+end
+return targets
+end
+
+
+function StartAutoFarm()
+if AutoFarm.Connection then
+AutoFarm.Connection:Disconnect()
+AutoFarm.Connection = nil
+end
+AutoFarm.Enabled = true
+-- FIX (Task 18): tick sebelumnya jalan tiap frame (60x/detik): teleport CFrame +
+-- GetChildren tiket + scan target tiap frame. Dibatasi 10x/detik (0.1s) - hasil farm
+-- tidak berubah (teleport instan), beban CPU turun ~6x.
+-- UPDATE BETA: prioritas mode mengikuti Beta - Catch NPC > Auto Ticket > Token Farm > SecurityPart.
+local farmAcc = 0
+AutoFarm.Connection = DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+farmAcc = farmAcc + dt
+if farmAcc < 0.1 then return end
+farmAcc = 0
+
+local char = LocalPlayer.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if not hrp then
+return
+end
+local hasTicket = table.find(AutoFarm.Modes, "Auto Ticket") ~= nil
+local hasTokenFarm = table.find(AutoFarm.Modes, "Token Farm") ~= nil
+local hasCatchNPC = table.find(AutoFarm.Modes, "Catch NPC") ~= nil
+local now = tick()
+
+local catchTarget = nil
+if hasCatchNPC then
+if now - AutoFarm.LastCatchScan >= 1 then
+AutoFarm.LastCatchScan = now
+AutoFarm.CatchTargets = getCatchTargets()
+end
+local target = AutoFarm.CatchTarget
+if not target or not target.Parent or not target:FindFirstChild("HumanoidRootPart") then
+target = nil
+for _, candidate in ipairs(AutoFarm.CatchTargets) do
+if candidate.Parent and candidate:FindFirstChild("HumanoidRootPart") then
+target = candidate
+break
+end
+end
+AutoFarm.CatchTarget = target
+end
+catchTarget = target
+end
+
+local ticketTarget = nil
+if hasTicket then
+-- FIX: folder Tickets dicari ulang saat loop bila belum ada saat load (map bisa dimuat belakangan)
+if not TicketsFolder then
+local effects = workspace:FindFirstChild("Effects")
+TicketsFolder = effects and effects:FindFirstChild("Tickets")
+end
+local ticket = TicketsFolder and TicketsFolder:GetChildren()[1]
+ticketTarget = ticket and (ticket:FindFirstChild("HumanoidRootPart") or ticket:FindFirstChildWhichIsA("BasePart"))
+end
+
+local tokenTarget = nil
+if hasTokenFarm then
+if not isValidTokenFarmTarget(AutoFarm.ReviveTarget) then
+AutoFarm.ReviveTarget = pickRandomTokenFarmTarget()
+end
+tokenTarget = AutoFarm.ReviveTarget
+end
+
+local catchHrp = catchTarget and catchTarget:FindFirstChild("HumanoidRootPart")
+local tokenHrp = tokenTarget and tokenTarget:FindFirstChild("HumanoidRootPart")
+
+if catchHrp then
+hrp.CFrame = catchHrp.CFrame + AutoFarm.CatchOffset
+local catchTag = catchTarget:GetAttribute("Tag")
+if catchTag and now - AutoFarm.LastCatchFire >= AutoFarm.CatchDelay then
+AutoFarm.LastCatchFire = now
+pcall(function()
+-- FIX: Events.Other.TouchReward dicari bertahap (tidak error bila path berubah)
+local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
+local otherFolder = eventsFolder and eventsFolder:FindFirstChild("Other")
+local touchReward = otherFolder and otherFolder:FindFirstChild("TouchReward")
+if touchReward then
+touchReward:FireServer(catchTag)
+end
+end)
+end
+elseif ticketTarget then
+hrp.CFrame = ticketTarget.CFrame + Vector3.new(0, 0, 0)
+elseif tokenHrp then
+hrp.CFrame = tokenHrp.CFrame + AutoFarm.TokenOffset
+local tag = tokenTarget:GetAttribute("Tag")
+if tag and now - AutoFarm.LastTokenFire >= AutoFarm.TokenDelay then
+AutoFarm.LastTokenFire = now
+pcall(function()
+Interact:FireServer("Revive", tag)
+Interact:FireServer("Revive", tag, true)
+end)
+end
+else
+teleportToSecurityPart(Vector3.new(0, 3, 0))
+end
+end))
+end
+
+function StopAutoFarm()
+AutoFarm.Enabled = false
+if AutoFarm.Connection then
+AutoFarm.Connection:Disconnect()
+AutoFarm.Connection = nil
+end
+AutoFarm.ReviveTarget = nil
+AutoFarm.CatchTarget = nil
+AutoFarm.CatchTargets = {}
+AutoFarm.LastTokenFire = 0
+AutoFarm.LastCatchFire = 0
+end
+
+
+
+Tabs.Auto:Space()
+
+AutoFarmModeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Farm Mode",
+Flag = "AutoFarmDropdown",
+Values = AutoFarmType,
+Multi = true,
+AllowNone = true,
+Value = {},
+Callback = function(selected)
+-- FIX: hasil Multi dropdown dibuat kompatibel dua format (array string / array objek {Value=...})
+AutoFarm.Modes = {}
+if type(selected) == "table" then
+if #selected > 0 then
+for _, v in ipairs(selected) do
+local val = v
+if type(v) == "table" and type(v.Value) == "string" then
+val = v.Value
+end
+if type(val) == "string" then
+table.insert(AutoFarm.Modes, val)
+end
+end
+else
+for key, isOn in pairs(selected) do
+if isOn and type(key) == "string" then
+table.insert(AutoFarm.Modes, key)
+end
+end
+end
+end
+end
+})
+
+TokenFarmOffsetInput = Tabs.Auto:Input({
+Title = "Token Farm Offset",
+Flag = "TokenFarmOffsetInput",
+Placeholder = "X Y Z",
+Value = "0 -11 0",
+Callback = function(value)
+local x, y, z = value:match("^%s*([%-%d%.]+)%s+([%-%d%.]+)%s+([%-%d%.]+)%s*$")
+if x and y and z then
+AutoFarm.TokenOffset = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+end
+end
+})
+
+TokenFarmDelaySlider = Tabs.Auto:Slider({
+Title = "Token Farm Delay",
+Flag = "TokenFarmDelaySlider",
+Desc = "Jeda fire revive dalam detik",
+Step = 0.01,
+Value = { Min = 0.84, Max = 4, Default = 2 }, -- sinkron Beta: min 0.84
+Callback = function(value)
+AutoFarm.TokenDelay = value
+end
+})
+
+AutoFarmToggle = Tabs.Auto:Toggle({
+Title = "Auto Farm",
+Flag = "AutoFarmToggle",
+Value = false,
+Callback = function(state)
+if state then
+if AntiAfkToggle then
+AntiAfkToggle:Set(true)
+end
+if AutoSelfReviveToggle then
+AutoSelfReviveToggle:Set(true)
+end
+local isVIP = false
+pcall(function()
+isVIP = LocalPlayer:GetAttribute("VIPCommandsAccess") == true
+end)
+if isVIP or AutoFarm.WarningShown then
+StartAutoFarm()
+else
+-- FIX: WindUI:Popup dibungkus pcall; bila versi WindUI tidak punya Popup,
+-- fallback ke Notify + langsung mulai agar toggle tidak mati sia-sia
+local okPopup = pcall(function()
+WindUI:Popup({
+Title = "<b><font color='#FF5555'>WARNING! BAN WAVE!</font></b>",
+Icon = "shield-x",
+Content = [[<b><font color='#FFAA00'>DO NOT USE AUTO FARM ON PUBLIC SERVER OR UNTRUSTED PRIVATE SERVER! IF YOU DON'T WANNA GET BAN!</font></b>
+<font color='#4fe000'> - Be Sure Use It On Your Own Private Server To Avoid BAN!</font>
+<b><font color='#FF5555'> - IF YOU KEEP CONTINUE DOING THIS YOU WILL GET BAN ANYTIME SOON!</font></b>
+<b><font color='#FF5555'> - WHEN YOU GET BANNED, THERE'S NO UNBAN APPEAL!</font></b>
+<font color='#FF5555'> Remember: Staff will not giving you second chance!</font>]],
+Buttons = {
+{
+Title = "Cancel",
+Callback = function()
+AutoFarmToggle:Set(false)
+end,
+Variant = "Destructive"
+},
+{
+Title = "Continue Anyway",
+Icon = "shield-check",
+Callback = function()
+AutoFarm.WarningShown = true
+StartAutoFarm()
+end,
+Variant = "Primary"
+}
+}
+})
+end)
+if not okPopup then
+pcall(function()
+WindUI:Notify({
+Title = "Auto Farm",
+Content = "WARNING: Jangan pakai Auto Farm di server publik! Risiko ban tanpa appeal.",
+Duration = 6
+})
+end)
+AutoFarm.WarningShown = true
+StartAutoFarm()
+end
+end
+else
+StopAutoFarm()
+end
+end
+})
+
+Tabs.Auto:Space()
+
+AutoCompleteObjectiveToggle = Tabs.Auto:Toggle({
+Title = "Auto Complete Objective",
+Flag = "AutoCompleteObjectiveToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoObjective()
+else
+StopAutoObjective()
+end
+end
+})
+-- ================= AKHIR SECTION AUTO FARM =================
+
+end)
+if ok_AF then
+        DaraSectionDone("AUTO FARM")
+else
+        DaraSectionFail("AUTO FARM", err_AF)
+end
+DaraSectionStart("VIP CMD MACRO")
+local ok_VM, err_VM = pcall(function()
+-- ================= ADD: SECTION VIP CMD MACRO (kembali Task 22, keadaan awal MATI - skema config EvadeCMDMacroGUI asli) =================
+-- ADD: macro chat command VIP (!time / !specialround / !MapScale); config default
+-- ter-embed sesuai config user, bisa diganti via Input JSON dan di-save ke JoblessHub/Games/Evade/VIPMacroConfig.json
+-- FIX (Task 22): dikembalikan dalam keadaan MATI sesuai klarifikasi user ("keadaan mati bukan hilang"):
+-- Auto Run default OFF dan TIDAK auto-start saat load; nyalakan manual via toggle "Auto Run VIP Macro"
+-- atau tombol "Run All Macros Now".
+local HttpService = game:GetService("HttpService")
+local UIS = game:GetService("UserInputService")
+
+local VIP_MACRO_CONFIG_FILE = "JoblessHub/Games/Evade/VIPMacroConfig.json"
+-- v1.5.0: config lama di folder DaraHub otomatis dimigrasi (dibaca bila folder baru masih kosong).
+local VIP_MACRO_CONFIG_LEGACY = "DaraHub/Games/Evade/VIPMacroConfig.json"
+local VIP_MACRO_CONFIG_READ = VIP_MACRO_CONFIG_FILE
+local VIP_MACRO_DEFAULT_CONFIG = '{"AutoFarm":[{"keybind":"F","delayValue":3,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro","command":"!time 1","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":1,"delayUnit":"Ms","startRoundType":"Intermission","name":"Macro","command":"!specialround Plushie Hell","startTimeType":"Any Time","stopMode":"indefinitely"},{"keybind":"F","delayValue":30,"delayUnit":"Second","startRoundType":"Intermission","name":"Macro_1790151459","command":"!MapScale 0","startTimeType":"Any Time","stopMode":"indefinitely"}]}'
+
+local VIPMacros = {}
+local VIPMacroRawConfig = ""
+-- FIX (Task 22): default MATI (dulu true) - macro tidak menyala saat load
+local VIPMacroAutoRunState = false
+local VIPAutoRunThread = nil
+local VIPWarnedNoRoundStatus = false
+
+-- FIX: RoundStatus dibaca lewat pcall; 2 = Round Active, 0/1 = Intermission (sesuai pemakaian asli).
+-- Bila registry tidak tersedia, kembalikan nil agar macro tetap jalan (fail-open) + warn sekali.
+local function VIPMacroIsRoundActive()
+if not ServerStateRegistryService then
+return nil
+end
+local ok, status = pcall(function()
+return tonumber(ServerStateRegistryService.Registry and ServerStateRegistryService.Registry.RoundStatus)
+end)
+if not ok then
+return nil
+end
+if status == nil and not VIPWarnedNoRoundStatus then
+VIPWarnedNoRoundStatus = true
+warn("[JoblessHub] RoundStatus tidak tersedia - VIP Macro tidak bisa membedakan intermission/round (macro jalan terus)")
+end
+if status == nil then
+return nil
+end
+return status == 2
+end
+
+local function VIPMacroDelaySeconds(macro)
+local n = tonumber(macro.delayValue) or 1
+local unit = tostring(macro.delayUnit or "Second")
+if unit == "Ms" then
+return math.max(n / 1000, 0)
+end
+return n
+end
+
+-- FIX: pengiriman chat dicoba lewat TextChatService (RBXGeneral:SendAsync) lalu fallback
+-- DefaultChatSystemChatEvents.SayMessageRequest (chat legacy); keduanya pcall + warn.
+local function VIPMacroSendChat(message)
+local sent = false
+local ok = pcall(function()
+local tcs = game:GetService("TextChatService")
+local channels = tcs and tcs:FindFirstChild("TextChannels")
+local general = channels and channels:FindFirstChild("RBXGeneral")
+if not general then
+error("RBXGeneral tidak ditemukan")
+end
+general:SendAsync(message)
+sent = true
+end)
+if not ok or not sent then
+pcall(function()
+local ev = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+local req = ev and ev:FindFirstChild("SayMessageRequest")
+if not req then
+error("SayMessageRequest tidak ditemukan")
+end
+req:FireServer(message, "All")
+sent = true
+end)
+end
+if not sent then
+warn("[JoblessHub] Gagal mengirim chat macro: " .. tostring(message))
+end
+end
+
+local function VIPMacroRunLoop(macro)
+while macro.Running do
+local mode = tostring(macro.startRoundType or "Any Time")
+if mode == "Intermission" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+elseif mode == "Round" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active == false do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+if tostring(macro.startTimeType or "Any Time") == "Round Start" then
+local active = VIPMacroIsRoundActive()
+while macro.Running and active ~= true do
+task.wait(0.5)
+active = VIPMacroIsRoundActive()
+end
+end
+if not macro.Running then break end
+VIPMacroSendChat(tostring(macro.command or ""))
+if tostring(macro.stopMode or "indefinitely") == "Once" then
+macro.Running = false
+break
+end
+task.wait(VIPMacroDelaySeconds(macro))
+end
+end
+
+local function VIPMacroStopAll()
+for _, m in ipairs(VIPMacros) do
+m.Running = false
+end
+end
+
+local function VIPMacroStartAll()
+for _, m in ipairs(VIPMacros) do
+if not m.Running then
+m.Running = true
+DaraTrackThread(task.spawn(VIPMacroRunLoop, m))
+end
+end
+end
+
+local function VIPMacroIsVIP()
+local ok, isVIP = pcall(function()
+return LocalPlayer:GetAttribute("VIPCommandsAccess") == true
+end)
+return ok and isVIP == true
+end
+
+local function VIPMacroAutoStart()
+if VIPAutoRunThread then
+pcall(task.cancel, VIPAutoRunThread)
+VIPAutoRunThread = nil
+end
+VIPAutoRunThread = DaraTrackThread(task.spawn(function()
+-- FIX: attribute VIPCommandsAccess bisa terisi lambat setelah load; polling 15 detik
+-- (versi asli hanya cek sekali saat load sehingga macro kadang tidak jalan)
+local waited = 0
+while waited < 15 do
+if VIPMacroIsVIP() then
+VIPMacroStartAll()
+pcall(function()
+WindUI:Notify({
+Title = "VIP CMD Macro",
+Content = "VIP terdeteksi - " .. #VIPMacros .. " macro mulai berjalan otomatis",
+Duration = 4
+})
+end)
+return
+end
+task.wait(1)
+waited = waited + 1
+end
+warn("[JoblessHub] VIPCommandsAccess tidak terdeteksi 15 detik - VIP Macro auto-run ditunda (pakai tombol Run All Macros Now bila sudah VIP)")
+end))
+end
+
+local function VIPMacroBuildStatus()
+if #VIPMacros == 0 then
+return "Tidak ada macro terload."
+end
+local lines = {}
+for i, m in ipairs(VIPMacros) do
+table.insert(lines, i .. ") " .. m.name .. ": " .. m.command .. " | tiap " .. tostring(m.delayValue) .. " " .. tostring(m.delayUnit) .. " | " .. tostring(m.startRoundType) .. " | keybind " .. (m.keybind ~= "" and m.keybind or "-"))
+end
+return table.concat(lines, "\n")
+end
+
+local function VIPMacroLoadFromTable(data)
+VIPMacroStopAll()
+VIPMacros = {}
+local list = data
+if type(data) == "table" and type(data.AutoFarm) == "table" then
+list = data.AutoFarm
+end
+if type(list) == "table" then
+for _, m in ipairs(list) do
+if type(m) == "table" and m.command then
+table.insert(VIPMacros, {
+name = tostring(m.name or "Macro"),
+command = tostring(m.command),
+keybind = tostring(m.keybind or ""),
+delayValue = tonumber(m.delayValue) or 1,
+delayUnit = tostring(m.delayUnit or "Second"),
+startRoundType = tostring(m.startRoundType or "Any Time"),
+startTimeType = tostring(m.startTimeType or "Any Time"),
+stopMode = tostring(m.stopMode or "indefinitely"),
+Running = false,
+Thread = nil,
+})
+end
+end
+end
+end
+
+local function VIPMacroApplyRaw(raw)
+if not raw or raw == "" then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config JSON masih kosong.", Duration = 3 })
+end)
+return false
+end
+local ok, data = pcall(function()
+return HttpService:JSONDecode(raw)
+end)
+if not ok or type(data) ~= "table" then
+warn("[JoblessHub] Config VIP Macro bukan JSON valid")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "JSON tidak valid!", Duration = 3 })
+end)
+return false
+end
+VIPMacroLoadFromTable(data)
+if #VIPMacros == 0 then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Tidak ada macro valid di config (butuh field command).", Duration = 3 })
+end)
+return false
+end
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = #VIPMacros .. " macro diterapkan.", Duration = 3 })
+end)
+return true
+end
+
+-- ADD: load config dari file (kalau pernah di-save), kalau tidak pakai config default ter-embed
+local VIPMacroLoadedFromDisk = false
+if isfile and readfile then
+local okFile, exists = pcall(isfile, VIP_MACRO_CONFIG_FILE)
+if okFile and not exists then
+-- v1.5.0 MIGRASI: config belum ada di folder JoblessHub tapi ada di folder lama DaraHub =
+-- baca dari path lama agar config lama user tetap terpakai; simpan berikutnya ke folder baru.
+local okLegacy, legacyExists = pcall(isfile, VIP_MACRO_CONFIG_LEGACY)
+if okLegacy and legacyExists then
+VIP_MACRO_CONFIG_READ = VIP_MACRO_CONFIG_LEGACY
+exists = true
+end
+end
+if okFile and exists then
+local ok, content = pcall(readfile, VIP_MACRO_CONFIG_READ)
+if ok and type(content) == "string" and content ~= "" then
+local ok2, data = pcall(function()
+return HttpService:JSONDecode(content)
+end)
+if ok2 and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+VIPMacroLoadedFromDisk = true
+end
+end
+end
+end
+if not VIPMacroLoadedFromDisk then
+local ok, data = pcall(function()
+return HttpService:JSONDecode(VIP_MACRO_DEFAULT_CONFIG)
+end)
+if ok and type(data) == "table" then
+VIPMacroLoadFromTable(data)
+end
+end
+
+Tabs.Auto:Section({ Title = "VIP CMD Macro" })
+
+Tabs.Auto:Paragraph({
+Title = "Macro Terload" .. (#VIPMacros > 0 and " (" .. #VIPMacros .. ")" or ""),
+Content = VIPMacroBuildStatus()
+})
+
+VIPMacroAutoRunToggle = Tabs.Auto:Toggle({
+Title = "Auto Run VIP Macro",
+Flag = "VIPMacroAutoRun",
+Desc = "Jalankan semua macro otomatis begitu VIP Commands aktif",
+-- FIX (Task 22): Value default false (keadaan mati) - user nyalakan manual bila mau
+Value = false,
+Callback = function(state)
+VIPMacroAutoRunState = state
+if state then
+VIPMacroAutoStart()
+else
+VIPMacroStopAll()
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Run All Macros Now",
+Icon = "play",
+Callback = function()
+if not VIPMacroIsVIP() then
+warn("[JoblessHub] VIPCommandsAccess belum aktif - macro chat VIP kemungkinan tidak berfungsi")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Kamu belum punya VIP Commands (coba di private server sendiri).", Duration = 4 })
+end)
+end
+VIPMacroStartAll()
+end
+})
+
+Tabs.Auto:Button({
+Title = "Stop All Macros",
+Icon = "square",
+Callback = function()
+VIPMacroStopAll()
+end
+})
+
+Tabs.Auto:Space()
+
+VIPMacroConfigInput = Tabs.Auto:Input({
+Title = "Macro Config (JSON)",
+Flag = "VIPMacroConfigInput",
+Placeholder = "Paste config JSON di sini",
+Callback = function(value)
+VIPMacroRawConfig = value or ""
+end
+})
+
+Tabs.Auto:Button({
+Title = "Apply Config JSON",
+Icon = "check",
+Callback = function()
+if VIPMacroApplyRaw(VIPMacroRawConfig) then
+VIPMacroStopAll()
+if VIPMacroAutoRunState then
+VIPMacroAutoStart()
+end
+end
+end
+})
+
+Tabs.Auto:Button({
+Title = "Save Config ke File",
+Desc = "Simpan config macro aktif ke JoblessHub/Games/Evade/VIPMacroConfig.json",
+Icon = "save",
+Callback = function()
+if not writefile then
+warn("[JoblessHub] Executor tidak mendukung writefile - config tidak bisa disimpan")
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Executor tidak mendukung writefile.", Duration = 3 })
+end)
+return
+end
+local ok = pcall(function()
+if isfolder and makefolder then
+if not isfolder("JoblessHub") then makefolder("JoblessHub") end
+if not isfolder("JoblessHub/Games") then makefolder("JoblessHub/Games") end
+if not isfolder("JoblessHub/Games/Evade") then makefolder("JoblessHub/Games/Evade") end
+end
+local list = {}
+for _, m in ipairs(VIPMacros) do
+table.insert(list, {
+keybind = m.keybind,
+delayValue = m.delayValue,
+delayUnit = m.delayUnit,
+startRoundType = m.startRoundType,
+name = m.name,
+command = m.command,
+startTimeType = m.startTimeType,
+stopMode = m.stopMode,
+})
+end
+writefile(VIP_MACRO_CONFIG_FILE, HttpService:JSONEncode({ AutoFarm = list }))
+end)
+if ok then
+pcall(function()
+WindUI:Notify({ Title = "VIP CMD Macro", Content = "Config tersimpan: " .. VIP_MACRO_CONFIG_FILE, Duration = 3 })
+end)
+else
+warn("[JoblessHub] Gagal menyimpan config VIP Macro")
+end
+end
+})
+
+-- ADD: keybind manual tiap macro (field keybind di config; semuanya "F" di config user)
+-- FIX v1.6.0: koneksi didaftarkan ke registry global - eksekusi ulang memutus handler lama
+-- (dulu menumpuk: keypress macro terkirim berulang dari setiap eksekusi sebelumnya).
+DaraTrackConn(UIS.InputBegan:Connect(function(input, processed)
+if processed then
+return
+end
+local key = input.KeyCode and input.KeyCode.Name
+if not key then
+return
+end
+for _, m in ipairs(VIPMacros) do
+if m.keybind ~= "" and m.keybind == key then
+task.spawn(VIPMacroSendChat, m.command)
+end
+end
+end))
+
+-- FIX (Task 22): keadaan awal MATI - VIPMacroAutoStart() TIDAK dipanggil saat load lagi.
+-- Macro hanya berjalan bila user menyalakan toggle "Auto Run VIP Macro"
+-- (callback memanggil VIPMacroAutoStart) atau menekan tombol "Run All Macros Now".
+-- ================= AKHIR SECTION VIP CMD MACRO =================
+
+end)
+if ok_VM then
+        DaraSectionDone("VIP CMD MACRO")
+else
+        DaraSectionFail("VIP CMD MACRO", err_VM)
+end
+DaraSectionStart("AUTO VOTE")
+local ok_AV, err_AV = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): AUTO VOTE - port dari DaraHub BETA (tab Auto).
+-- Otomatis memilih map / game mode saat voting terbuka: selama popup Vote
+-- (PlayerGui.Shared.Popups.VoteActive / Vote) terlihat, kirim Events.Vote:FireServer.
+-- Map & Mode dipilih dari dropdown (Map 1-4 / Mode 1-4).
+-- ============================================================
+Tabs.Auto:Section({ Title = "Auto Vote" })
+Tabs.Auto:Divider()
+
+do
+local AutoVote = {
+Enabled = false,
+Map = 1,
+Mode = 1,
+Connections = {
+Map = nil,
+Mode = nil
+}
+}
+
+-- FIX: akses ServerStateRegistry dibungkus pcall + fail-open (registry tidak tersedia
+-- = tetap coba lewat popup, jangan matikan fitur hanya karena struktur service berubah)
+local function isVotingActive()
+local ok, voting = pcall(function()
+return ServerStateRegistryService
+and ServerStateRegistryService.Registry
+and ServerStateRegistryService.Registry.Voting
+end)
+if ok and voting == false then
+return false
+end
+return true
+end
+
+local function getVotePopup()
+if not isVotingActive() then
+return nil
+end
+local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+if not playerGui then
+return nil
+end
+local shared = playerGui:FindFirstChild("Shared")
+if shared then
+local popups = shared:FindFirstChild("Popups")
+if popups then
+local voteActive = popups:FindFirstChild("VoteActive")
+if voteActive and voteActive.Visible then
+return voteActive
+end
+local vote = popups:FindFirstChild("Vote")
+if vote and vote.Visible then
+return vote
+end
+end
+end
+return nil
+end
+
+-- FIX: pencarian event + FireServer dibungkus pcall (anti spam error di Heartbeat)
+local function fireVoteServer(mapNumber)
+local votePopup = getVotePopup()
+if not votePopup then
+return
+end
+local voteEvent = ReplicatedStorage:FindFirstChild("Events")
+if voteEvent then
+voteEvent = voteEvent:FindFirstChild("Vote")
+if voteEvent and voteEvent:IsA("RemoteEvent") then
+pcall(voteEvent.FireServer, voteEvent, mapNumber)
+end
+end
+end
+
+local function fireVoteMode(modeNumber)
+local votePopup = getVotePopup()
+if not votePopup then
+return
+end
+local voteEvent = ReplicatedStorage:FindFirstChild("Events")
+if voteEvent then
+voteEvent = voteEvent:FindFirstChild("Vote")
+if voteEvent and voteEvent:IsA("RemoteEvent") then
+-- argumen kedua true = vote game mode (bukan map)
+pcall(voteEvent.FireServer, voteEvent, modeNumber, true)
+end
+end
+end
+
+-- FIX: forward declaration agar pemanggilan silang antar fungsi lokal valid
+local StartAutoVoteMap, StopAutoVoteMap, StartAutoVoteMode, StopAutoVoteMode
+
+function StartAutoVoteMap()
+StopAutoVoteMap()
+AutoVote.Enabled = true
+-- FIX (Task 18): FireServer + lookup popup PlayerGui sebelumnya tiap frame (60x/detik)
+-- per koneksi -> boros. Dibatasi 10x/detik - spam vote tetap efektif, beban turun ~6x.
+local voteMapAcc = 0
+AutoVote.Connections.Map = DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+voteMapAcc = voteMapAcc + dt
+if voteMapAcc < 0.1 then return end
+voteMapAcc = 0
+pcall(fireVoteServer, AutoVote.Map)
+end))
+end
+
+function StopAutoVoteMap()
+AutoVote.Enabled = false
+if AutoVote.Connections.Map then
+AutoVote.Connections.Map:Disconnect()
+AutoVote.Connections.Map = nil
+end
+end
+
+function StartAutoVoteMode()
+StopAutoVoteMode()
+AutoVote.Enabled = true
+local voteModeAcc = 0
+AutoVote.Connections.Mode = DaraTrackConn(RunService.Heartbeat:Connect(function(dt)
+voteModeAcc = voteModeAcc + dt
+if voteModeAcc < 0.1 then return end
+voteModeAcc = 0
+pcall(fireVoteMode, AutoVote.Mode)
+end))
+end
+
+function StopAutoVoteMode()
+if AutoVote.Connections.Mode then
+AutoVote.Connections.Mode:Disconnect()
+AutoVote.Connections.Mode = nil
+end
+end
+
+local mapDropdownValues = {}
+for i = 1, 4 do
+table.insert(mapDropdownValues, "Map " .. i)
+end
+AutoVoteDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Vote Map",
+Flag = "AutoVoteDropdown",
+Values = mapDropdownValues,
+Value = "Map 1",
+Callback = function(value)
+-- FIX: guard tonumber (nilai dropdown bisa bukan string / tanpa angka)
+local n = tonumber(type(value) == "string" and value:match("%d+") or nil)
+if n then
+AutoVote.Map = n
+end
+end
+})
+AutoVoteToggle = Tabs.Auto:Toggle({
+Title = "Auto Vote Map",
+Flag = "AutoVoteToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoVoteMap()
+else
+StopAutoVoteMap()
+end
+end
+})
+Tabs.Auto:Space()
+local modeDropdownValues = {}
+for i = 1, 4 do
+table.insert(modeDropdownValues, "Mode " .. i)
+end
+AutoVoteModeDropdown = Tabs.Auto:Dropdown({
+Title = "Auto Vote Mode",
+Flag = "AutoVoteModeDropdown",
+Values = modeDropdownValues,
+Value = "Mode 1",
+Callback = function(value)
+local n = tonumber(type(value) == "string" and value:match("%d+") or nil)
+if n then
+AutoVote.Mode = n
+end
+end
+})
+AutoVoteModeToggle = Tabs.Auto:Toggle({
+Title = "Auto Vote Game Mode",
+Flag = "AutoVoteModeToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoVoteMode()
+else
+StopAutoVoteMode()
+end
+end
+})
+end
+end)
+if ok_AV then
+        DaraSectionDone("AUTO VOTE")
+else
+        DaraSectionFail("AUTO VOTE", err_AV)
+end
+DaraSectionStart("AUTO WHISTLE")
+local ok_AW, err_AW = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): AUTO WHISTLE - port dari DaraHub BETA (tab Auto).
+-- Meniup peluit otomatis tiap 1 detik (interval persis Beta) lewat KeybindService.
+-- ============================================================
+Tabs.Auto:Space()
+do
+local autoWhistleOn = false
+local autoWhistleConnection = nil
+local lastWhistle = 0
+local function stopAutoWhistle()
+autoWhistleOn = false
+if autoWhistleConnection then
+autoWhistleConnection:Disconnect()
+autoWhistleConnection = nil
+end
+end
+local function startAutoWhistle()
+stopAutoWhistle()
+autoWhistleOn = true
+lastWhistle = tick()
+-- FIX: Beta memakai WaitForChild bertingkat TIAP fire (bisa yield di dalam Heartbeat) ->
+-- kini memakai SendKeybindEvent (cache + FindFirstChild + warn sekali), loop di-throttle 4x/detik.
+autoWhistleConnection = HeartbeatLoop(0.25, function()
+if not autoWhistleOn then
+return
+end
+local now = tick()
+if now - lastWhistle >= 1 then
+lastWhistle = now
+SendKeybindEvent("Whistle", true)
+end
+end)
+end
+AutoWhistleToggle = Tabs.Auto:Toggle({
+Title = "Auto Whistle",
+Flag = "AutoWhistleToggle",
+Value = false,
+Callback = function(state)
+if state then
+startAutoWhistle()
+else
+stopAutoWhistle()
+end
+end
+})
+end
+end)
+if ok_AW then
+        DaraSectionDone("AUTO WHISTLE")
+else
+        DaraSectionFail("AUTO WHISTLE", err_AW)
+end
+
+
+
+
+-- ================= TAB VISUALS =================
+-- FIX v1.4.3: dua baris di bawah tadinya TANPA pcall - satu error di sini mematikan
+-- SEMUA section setelahnya (FULL BRIGHT s/d PLATFORM PC tidak pernah dimuat, tab
+-- Visuals/Utility/Teleport/Shop jadi kosong). Ini penyebab "satu error mati semua".
+do
+local ok_VH, err_VH = pcall(function()
+Tabs.Visuals:Section({ Title = "Visual", TextSize = 20 })
+Tabs.Visuals:Divider()
+end)
+if not ok_VH then
+warn("[JoblessHub][SECTION ERROR] 'TAB VISUALS (header)' gagal: " .. tostring(err_VH))
+end
+end
+DaraSectionStart("FULL BRIGHT")
+local ok_FB, err_FB = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): FULL BRIGHT - port dari DaraHub BETA (tab Visuals).
+-- ============================================================
+Tabs.Visuals:Space()
+do
+local LightingService = game:GetService("Lighting")
+local fbOriginal = nil
+local fbConnection = nil
+local function applyFullBright()
+if LightingService.Brightness ~= 1 then
+LightingService.Brightness = 1
+end
+if LightingService.Ambient ~= Color3.new(1, 1, 1) then
+LightingService.Ambient = Color3.new(1, 1, 1)
+end
+if LightingService.OutdoorAmbient ~= Color3.new(1, 1, 1) then
+LightingService.OutdoorAmbient = Color3.new(1, 1, 1)
+end
+if LightingService.ColorShift_Bottom ~= Color3.new(1, 1, 1) then
+LightingService.ColorShift_Bottom = Color3.new(1, 1, 1)
+end
+if LightingService.ColorShift_Top ~= Color3.new(1, 1, 1) then
+LightingService.ColorShift_Top = Color3.new(1, 1, 1)
+end
+end
+FullBrightToggle = Tabs.Visuals:Toggle({
+Title = "Full Bright",
+Flag = "FullBrightToggle",
+Desc = "Ya Like drinking Night Vision while mining in da cave and sceard of creeper blow you up dawg?",
+Value = false,
+Callback = function(state)
+if state then
+fbOriginal = {
+Brightness = LightingService.Brightness,
+Ambient = LightingService.Ambient,
+OutdoorAmbient = LightingService.OutdoorAmbient,
+ColorShift_Bottom = LightingService.ColorShift_Bottom,
+ColorShift_Top = LightingService.ColorShift_Top,
+}
+applyFullBright()
+if fbConnection then
+fbConnection:Disconnect()
+end
+-- FIX (FPS): Beta memakai Heartbeat TIAP FRAME; cukup 4x/detik (lighting jarang berubah tiap frame)
+fbConnection = HeartbeatLoop(0.25, applyFullBright)
+else
+if fbConnection then
+fbConnection:Disconnect()
+fbConnection = nil
+end
+if fbOriginal then
+pcall(function()
+LightingService.Brightness = fbOriginal.Brightness
+LightingService.Ambient = fbOriginal.Ambient
+LightingService.OutdoorAmbient = fbOriginal.OutdoorAmbient
+LightingService.ColorShift_Bottom = fbOriginal.ColorShift_Bottom
+LightingService.ColorShift_Top = fbOriginal.ColorShift_Top
+end)
+fbOriginal = nil
+end
+end
+end
+})
+end
+end)
+if ok_FB then
+        DaraSectionDone("FULL BRIGHT")
+else
+        DaraSectionFail("FULL BRIGHT", err_FB)
+end
+
+DaraSectionStart("REMOVE FOG")
+local ok_RF, err_RF = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): REMOVE FOG - port dari DaraHub BETA (tab Visuals).
+-- FogEnd dibesarkan + semua Atmosphere dihapus; saat OFF dikembalikan persis seperti semula.
+-- ============================================================
+Tabs.Visuals:Space()
+do
+local LightingService = game:GetService("Lighting")
+local fogOriginal = nil
+local savedAtmospheres = nil
+local fogAddedConnection = nil
+NoFogToggle = Tabs.Visuals:Toggle({
+Title = "Remove Fog",
+Flag = "NoFogToggle",
+Value = false,
+Callback = function(state)
+if state then
+fogOriginal = {
+FogEnd = LightingService.FogEnd,
+FogStart = LightingService.FogStart,
+FogColor = LightingService.FogColor,
+}
+savedAtmospheres = {}
+for _, v in pairs(LightingService:GetDescendants()) do
+if v:IsA("Atmosphere") then
+table.insert(savedAtmospheres, {
+Density = v.Density,
+Offset = v.Offset,
+Color = v.Color,
+Decay = v.Decay,
+Glare = v.Glare,
+Haze = v.Haze,
+})
+v:Destroy()
+end
+end
+LightingService.FogEnd = 1000000
+-- FIX (peningkatan dari Beta): game bisa menambah Atmosphere baru saat pindah map/round ->
+-- selama fitur ON, Atmosphere baru juga dihapus otomatis (koneksi dilepas saat OFF).
+fogAddedConnection = DaraTrackConn(LightingService.DescendantAdded:Connect(function(v)
+if v:IsA("Atmosphere") then
+task.defer(function()
+if v and v.Parent then
+v:Destroy()
+end
+end)
+end
+end))
+else
+if fogAddedConnection then
+fogAddedConnection:Disconnect()
+fogAddedConnection = nil
+end
+if fogOriginal then
+pcall(function()
+LightingService.FogEnd = fogOriginal.FogEnd
+LightingService.FogStart = fogOriginal.FogStart
+LightingService.FogColor = fogOriginal.FogColor
+end)
+fogOriginal = nil
+end
+if savedAtmospheres then
+for _, props in ipairs(savedAtmospheres) do
+pcall(function()
+local atm = Instance.new("Atmosphere")
+atm.Density = props.Density
+atm.Offset = props.Offset
+atm.Color = props.Color
+atm.Decay = props.Decay
+atm.Glare = props.Glare
+atm.Haze = props.Haze
+atm.Parent = LightingService
+end)
+end
+savedAtmospheres = nil
+end
+end
+end
+})
+end
+end)
+if ok_RF then
+        DaraSectionDone("REMOVE FOG")
+else
+        DaraSectionFail("REMOVE FOG", err_RF)
+end
+DaraSectionStart("TIMER GUI")
+local ok_TG, err_TG = pcall(function()
+
+
+
+local TimerGUI = nil
+local TimerEnabled = false
+local SpecialRoundEnabled = false
+local CurrentSpecialRoundName = ""
+local OriginalTimerVisible = false
+local CheckingGameTimer = false
+local _attributeConnection = nil
+local _attributeConnection2 = nil
+local _attributeConnection3 = nil
+local _gameTimerConnection = nil -- FIX: koneksi GameTimerCheck kini disimpan agar bisa di-disconnect bersih
+
+function createTimerGUI()
+-- FIX: template dicari bertahap FindFirstChild (path diindeks langsung = error bila struktur berubah)
+local _assetsF = ReplicatedStorage:FindFirstChild("Assets")
+local _uiF = _assetsF and _assetsF:FindFirstChild("UI")
+local _gameF = _uiF and _uiF:FindFirstChild("Game")
+local _hudF = _gameF and _gameF:FindFirstChild("HUD")
+local _overlayF = _hudF and _hudF:FindFirstChild("Overlay")
+local _roundOverlayF = _overlayF and _overlayF:FindFirstChild("RoundOverlay")
+local _roundTimerF = _roundOverlayF and _roundOverlayF:FindFirstChild("RoundTimer")
+local RoundTimerTemplate = _roundTimerF and _roundTimerF:FindFirstChild("RoundTimer")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TimerGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+local Timer = Instance.new("Frame")
+Timer.Name = "Timer"
+Timer.BackgroundTransparency = 1
+Timer.Size = UDim2.new(1, 0, 1, 0)
+Timer.Parent = ScreenGui
+
+local Top = Instance.new("Frame")
+Top.Name = "Top"
+Top.AnchorPoint = Vector2.new(0.5, 0)
+Top.BackgroundTransparency = 1
+Top.Position = UDim2.new(0.5, 0, 0, 0)
+Top.Size = UDim2.new(1, 0, 1, 0)
+Top.Parent = Timer
+
+local AspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+AspectRatioConstraint.Parent = Top
+
+local SizeConstraint = Instance.new("UISizeConstraint")
+SizeConstraint.MaxSize = Vector2.new(900, 900)
+SizeConstraint.Parent = Top
+
+local MainTimer
+if RoundTimerTemplate then
+MainTimer = RoundTimerTemplate:Clone()
+else
+-- FIX: template hilang = pakai Frame sendiri (Timer Display tetap jalan, tidak error)
+MainTimer = Instance.new("Frame")
+MainTimer.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
+MainTimer.BackgroundTransparency = 0.35
+end
+MainTimer.Name = "MainTimer"
+MainTimer.AnchorPoint = Vector2.new(0.5, 0)
+MainTimer.Position = UDim2.new(0.5, 0, 0.04, 0)
+MainTimer.Size = UDim2.new(0.25, 0, 0.1, 0)
+MainTimer.Parent = Top
+MainTimer.Visible = false
+
+local TimeDisplay = MainTimer:FindFirstChild("Timer")
+if not TimeDisplay then
+TimeDisplay = Instance.new("TextLabel")
+TimeDisplay.Name = "Timer"
+TimeDisplay.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+TimeDisplay.Text = "0:00"
+TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255)
+TimeDisplay.TextScaled = true
+TimeDisplay.TextSize = 14
+TimeDisplay.TextStrokeTransparency = 0.95
+TimeDisplay.TextWrapped = true
+TimeDisplay.AnchorPoint = Vector2.new(0.5, 0.5)
+TimeDisplay.BackgroundTransparency = 1
+TimeDisplay.Position = UDim2.new(0.5, 0, 0.65, 0)
+TimeDisplay.Size = UDim2.new(0.5, 0, 0.5, 0)
+TimeDisplay.ZIndex = 3
+TimeDisplay.Parent = MainTimer
+local TimeStroke = Instance.new("UIStroke")
+TimeStroke.Thickness = 3
+TimeStroke.Transparency = 0.7
+TimeStroke.Parent = TimeDisplay
+local TimeGradient = Instance.new("UIGradient")
+TimeGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 194, 194))
+})
+TimeGradient.Rotation = 90
+TimeGradient.Parent = TimeDisplay
+end
+
+local StatusLabel = MainTimer:FindFirstChild("About")
+if not StatusLabel then
+StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "About"
+StatusLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+StatusLabel.Text = "ROUND ACTIVE"
+StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255)
+StatusLabel.TextScaled = true
+StatusLabel.TextSize = 14
+StatusLabel.TextStrokeTransparency = 0.95
+StatusLabel.TextWrapped = true
+StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0.5, 0, 0.25, 0)
+StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0)
+StatusLabel.ZIndex = 3
+StatusLabel.Parent = MainTimer
+local StatusStroke = Instance.new("UIStroke")
+StatusStroke.Thickness = 2
+StatusStroke.Transparency = 0.7
+StatusStroke.Parent = StatusLabel
+local StatusGradient = Instance.new("UIGradient")
+StatusGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 194, 194))
+})
+StatusGradient.Rotation = 90
+StatusGradient.Parent = StatusLabel
+end
+
+local MainTimerStroke = MainTimer:FindFirstChildOfClass("UIStroke")
+if not MainTimerStroke then
+MainTimerStroke = Instance.new("UIStroke")
+MainTimerStroke.Transparency = 0.8
+MainTimerStroke.Parent = MainTimer
+end
+
+local MainTimerImage = MainTimer:FindFirstChildOfClass("ImageLabel")
+if not MainTimerImage then
+MainTimerImage = Instance.new("ImageLabel")
+MainTimerImage.Name = "Background"
+MainTimerImage.Image = "rbxassetid://196969716"
+MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21)
+MainTimerImage.ImageTransparency = 0.7
+MainTimerImage.AnchorPoint = Vector2.new(0.5, 0.5)
+MainTimerImage.BackgroundTransparency = 1
+MainTimerImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainTimerImage.Size = UDim2.new(1, 0, 1, 0)
+MainTimerImage.ZIndex = 0
+MainTimerImage.Parent = MainTimer
+local MainTimerImageCorner = Instance.new("UICorner")
+MainTimerImageCorner.CornerRadius = UDim.new(0, 4)
+MainTimerImageCorner.Parent = MainTimerImage
+end
+
+local SpecialRound = Instance.new("Frame")
+SpecialRound.Name = "SpecialRound"
+SpecialRound.AnchorPoint = Vector2.new(0.5, 0)
+SpecialRound.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+SpecialRound.BackgroundTransparency = 0.6
+SpecialRound.BorderSizePixel = 0
+SpecialRound.Position = UDim2.new(0.5, 0, 0.15, 0)
+SpecialRound.Size = UDim2.new(0.23, 0, 0.05, 0)
+SpecialRound.Parent = Top
+SpecialRound.Visible = false
+
+local SpecialRoundLabel = Instance.new("TextLabel")
+SpecialRoundLabel.Name = "Label"
+SpecialRoundLabel.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+SpecialRoundLabel.Text = "No Data"
+SpecialRoundLabel.TextColor3 = Color3.fromRGB(255, 208, 115)
+SpecialRoundLabel.TextScaled = true
+SpecialRoundLabel.TextSize = 14
+SpecialRoundLabel.TextStrokeTransparency = 0.95
+SpecialRoundLabel.TextWrapped = true
+SpecialRoundLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+SpecialRoundLabel.BackgroundTransparency = 1
+SpecialRoundLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+SpecialRoundLabel.Size = UDim2.new(0.9, 0, 0.6, 0)
+SpecialRoundLabel.ZIndex = 3
+SpecialRoundLabel.Parent = SpecialRound
+
+local SpecialRoundStroke = Instance.new("UIStroke")
+SpecialRoundStroke.Thickness = 2
+SpecialRoundStroke.Transparency = 0.7
+SpecialRoundStroke.Parent = SpecialRoundLabel
+
+local SpecialRoundEmptyFrame = Instance.new("Frame")
+SpecialRoundEmptyFrame.AnchorPoint = Vector2.new(0, 0.5)
+SpecialRoundEmptyFrame.BackgroundTransparency = 1
+SpecialRoundEmptyFrame.Position = UDim2.new(0.775, 0, 0.6, 0)
+SpecialRoundEmptyFrame.Size = UDim2.new(0.225, 0, 0.45, 0)
+SpecialRoundEmptyFrame.Parent = SpecialRound
+
+local SpecialRoundListLayout = Instance.new("UIListLayout")
+SpecialRoundListLayout.FillDirection = Enum.FillDirection.Horizontal
+SpecialRoundListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+SpecialRoundListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SpecialRoundListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+SpecialRoundListLayout.Parent = SpecialRoundEmptyFrame
+
+local SpecialRoundCorner = Instance.new("UICorner")
+SpecialRoundCorner.CornerRadius = UDim.new(0, 4)
+SpecialRoundCorner.Parent = SpecialRound
+
+local SpecialRoundBackground = Instance.new("ImageLabel")
+SpecialRoundBackground.Name = "Background"
+SpecialRoundBackground.Image = "rbxassetid://196969716"
+SpecialRoundBackground.ImageColor3 = Color3.fromRGB(21, 21, 21)
+SpecialRoundBackground.ImageTransparency = 0.7
+SpecialRoundBackground.AnchorPoint = Vector2.new(0.5, 0.5)
+SpecialRoundBackground.BackgroundTransparency = 1
+SpecialRoundBackground.Position = UDim2.new(0.5, 0, 0.5, 0)
+SpecialRoundBackground.Size = UDim2.new(1, 0, 1, 0)
+SpecialRoundBackground.ZIndex = 0
+SpecialRoundBackground.Parent = SpecialRound
+
+local SpecialRoundBackgroundCorner = Instance.new("UICorner")
+SpecialRoundBackgroundCorner.CornerRadius = UDim.new(0, 4)
+SpecialRoundBackgroundCorner.Parent = SpecialRoundBackground
+
+local SpecialRoundUIStroke = Instance.new("UIStroke")
+SpecialRoundUIStroke.Transparency = 0.8
+SpecialRoundUIStroke.Parent = SpecialRound
+
+return {
+ScreenGui = ScreenGui,
+TimeDisplay = TimeDisplay,
+SpecialRoundLabel = SpecialRoundLabel,
+StatusLabel = StatusLabel,
+MainTimer = MainTimer,
+SpecialRound = SpecialRound,
+MainTimerStroke = MainTimerStroke,
+MainTimerImage = MainTimerImage
+}
+end
+
+function destroyTimerGUI()
+if TimerGUI then
+StopGameTimerCheck()
+StopAttributeMonitor()
+TimerGUI.ScreenGui:Destroy()
+TimerGUI = nil
+end
+TimerEnabled = false
+SpecialRoundEnabled = false
+end
+
+function ensureTimerGUI()
+if not TimerGUI then
+TimerGUI = createTimerGUI()
+end
+end
+
+function GetRoundTitle(roundName)
+if not roundName or roundName == "" then
+return ""
+end
+
+local specialRoundsFolder = ReplicatedStorage:FindFirstChild("Info")
+if not specialRoundsFolder then return roundName end
+
+specialRoundsFolder = specialRoundsFolder:FindFirstChild("SpecialRounds")
+if not specialRoundsFolder then return roundName end
+
+local roundModule = specialRoundsFolder:FindFirstChild(roundName)
+if not roundModule then return roundName end
+
+local success, moduleData = pcall(function()
+return require(roundModule)
+end)
+
+if success and moduleData and moduleData.Title then
+return moduleData.Title
+end
+
+return roundName
+end
+
+function SetTime(seconds)
+if not TimerGUI then return end
+if type(seconds) == "number" then
+local minutes = math.floor(seconds / 60)
+local remainingSeconds = math.floor(seconds % 60)
+TimerGUI.TimeDisplay.Text = string.format("%d:%02d", minutes, remainingSeconds)
+
+if seconds <= 5 then
+TimerGUI.TimeDisplay.TextColor3 = Color3.fromRGB(215, 100, 100)
+TimerGUI.StatusLabel.TextColor3 = Color3.fromRGB(215, 100, 100)
+if TimerGUI.MainTimerStroke then
+TimerGUI.MainTimerStroke.Color = Color3.fromRGB(255, 138, 138)
+end
+if TimerGUI.MainTimerImage then
+TimerGUI.MainTimerImage.ImageColor3 = Color3.fromRGB(255, 138, 138)
+end
+else
+TimerGUI.TimeDisplay.TextColor3 = Color3.fromRGB(165, 194, 255)
+TimerGUI.StatusLabel.TextColor3 = Color3.fromRGB(165, 194, 255)
+if TimerGUI.MainTimerStroke then
+TimerGUI.MainTimerStroke.Color = Color3.fromRGB(165, 194, 255)
+end
+if TimerGUI.MainTimerImage then
+TimerGUI.MainTimerImage.ImageColor3 = Color3.fromRGB(21, 21, 21)
+end
+end
+else
+TimerGUI.TimeDisplay.Text = tostring(seconds)
+end
+end
+
+function SetSpecialRound(roundName)
+if not TimerGUI then return end
+if roundName and roundName ~= "" then
+CurrentSpecialRoundName = roundName
+local roundTitle = GetRoundTitle(roundName)
+TimerGUI.SpecialRoundLabel.Text = roundTitle
+TimerGUI.SpecialRound.Visible = SpecialRoundEnabled
+else
+CurrentSpecialRoundName = ""
+TimerGUI.SpecialRound.Visible = false
+end
+end
+
+function SetStatus(text)
+if not TimerGUI then return end
+TimerGUI.StatusLabel.Text = text:upper()
+end
+
+function SetTimerVisible(visible)
+TimerEnabled = visible
+OriginalTimerVisible = visible
+
+if CheckingGameTimer then
+CheckGameTimerVisibility()
+else
+if TimerGUI then
+TimerGUI.MainTimer.Visible = visible
+end
+end
+end
+
+function SetSpecialRoundVisible(visible)
+SpecialRoundEnabled = visible
+
+if TimerGUI and visible and CurrentSpecialRoundName ~= "" then
+TimerGUI.SpecialRound.Visible = true
+elseif TimerGUI then
+TimerGUI.SpecialRound.Visible = false
+end
+end
+
+function CheckGameTimerVisibility()
+if not TimerEnabled or not TimerGUI then
+if TimerGUI then TimerGUI.MainTimer.Visible = false end
+return
+end
+
+local hud = PlayerGui:FindFirstChild("Shared")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("HUD")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Overlay")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Default")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("RoundOverlay")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+hud = hud:FindFirstChild("Round")
+if not hud then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+local roundTimer = hud:FindFirstChild("RoundTimer")
+if not roundTimer then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+return
+end
+
+if roundTimer.Visible then
+TimerGUI.MainTimer.Visible = false
+else
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+end
+end
+
+function StartGameTimerCheck()
+if CheckingGameTimer then return end
+
+CheckingGameTimer = true
+-- FIX: versi Ringkas memakai spawn()+wait() deprecated (wait dibatasi Roblox & tidak bisa dibatalkan
+-- dengan bersih) -> kini Heartbeat + throttle 0.1s + koneksi disimpan (persis DaraHub BETA) + pcall.
+-- FIX v1.6.0: koneksi didaftarkan ke registry global (re-execute memutus koneksi Timer lama).
+local last = 0
+_gameTimerConnection = DaraTrackConn(RunService.Heartbeat:Connect(function()
+local now = os.clock()
+if now - last < 0.1 then
+return
+end
+last = now
+pcall(CheckGameTimerVisibility)
+end))
+end
+
+function StopGameTimerCheck()
+CheckingGameTimer = false
+if _gameTimerConnection then
+_gameTimerConnection:Disconnect()
+_gameTimerConnection = nil
+end
+if TimerGUI then
+TimerGUI.MainTimer.Visible = OriginalTimerVisible
+end
+end
+
+function UpdateFromAttributes()
+-- FIX error spam: akses Registry dibungkus pcall + guard (service nil/berubah path
+-- tidak lagi error tiap frame -> FPS drop). Bug `roundStatus == 1 or 0` (selalu true) juga diperbaiki.
+local okReg, reg = pcall(function()
+return ServerStateRegistryService and ServerStateRegistryService.Registry
+end)
+if not okReg or not reg then
+return
+end
+local timerValue = reg.Time
+local specialRoundValue = reg.SpecialRound
+local roundStatus = reg.RoundStatus
+
+if timerValue and timerValue ~= -1 then
+SetTime(timerValue)
+end
+
+if roundStatus == 2 then
+SetStatus("Round Active")
+-- FIX BUG LOGIKA: dulu `elseif roundStatus == 1 or 0 then` - 0 dianggap truthy di Lua
+-- sehingga kondisi SELALU benar dan status tidak pernah selain Round Active/Intermission.
+elseif roundStatus == 1 or roundStatus == 0 then
+SetStatus("Intermission")
+else
+SetStatus("nil")
+end
+
+if specialRoundValue and specialRoundValue ~= false then
+SetSpecialRound(tostring(specialRoundValue))
+else
+SetSpecialRound("")
+end
+end
+
+function StartAttributeMonitor()
+StopAttributeMonitor()
+
+-- FIX error spam: pembacaan awal Registry dibungkus pcall; bila registry tidak tersedia,
+-- monitor tidak dinyalakan (warn sekali) - tidak ada lagi error tiap frame.
+-- FIX v1.6.0 (FPS): fungsi pembaca registry di-hoist SEKALI di sini - versi lama membuat
+-- closure baru TIAP FRAME di dalam Heartbeat (alokasi terus-menerus -> sampah GC -> frame
+-- patah-patah saat Timer Display menyala; kamera ikut terasa kaku).
+local okReg, reg = pcall(function()
+return ServerStateRegistryService and ServerStateRegistryService.Registry
+end)
+if not okReg or not reg then
+warn("[JoblessHub] ServerStateRegistryService.Registry tidak tersedia - Timer Display tidak bisa membaca data round")
+return
+end
+local lastTimer = reg.Time
+local lastRoundStatus = reg.RoundStatus
+local lastSpecialRound = reg.SpecialRound
+local function readRegistry()
+local r = ServerStateRegistryService and ServerStateRegistryService.Registry
+return r, r and r.Time, r and r.RoundStatus, r and r.SpecialRound
+end
+_attributeConnection = DaraTrackConn(RunService.Heartbeat:Connect(function()
+local okNow, currentTimer, currentRoundStatus, currentSpecialRound = pcall(readRegistry)
+if not okNow then
+return
+end
+if currentTimer ~= lastTimer or currentRoundStatus ~= lastRoundStatus or currentSpecialRound ~= lastSpecialRound then
+lastTimer = currentTimer
+lastRoundStatus = currentRoundStatus
+lastSpecialRound = currentSpecialRound
+pcall(UpdateFromAttributes)
+end
+end))
+
+UpdateFromAttributes()
+end
+
+
+
+function StopAttributeMonitor()
+if _attributeConnection then
+_attributeConnection:Disconnect()
+_attributeConnection = nil
+end
+if _attributeConnection2 then
+_attributeConnection2:Disconnect()
+_attributeConnection2 = nil
+end
+if _attributeConnection3 then
+_attributeConnection3:Disconnect()
+_attributeConnection3 = nil
+end
+end
+
+function handleTimerToggles()
+local timerOn = TimerEnabled
+local specialOn = SpecialRoundEnabled
+
+if not timerOn and not specialOn then
+destroyTimerGUI()
+else
+ensureTimerGUI()
+if timerOn then
+SetTimerVisible(true)
+StartAttributeMonitor()
+StartGameTimerCheck()
+end
+if specialOn then
+SetSpecialRoundVisible(true)
+end
+end
+end
+Tabs.Visuals:Space()
+TimerDisplayToggle = Tabs.Visuals:Toggle({
+Title = "Timer Display",
+Flag = "TimerDisplayToggle",
+Value = false,
+Callback = function(state)
+TimerEnabled = state
+handleTimerToggles()
+end
+})
+Tabs.Visuals:Space()
+
+SpecialRoundToggle = Tabs.Visuals:Toggle({
+Title = "Special Round Display",
+Flag = "SpecialRoundToggle",
+Value = false,
+Callback = function(state)
+SpecialRoundEnabled = state
+handleTimerToggles()
+end
+})
+-- FIX v1.4.3: dibungkus pcall (baris telanjang di ujung section yang tidak dibungkus)
+pcall(function() Tabs.Visuals:Space() end)
+end)
+if ok_TG then
+DaraSectionDone("TIMER GUI")
+else
+DaraSectionFail("TIMER GUI", err_TG)
+end
+DaraSectionStart("VISUALS: STATS/DEATHFEED/COLA")
+local ok_VS, err_VS = pcall(function()
+-- ============================================================
+-- SHOW PLAYER STATS (UPDATE BETA) - ditulis ulang mengikuti DaraHub BETA.
+-- Game versi terbaru memindahkan UserData ke Client.Services.UserData dan menghapus
+-- ClientHooks, sehingga HUD stats custom lama (useCurrency/useProgression/useEvent)
+-- kehilangan sumber data. Pendekatan baru: MIRROR (klon + sinkron realtime) dari GUI
+-- stats asli game di PlayerGui.HomePage.Root.Bottom - datanya selalu persis seperti
+-- yang ditampilkan game, apa pun struktur datanya, dan tetap terlihat saat HomePage
+-- tertutup maupun sedang bermain.
+-- ============================================================
+do
+local SYNC_PROPERTIES = {
+"Text", "TextColor3", "TextTransparency", "TextStrokeColor3", "TextStrokeTransparency",
+"Image", "ImageColor3", "ImageTransparency", "ImageRectOffset", "ImageRectSize",
+"BackgroundColor3", "BackgroundTransparency",
+"Visible", "Size", "Position", "AnchorPoint", "Rotation", "ZIndex", "LayoutOrder",
+}
+
+local mirrorEnabled = false
+local mirrorGui = nil
+local sourceScope = nil
+local mirrorScope = nil
+local connections = {}
+local watched = setmetatable({}, { __mode = "k" })
+local mirrorToken = 0
+
+-- FIX: WaitForChild diberi timeout + cek nil agar tidak ada thread menggantung
+-- selamanya bila GUI HomePage belum ada (map lambat load / struktur berubah lagi)
+local function waitForChild(parent, name, timeout)
+local existing = parent:FindFirstChild(name)
+if existing then
+return existing
+end
+local ok, result = pcall(function()
+return parent:WaitForChild(name, timeout or 15)
+end)
+return ok and result or nil
+end
+
+local function getPath(instance, scope)
+local names = {}
+local current = instance
+while current and current ~= scope do
+table.insert(names, 1, current.Name)
+current = current.Parent
+end
+if current ~= scope then
+return nil
+end
+return names
+end
+
+local function findMirror(instance)
+if not instance or not sourceScope or not mirrorScope then
+return nil
+end
+local path = getPath(instance, sourceScope)
+if not path then
+return nil
+end
+local node = mirrorScope
+for _, name in ipairs(path) do
+node = node:FindFirstChild(name)
+if not node then
+return nil
+end
+end
+return node
+end
+
+local function syncProperty(source, property)
+local target = findMirror(source)
+if target then
+pcall(function()
+local value = source[property]
+-- elemen yang disembunyikan game tetap ditampilkan di mirror
+if property == "Visible" and value == false then
+value = true
+end
+target[property] = value
+end)
+end
+end
+
+local function watchInstance(instance)
+if watched[instance] or not instance:IsA("GuiObject") then
+return
+end
+watched[instance] = true
+for _, property in ipairs(SYNC_PROPERTIES) do
+local ok, signal = pcall(function()
+return instance:GetPropertyChangedSignal(property)
+end)
+if ok and signal then
+table.insert(connections, DaraTrackConn(signal:Connect(function()
+syncProperty(instance, property)
+end)))
+end
+end
+end
+
+local function watchTree(root)
+watchInstance(root)
+for _, descendant in ipairs(root:GetDescendants()) do
+watchInstance(descendant)
+end
+end
+
+local function cleanMirror(root)
+local function clean(instance)
+if instance.Name == "Plus" then
+instance:Destroy()
+return
+end
+if instance:IsA("GuiObject") and not instance.Visible then
+instance.Visible = true
+end
+end
+clean(root)
+for _, descendant in ipairs(root:GetDescendants()) do
+clean(descendant)
+end
+end
+
+local function reconcileVisibility()
+if not mirrorGui then
+return
+end
+for _, descendant in ipairs(mirrorGui:GetDescendants()) do
+if descendant:IsA("GuiObject") and not descendant.Visible then
+descendant.Visible = true
+end
+end
+end
+
+local function stopMirror()
+mirrorToken = mirrorToken + 1
+for _, connection in ipairs(connections) do
+pcall(function() connection:Disconnect() end)
+end
+table.clear(connections)
+if mirrorGui then
+pcall(function() mirrorGui:Destroy() end)
+end
+mirrorGui, sourceScope, mirrorScope = nil, nil, nil
+end
+
+local startMirror
+local function enableMirror()
+mirrorEnabled = true
+task.spawn(function()
+local ok, err = pcall(startMirror)
+if not ok then
+warn("[JoblessHub] Player stats mirror gagal: " .. tostring(err))
+end
+end)
+end
+
+function startMirror()
+stopMirror()
+mirrorToken = mirrorToken + 1
+local myToken = mirrorToken
+local playerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+local homePage = waitForChild(playerGui, "HomePage", 20)
+if not homePage then
+warn("[JoblessHub] PlayerGui.HomePage tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+local root = waitForChild(homePage, "Root", 15)
+if not root then
+warn("[JoblessHub] HomePage.Root tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+local bottom = waitForChild(root, "Bottom", 15)
+if not bottom then
+warn("[JoblessHub] HomePage.Root.Bottom tidak ditemukan - Show Player Stats tidak tersedia")
+return
+end
+
+mirrorGui = Instance.new("ScreenGui")
+mirrorGui.Name = "PlayerStats"
+mirrorGui.ResetOnSpawn = false
+mirrorGui.IgnoreGuiInset = false
+mirrorGui.Parent = playerGui
+
+table.insert(connections, DaraTrackConn(mirrorGui.AncestryChanged:Connect(function(_, parent)
+if not parent and mirrorEnabled then
+-- mirror dihapus game/died -> bangun ulang otomatis
+task.defer(enableMirror)
+end
+end)))
+
+local container = Instance.new("Frame")
+container.Name = "BottomContainer"
+container.Size = UDim2.new(1, 0, 1, 0)
+container.BackgroundTransparency = 1
+container.BorderSizePixel = 0
+container.Parent = mirrorGui
+
+local bottomClone = bottom:Clone()
+bottomClone.Parent = container
+
+sourceScope = bottom
+mirrorScope = bottomClone
+
+watchTree(sourceScope)
+cleanMirror(bottomClone)
+
+table.insert(connections, DaraTrackConn(sourceScope.DescendantAdded:Connect(function(descendant)
+watchTree(descendant)
+if descendant.Name == "Plus" then
+return
+end
+if findMirror(descendant) then
+return
+end
+local parentMirror = findMirror(descendant.Parent)
+if parentMirror then
+local ok, copy = pcall(function()
+return descendant:Clone()
+end)
+if ok and copy then
+copy.Parent = parentMirror
+cleanMirror(copy)
+end
+end
+end)))
+
+table.insert(connections, DaraTrackConn(sourceScope.DescendantRemoving:Connect(function(descendant)
+local target = findMirror(descendant)
+if target then
+pcall(function() target:Destroy() end)
+end
+end)))
+
+table.insert(connections, DaraTrackConn(sourceScope.AncestryChanged:Connect(function(_, parent)
+if not parent and mirrorEnabled then
+task.defer(enableMirror)
+end
+end)))
+
+-- FIX v1.6.0: thread mirror didaftarkan ke registry global - eksekusi ulang membatalkan
+-- loop rekonsiliasi lama (dulu menumpuk 4x/detik per eksekusi sebelumnya).
+DaraTrackThread(task.spawn(function()
+while mirrorEnabled and myToken == mirrorToken do
+pcall(reconcileVisibility)
+task.wait(0.25)
+end
+end))
+end
+
+PlayerStatsToggle = Tabs.Visuals:Toggle({
+Title = "Show Player Stats",
+Flag = "PlayerStatsToggle",
+Value = false,
+Callback = function(state)
+if state then
+enableMirror()
+else
+mirrorEnabled = false
+stopMirror()
+end
+end
+})
+end
+
+
+do
+Tabs.Visuals:Space()
+local _originals = {
+Set = nil,
+CharacterDiedSimple = nil
+}
+
+function ForceDeathFeed()
+if _originals.Set then return end
+
+_originals.Set = DeathFeed.Set
+_originals.CharacterDiedSimple = DeathFeed.CharacterDiedSimple
+DeathFeed.Set = function(self, eventType, data)
+if eventType == "Death" then
+self:CharacterDied(data)
+else
+_originals.Set(self, eventType, data)
+end
+end
+DeathFeed.CharacterDiedSimple = function(self, data)
+return self:CharacterDied(data)
+end
+end
+
+function RestoreOldDeathFeed()
+if not _originals.Set then return end
+
+DeathFeed.Set = _originals.Set
+DeathFeed.CharacterDiedSimple = _originals.CharacterDiedSimple
+
+_originals.Set = nil
+_originals.CharacterDiedSimple = nil
+end
+Tabs.Visuals:Toggle({
+Title = "Always Show Death Feed",
+Callback = function(s)
+if s then ForceDeathFeed() else RestoreOldDeathFeed() end
+end
+})
+end
+
+Tabs.Visuals:Space()
+Tabs.Visuals:Section({ Title = "Cola", TextSize = 20 })
+
+-- ADD: semua fitur Cola - port dari file asli (tab Visuals).
+-- Cara kerja: hook metatable __namecall sehingga setiap kali pemain memakai Cola (ToolAction:FireServer),
+-- efeknya digantikan versi kustom (unlimited / durasi & speed boost) sepenuhnya client-side.
+-- Butuh executor dengan hookfunction + getrawmetatable + newcclosure + buffer.
+do
+local ColaModule = safeRequire(ReplicatedStorage.Tools.Cola, "Cola")
+
+if hookfunction and getrawmetatable and newcclosure and ToolAction and buffer
+and type(ColaModule) == "table" and ColaModule.Tasks
+and ColaModule.Tasks[1] and ColaModule.Tasks[1].AutomaticFunctions
+and ColaModule.Tasks[1].AutomaticFunctions[2] and ColaModule.Tasks[1].AutomaticFunctions[2].Methods
+and ColaModule.Tasks[1].AutomaticFunctions[2].Methods[1] then
+
+local okInfo, info = pcall(function()
+return ColaModule.Tasks[1].AutomaticFunctions[2].Methods[1].Info
+end)
+
+if okInfo and type(info) == "table" then
+local endlessColaEnabled = false
+local modifyColaEnabled = false
+
+local customDuration = tonumber(info.Duration) or 10
+local customSpeedBoost = tonumber(info.SpeedBoost) or 15
+
+local function ColaVignette()
+local duration = modifyColaEnabled and customDuration or info.Duration
+
+SafeFireEvent(ReplicatedStorage.Events, "SharedUISetType", "Vignette", info.Color, duration, true)
+end
+
+local function ColaSpeedBoost(Type)
+local character = LocalPlayer.Character
+if character then
+local tag = character:GetAttribute("Tag")
+if tag then
+local speed = modifyColaEnabled and customSpeedBoost or info.SpeedBoost
+local duration = modifyColaEnabled and customDuration or info.Duration
+
+SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", tag, "Movement", {SpeedChange = {Value = speed, Type = Type or "Cola", Length = duration}})
+end
+end
+end
+
+local gmt = getrawmetatable(game)
+local oldNamecall = gmt.__namecall
+local isColaHooked = false
+
+local function applyColaHook()
+if isColaHooked then return end
+
+setreadonly(gmt, false)
+local okHook, hookErr = pcall(function()
+gmt.__namecall = newcclosure(function(self, ...)
+local method = getnamecallmethod()
+local args = {...}
+
+-- FIX (UI hang): hook __namecall berjalan DI THREAD pemanggil. Semua interaksi UI game asli
+-- (leaderboard, zoom, ganti POV depan/belakang, boombox, drop/lepaskan item) mengirim remote
+-- lewat FireServer yang sama sehingga ikut melewati hook ini. Kode asli menjalankan efek Cola
+-- SINKRON di dalam hook (termasuk task.wait() dan FireClient/getconnections yang bisa yield),
+-- sehingga thread pemanggil ikut tertahan -> tombol UI game terasa delay/macet dan boombox
+-- tidak jalan. Perbaikan: (1) logika intersepsi dibungkus pcall agar error apapun TIDAK
+-- merambat ke thread game (remote diteruskan apa adanya), (2) seluruh efek Cola dipindah ke
+-- task.spawn sehingga hook langsung return dan tidak pernah yield di thread pemanggil.
+local eatRemote = false
+if method == "FireServer" or method == "fireServer" then
+local okInt = pcall(function()
+if self == ToolAction then
+for i, v in ipairs(args) do
+if typeof(v) == "buffer" then
+local content = buffer.tostring(v)
+if content == "\1\1\1" and endlessColaEnabled then
+eatRemote = true
+end
+if content == "\1\2\1" and (endlessColaEnabled or modifyColaEnabled) then
+eatRemote = true
+task.spawn(function()
+if endlessColaEnabled then
+ColaSpeedBoost()
+task.wait()
+ColaVignette()
+else
+ColaSpeedBoost("FakeCola")
+ColaVignette()
+end
+end)
+end
+break
+end
+end
+end
+end)
+
+if okInt and eatRemote then
+return
+end
+end
+
+return oldNamecall(self, ...)
+end)
+end)
+pcall(function()
+setreadonly(gmt, true)
+end)
+
+if okHook then
+isColaHooked = true
+else
+warn("[JoblessHub] Gagal memasang hook Cola: " .. tostring(hookErr))
+end
+end
+
+local function removeColaHook()
+if not isColaHooked then return end
+
+pcall(function()
+setreadonly(gmt, false)
+gmt.__namecall = oldNamecall
+setreadonly(gmt, true)
+end)
+
+isColaHooked = false
+end
+
+local function checkColaHookStatus()
+if endlessColaEnabled or modifyColaEnabled then
+applyColaHook()
+else
+removeColaHook()
+end
+end
+
+Tabs.Visuals:Toggle({
+Title = "Visuals Endless Cola",
+Desc = "Gives you unlimited cola client-side while blocking server animation",
+Callback = function(state)
+endlessColaEnabled = state
+checkColaHookStatus()
+end
+})
+
+Tabs.Visuals:Toggle({
+Title = "Cola Booster",
+Desc = "Ganti efek cola versi kustom (FakeCola) memakai nilai Duration & Speed Boost di bawah",
+Callback = function(state)
+modifyColaEnabled = state
+checkColaHookStatus()
+end
+})
+
+Tabs.Visuals:Input({
+Title = "Cola Duration Boost",
+Value = tostring(customDuration),
+Callback = function(v)
+local num = tonumber(v)
+if num then
+customDuration = num
+end
+end
+})
+
+Tabs.Visuals:Input({
+Title = "Cola Speed Boost",
+Value = tostring(customSpeedBoost),
+Callback = function(v)
+local num = tonumber(v)
+if num then
+customSpeedBoost = num
+end
+end
+})
+else
+warn("[JoblessHub] Struktur module Cola berubah (Info tidak ditemukan) - fitur Cola dinonaktifkan")
+Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
+end
+else
+warn("[JoblessHub] Fitur Cola butuh hookfunction/getrawmetatable/newcclosure/buffer + Events.ToolAction + Tools.Cola")
+Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
+end
+end
+
+end)
+if ok_VS then
+DaraSectionDone("VISUALS: STATS/DEATHFEED/COLA")
+else
+DaraSectionFail("VISUALS: STATS/DEATHFEED/COLA", err_VS)
+end
+DaraSectionStart("TAB UTILITY")
+local ok_TU, err_TU = pcall(function()
+-- ================= TAB UTILITY =================
+Tabs.Utility:Toggle({
+Title = "Invis Walls Collide",
+Value = true,
+Callback = function(state)
+local invisPartsFolder = workspace:FindFirstChild("Map")
+if invisPartsFolder then
+invisPartsFolder = invisPartsFolder:FindFirstChild("InvisParts")
+end
+
+if not invisPartsFolder then
+invisPartsFolder = workspace:FindFirstChild("Game")
+if invisPartsFolder then
+invisPartsFolder = invisPartsFolder:FindFirstChild("Map")
+if invisPartsFolder then
+invisPartsFolder = invisPartsFolder:FindFirstChild("InvisParts")
+end
+end
+end
+
+if invisPartsFolder then
+for _, obj in ipairs(invisPartsFolder:GetDescendants()) do
+if obj:IsA("BasePart") then
+obj.CanCollide = state
+end
+end
+else
+WindUI:Notify({
+Title = "Error",
+Content = "InvisParts folder not found",
+Duration = 3
+})
+warn("InvisParts folder not found")
+end
+end
+})
+-- ============================================================
+-- LAG SWITCH - 5 mode: CPU Cycle & OS.ClockFFlag (original Dara Hub),
+-- Normal / FastFlag (Phantomwrym Overhaul, port verbatim),
+-- Demon (basis versi PC Phantomwrym + perbaikan hitbox, lihat catatan menjelang akhir lag()).
+-- Cara pakai: aktifkan toggle "Lag Switch" -> tombol "Lag Switch" muncul di layar -> tap tombolnya untuk lag.
+-- Catatan: CPU Cycle / OS.ClockFFlag tetap bekerja saat diam; Normal / Demon / FastFlag butuh
+-- karakter sedang bergerak (kecepatan >= 1) karena memakai arah & kecepatan gerak.
+-- ============================================================
+Tabs.Utility:Section({ Title = "Lag Switch", TextSize = 20 })
+
+local lagSwitchEnabled = false
+local lagDuration = 0.5
+local lagMethod = "CPU Cycle"
+local demonDelayMS = 200
+local demonPowerMax = 10
+local demonLaunchTime = 0.1
+
+local CachedRayParams = RaycastParams.new()
+CachedRayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- FIX: setfflag tidak tersedia di semua executor -> pcall + warn agar penyebabnya terlihat
+local function safeSetFFlag(flag, value)
+local ok, err = pcall(function()
+setfflag(flag, value)
+end)
+if not ok then
+warn("[JoblessHub] setfflag('" .. tostring(flag) .. "') gagal: " .. tostring(err))
+end
+return ok
+end
+
+-- FIX (Task 23): PENYEBAB "render PC tiba-tiba acak (pendek/jauh), sering terpotong, dan lag":
+-- FFlag engine 'MaxMissedWorldStepsRemembered' yang dipakai mode Lag Switch tidak pernah
+-- dikembalikan ke nilai asli setelah lag selesai. Nilai besar (9999 / 10000001000000) menempel
+-- SELAMANYA sehingga engine terus mengingat & memproses world step yang terlewat: render dunia
+-- jadi acak, jarak pandang tidak menentu, sering terpotong, dan lag menetap sampai rejoin.
+-- Kini nilai asli dibaca sekali via getfflag (fallback "1") dan DIKEMBALIKAN otomatis setiap
+-- selesai lag di semua mode yang menyentuh FFlag ini (restore hanya dilakukan bila set berhasil).
+local LAG_FFLAG = "MaxMissedWorldStepsRemembered"
+local lagFFlagOriginal = nil
+local lagFFlagSet = false
+
+local function captureLagFFlagOriginal()
+if lagFFlagOriginal ~= nil then return end
+if type(getfflag) == "function" then
+local ok, val = pcall(getfflag, LAG_FFLAG)
+if ok and type(val) == "string" and val ~= "" then
+lagFFlagOriginal = val
+return
+end
+end
+lagFFlagOriginal = "1"
+end
+
+local function setLagFFlag(value)
+captureLagFFlagOriginal()
+if safeSetFFlag(LAG_FFLAG, value) then
+lagFFlagSet = true
+end
+end
+
+local function restoreLagFFlag()
+if not lagFFlagSet then return end
+lagFFlagSet = false
+safeSetFFlag(LAG_FFLAG, lagFFlagOriginal or "1")
+lagFFlagOriginal = nil
+end
+
+local function lag()
+local method = lagMethod or "CPU Cycle"
+
+-- Mode 1: CPU Cycle (original Dara Hub) - bekukan thread dengan busy-loop angka acak
+if method == "CPU Cycle" then
+-- FIX (Task 23): simpan nilai asli sebelum diubah, kembalikan setelah loop selesai
+setLagFFlag("1")
+local start = tick()
+while tick() - start < lagDuration do
+local a = math.random(1, 1000000) * math.random(1, 1000000)
+a = a / math.random(1, 10000)
+end
+restoreLagFFlag()
+return
+
+-- Mode 2: OS.ClockFFlag (original Dara Hub) - busy-loop os.clock + FFlag agresif
+elseif method == "OS.ClockFFlag" then
+-- FIX (Task 23): nilai besar 10000001000000 dulu MENETAP selamanya (render acak + lag);
+-- kini dikembalikan ke nilai asli segera setelah loop selesai
+setLagFFlag("10000001000000")
+local start = os.clock()
+while os.clock() - start < lagDuration do
+end
+restoreLagFFlag()
+return
+end
+
+-- ===== Mode 3-6: Normal / Demon / FastFlag / FFlag+Demon (Phantomwrym Overhaul, port verbatim) =====
+local ms = demonDelayMS
+-- ADD (Task 23): mode "FFlag+Demon" memakai timing Demon (Demon Delay ms di Demon Settings),
+-- bukan Lag Duration seperti mode Normal/FastFlag
+if method ~= "Demon" and method ~= "FFlag+Demon" then
+ms = (lagDuration or 0.5) * 1000
+end
+local LagTime = ms * 0.002
+
+local character = LocalPlayer.Character
+if not character then return end
+
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not hrp then return end
+
+local storedVelocity = hrp.AssemblyLinearVelocity
+if storedVelocity.Magnitude < 1 then return end
+
+local start = tick()
+while tick() - start < LagTime do end
+
+if method == "FastFlag" or LagTime < 0.2 then
+-- FIX (Task 23): FFlag 9999 kini dikembalikan ke nilai asli setelah dipakai
+setLagFFlag("9999")
+restoreLagFFlag()
+return
+end
+
+-- ADD (Task 23): mode "FFlag+Demon" (permintaan user) - gabungan metode FFlag + dash Demon:
+-- FFlag dipasang lalu DIKEMBALIKAN ke nilai asli, lalu lanjut ke dash Demon di bawah.
+if method == "FFlag+Demon" then
+setLagFFlag("9999")
+restoreLagFFlag()
+elseif method ~= "Demon" then
+return
+end
+
+CachedRayParams.FilterDescendantsInstances = {character}
+-- FIX: multiplier diambil dari versi PC (2-10); versi Mobile hanya 2-4 sehingga dash Demon kurang variatif.
+-- Nilai maksimal kini diatur lewat input "Demon Power (Multiplier)" di section Demon Settings (tab Utility).
+local multiplier = math.random(2, math.clamp(demonPowerMax, 2, 50))
+local horizontalVelocity = Vector3.new(storedVelocity.X, 0, storedVelocity.Z)
+local direction = horizontalVelocity.Magnitude > 0 and horizontalVelocity.Unit or hrp.CFrame.LookVector
+local distance = math.min(horizontalVelocity.Magnitude * LagTime * multiplier, 30)
+local forwardPos = hrp.Position + direction * distance
+local targetPos = forwardPos
+
+local forwardResult = workspace:Raycast(hrp.Position, forwardPos - hrp.Position, CachedRayParams)
+if forwardResult then
+targetPos = forwardResult.Position - direction * 2
+end
+
+-- FIX: titik asal ray dinaikkan 15 stud (panjang ray -60 -> -75 supaya jangkauan bawah tetap sama).
+-- Dengan hitbox normal, di dasar ramp curam permukaan tanjakan berada DI ATAS HRP, sehingga ray lama
+-- (sejajar HRP) malah mulai DI DALAM ramp dan tidak mengenai apa pun (ray Roblox tidak mengenai
+-- backface) -> kemiringan ramp tidak pernah terdeteksi. Versi Mobile lama tidak kena masalah ini
+-- karena hitbox raksasanya membuat HRP melayang tinggi sehingga ray selalu mulai di atas tanjakan.
+local function detectSlope(dir, dist)
+return workspace:Raycast(hrp.Position + dir * dist + Vector3.new(0, 15, 0), Vector3.new(0, -75, 0), CachedRayParams)
+end
+
+local longSlopeCheck = detectSlope(direction, 50)
+local shortSlopeCheck = nil
+
+for i = 2, 20, 2 do
+local result = detectSlope(direction, i)
+if result then
+shortSlopeCheck = result
+break
+end
+end
+
+local slopeLengthBoost, shortSlopeBoost = 1, 1
+local slopeDirBoost = 1
+local hoverBuffer = 0
+local slopeAngle = 0
+local earlyBounce = false
+
+if longSlopeCheck then
+local normal = longSlopeCheck.Normal
+slopeAngle = math.deg(math.acos(normal:Dot(Vector3.new(0, 1, 0))))
+if slopeAngle >= 20 and slopeAngle <= 80 then
+slopeLengthBoost = math.clamp(slopeAngle / 25, 1, 2.2)
+slopeDirBoost = math.clamp(slopeAngle / 40, 1, 2)
+hoverBuffer = math.clamp((slopeAngle - 20) * 0.06, 0, 3)
+if slopeAngle < 35 then
+targetPos = targetPos + Vector3.new(0, 3, 0) + direction * (2 * slopeDirBoost)
+else
+targetPos = targetPos + Vector3.new(0, slopeAngle * 0.3 + hoverBuffer, 0)
+end
+end
+end
+
+if shortSlopeCheck then
+local normal = shortSlopeCheck.Normal
+slopeAngle = math.deg(math.acos(normal:Dot(Vector3.new(0, 1, 0))))
+if slopeAngle >= 20 and slopeAngle <= 80 then
+shortSlopeBoost = math.clamp(slopeAngle / 22, 1, 2.5)
+slopeDirBoost = slopeDirBoost + math.clamp(slopeAngle / 50, 0, 1.6)
+hoverBuffer = hoverBuffer + math.clamp((slopeAngle - 20) * 0.05, 0, 3)
+local verticalDist = hrp.Position.Y - shortSlopeCheck.Position.Y
+local minForward = 4
+local minUp = 4
+if slopeAngle >= 50 and verticalDist < 3 then
+earlyBounce = true
+targetPos = targetPos + direction * minForward + Vector3.new(0, minUp, 0)
+else
+if slopeAngle < 35 then
+targetPos = targetPos + Vector3.new(0, 3, 0) + direction * (2 * slopeDirBoost)
+else
+targetPos = targetPos + Vector3.new(0, slopeAngle * 0.4 + hoverBuffer, 0)
+end
+end
+end
+end
+
+if slopeAngle >= 35 then
+targetPos = targetPos + direction * (5 * slopeDirBoost)
+end
+
+local safetyCheck = workspace:Raycast(hrp.Position, targetPos - hrp.Position, CachedRayParams)
+if safetyCheck then
+targetPos = safetyCheck.Position + Vector3.new(0, 2, 0) - direction * 2
+end
+
+if shortSlopeCheck or longSlopeCheck then
+local hitPos = (shortSlopeCheck or longSlopeCheck).Position
+local verticalDist = hrp.Position.Y - hitPos.Y
+-- FIX: jangan datarkan target bila tanjakan curam terdeteksi (slopeAngle >= 35).
+-- Sebelumnya lompatan kecil 2+2 ini menimpa earlyBounce dan seluruh boost kemiringan karena
+-- saat berlari di/di dekat ramp permukaan selalu berada < 2 stud di bawah HRP
+-- -> itulah sebabnya dash di dekat ramp curam terasa lurus dengan lompatan kecil.
+if verticalDist < 2 and slopeAngle < 35 then
+targetPos = hrp.Position + direction * 2 + Vector3.new(0, 2, 0)
+end
+end
+
+hrp.CFrame = CFrame.new(targetPos, targetPos + hrp.CFrame.LookVector)
+
+local delta = targetPos - hrp.Position
+local speed = storedVelocity.Magnitude
+-- FIX: batas bawah forward boost 5 (versi PC); versi Mobile hanya 4
+local forwardBoost = math.clamp(speed * 0.4, 5, 20)
+local safeDir = delta.Magnitude > 0 and delta.Unit or direction
+local safeCheck = workspace:Raycast(hrp.Position, safeDir * forwardBoost, CachedRayParams)
+
+if not safeCheck then
+hrp.AssemblyLinearVelocity += safeDir * forwardBoost
+else
+local safeDist = (safeCheck.Position - hrp.Position).Magnitude
+if safeDist > 3 then
+hrp.AssemblyLinearVelocity += safeDir * (safeDist * 0.6)
+end
+end
+
+local bounceMultiplier = 1.2
+if slopeAngle >= 45 then
+-- FIX: angleBoost maksimal 1.5 (versi PC); versi Mobile hanya 1.0 (bounce di slope curam lemah)
+local angleBoost = math.clamp((slopeAngle - 45) / 20, 0, 1.5)
+bounceMultiplier = 1.2 + angleBoost
+end
+
+if storedVelocity.Y < -60 then
+bounceMultiplier *= 0.9 * slopeLengthBoost * shortSlopeBoost
+elseif storedVelocity.Y < -30 then
+bounceMultiplier *= 1.0 * slopeLengthBoost * shortSlopeBoost
+end
+
+if storedVelocity.Y < -10 then
+local angleFactor = math.clamp((slopeAngle - 20) / 40, 0, 1)
+local bounceY = math.abs(storedVelocity.Y) * (1.1 + angleFactor * 0.9)
+bounceY = bounceY + storedVelocity.Magnitude * (0.3 + angleFactor * 0.5)
+bounceY = math.clamp(bounceY * bounceMultiplier * 1.0, 0, 60 + storedVelocity.Magnitude * 0.4)
+
+hrp.AssemblyLinearVelocity = Vector3.new(
+storedVelocity.X * slopeDirBoost,
+bounceY,
+storedVelocity.Z * slopeDirBoost
+)
+
+-- FIX: lompatan Demon kini juga membaca KEMIRINGAN ramp saat berlari (dulu hanya saat jatuh,
+-- sehingga yang terasa hanya "jatuh & speed", bukan ketajaman ramp). Makin curam ramp (35-80
+-- derajat), makin tinggi lompatannya; tidak akan melemahkan lompatan yang sedang naik (math.max).
+elseif shortSlopeCheck and slopeAngle >= 35 and slopeAngle <= 80 then
+local angleFactor = math.clamp((slopeAngle - 20) / 40, 0, 1)
+local rampLaunch = speed * (0.35 + angleFactor * 0.85) + slopeAngle * 0.35
+rampLaunch = math.clamp(math.max(rampLaunch * bounceMultiplier, storedVelocity.Y), 0, 60 + speed * 0.4)
+
+hrp.AssemblyLinearVelocity = Vector3.new(
+storedVelocity.X * slopeDirBoost,
+rampLaunch,
+storedVelocity.Z * slopeDirBoost
+)
+end
+
+-- FIX: dash maju earlyBounce dipindah keluar cabang jatuh supaya lompatan dari ramp saat
+-- berlari (cabang baru di atas) juga mendapat dorongan maju yang sama seperti saat jatuh.
+if earlyBounce then
+local forwardBoost = math.clamp(5 + storedVelocity.Magnitude * 0.1, 6, 20)
+local forwardCheck = workspace:Raycast(hrp.Position, direction * forwardBoost, CachedRayParams)
+if not forwardCheck then
+hrp.CFrame = hrp.CFrame + direction * forwardBoost
+else
+local safeDist = (forwardCheck.Position - hrp.Position).Magnitude
+if safeDist > 3 then
+hrp.CFrame = hrp.CFrame + direction * (safeDist * 0.5)
+end
+end
+end
+
+-- ============================================================
+-- REWORK RESIZE HITBOX DEMON - basis versi PC (PhantomwrymOverhaulPC), BUKAN versi Mobile.
+-- Perbedaan Demon Mobile vs PC di file asli:
+--   * Mobile : multiplier random(2-4), boost min 4, angleBoost max 1.0, diakhiri
+--              hrp.Size = 3,20,3 yang TIDAK PERNAH direset -> hitbox raksasa menempel
+--              permanen: karakter melayang + tersangkut dinding/pintu/plafon (bug HRP).
+--   * PC     : multiplier random(2-10), boost min 5, angleBoost max 1.5, diakhiri
+--              Size = 3,25,3 selama 0.1 detik lalu direset -> hitbox kembali normal.
+--   Versi PC yang diambil (hitbox bisa reset kembali), dengan perbaikan tambahan:
+--   FIX 1: PC mereset ke hardcode 2,4,2 yang bisa salah bila rig karakter berbeda.
+--          Sekarang ukuran ASLI disimpan sebelum resize (guard demonResizeActive mencegah
+--          ukuran raksasa tersimpan sebagai ukuran asli) dan selalu dikembalikan apa adanya
+--          -> hitbox reset ke bentuk semula, bukan ke ukuran tebakan.
+--   FIX 2: sebelum memperbesar, ruang ke atas dicek dengan raycast; tinggi resize di-clamp
+--          mengikuti ruang plafon (3,25,3 penuh hanya di ruang terbuka). Bila ruang terlalu
+--          sempit (< 4 stud) resize dilewati sama sekali -> hitbox raksasa tidak pernah
+--          menembus plafon/pintu sehingga tidak tersangkut dinding.
+--   FIX 3: wait(0.1) versi PC diganti task.delay (tidak memblokir thread) + pcall +
+--          guard hrp.Parent agar aman bila karakter mati/respawn di tengah proses.
+--   CATATAN: bug versi PC (blok earlyBounce memakai variabel hrp yang tidak terdefinisi)
+--          tidak terbawa karena port ini konsisten memakai hrp yang terdefinisi.
+--   FIX 4 (ramp): deteksi kemiringan ramp diperkuat agar dash di dekat tanjakan curam kembali
+--          melompat tinggi mengikuti kemiringan seperti versi lama: asal ray slope dinaikkan 15 stud,
+--          target tidak didatarkan di tanjakan curam (slopeAngle >= 35), dash maju earlyBounce
+--          berlaku juga saat berlari, dan ada lompatan vertikal berskala kemiringan (35-80 derajat).
+-- ============================================================
+if not demonResizeActive then
+demonOriginalSize = hrp.Size
+end
+demonResizeActive = true
+
+local resizeHeight = 25
+pcall(function()
+CachedRayParams.FilterDescendantsInstances = {character}
+local ceiling = workspace:Raycast(hrp.Position, Vector3.new(0, 30, 0), CachedRayParams)
+if ceiling then
+local ceilingDist = (ceiling.Position - hrp.Position).Magnitude
+resizeHeight = math.clamp((ceilingDist - 2) * 2, 0, 25)
+end
+end)
+
+if resizeHeight >= 4 then
+pcall(function()
+hrp.Size = Vector3.new(3, resizeHeight, 3)
+end)
+task.delay(math.clamp(demonLaunchTime, 0.05, 0.5), function()
+if hrp and hrp.Parent and demonResizeActive then
+pcall(function()
+hrp.Size = demonOriginalSize
+end)
+end
+demonResizeActive = false
+end)
+else
+demonResizeActive = false
+end
+end
+
+Tabs.Utility:Space()
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
+ButtonLib.Create:Button({
+Text = "Lag Switch",
+Flag = "LagSwitch",
+Position = UDim2.new(0.5, -125, 0.2, 0),
+Visible = false,
+Callback = function()
+-- FIX: isLagActive mencegah lag ditumpuk bila tombol ditekan berulang; pcall agar error mode tidak matikan tombol
+if isLagActive then return end
+isLagActive = true
+task.spawn(function()
+pcall(lag)
+isLagActive = false
+end)
+end
+})
+
+LagSwitchToggle = Tabs.Utility:Toggle({
+Title = "Lag Switch",
+Flag = "LagSwitchToggle",
+Icon = "zap",
+Value = false,
+Callback = function(state)
+lagSwitchEnabled = state
+
+if ButtonLib and ButtonLib.LagSwitch then
+ButtonLib.LagSwitch:SetVisible(state)
+end
+end
+})
+
+LagMethodDropdown = Tabs.Utility:Dropdown({
+Title = "Lag Method",
+Flag = "LagMethodDropdown",
+-- ADD (Task 23): mode gabungan FFlag+Demon (FFlag lag + dash Demon)
+Values = {"CPU Cycle", "OS.ClockFFlag", "Normal", "Demon", "FastFlag", "FFlag+Demon"},
+Value = "CPU Cycle",
+Callback = function(value)
+lagMethod = value
+end
+})
+
+LagDurationInput = Tabs.Utility:Input({
+Title = "Lag Duration (seconds)",
+Flag = "LagDurationInput",
+Placeholder = "0.5",
+Value = tostring(lagDuration),
+NumbersOnly = true,
+Callback = function(text)
+local n = tonumber(text)
+if n and n > 0 then
+lagDuration = n
+end
+end
+})
+
+Tabs.Utility:Space()
+Tabs.Utility:Section({ Title = "Demon Settings", TextSize = 20 })
+
+-- ADD: section Demon Settings - mengatur kekuatan & waktu mode Demon (Lag Switch) tanpa edit script.
+Tabs.Utility:Input({
+Title = "Demon Power (Multiplier)",
+Flag = "DemonPowerInput",
+Placeholder = "10",
+Value = tostring(demonPowerMax),
+NumbersOnly = true,
+Callback = function(text)
+local n = tonumber(text)
+if n and n >= 2 then
+demonPowerMax = math.floor(n)
+end
+end
+})
+
+Tabs.Utility:Input({
+Title = "Demon Delay (ms)",
+Flag = "DemonDelayInput",
+Placeholder = "200",
+Value = tostring(demonDelayMS),
+NumbersOnly = true,
+Callback = function(text)
+local n = tonumber(text)
+if n and n > 0 then
+demonDelayMS = n
+end
+end
+})
+
+Tabs.Utility:Input({
+Title = "Demon Launch Time (s)",
+Flag = "DemonLaunchTimeInput",
+Placeholder = "0.1",
+Value = tostring(demonLaunchTime),
+NumbersOnly = true,
+Callback = function(text)
+local n = tonumber(text)
+if n and n >= 0.05 and n <= 0.5 then
+demonLaunchTime = n
+end
+end
+})
+
+-- ADD: tombol darurat "Reset Hitbox (HRP)" - jaring pengaman manual: bila hitbox masih
+-- membesar (raksasa) setelah Demon mode karena alasan apapun, tombol ini mengembalikannya
+-- ke ukuran normal. Hanya bekerja saat hitbox memang abnormal (aman ditekan kapan saja).
+Tabs.Utility:Button({
+Title = "Reset Hitbox (HRP)",
+Desc = "Kembalikan hitbox raksasa ke ukuran normal (darurat)",
+Callback = function()
+task.spawn(function()
+local char = LocalPlayer.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+if not hrp then return end
+pcall(function()
+local s = hrp.Size
+if s.Y > 6 or s.X > 4 or s.Z > 4 then
+local target = demonOriginalSize
+if not target or target.Y > 6 or target.X > 4 or target.Z > 4 then
+target = Vector3.new(2, 2, 1)
+end
+hrp.Size = target
+demonResizeActive = false
+WindUI:Notify({ Title = "Hitbox Reset", Content = "Ukuran hitbox dikembalikan ke normal", Duration = 3 })
+else
+WindUI:Notify({ Title = "Hitbox Normal", Content = "Hitbox sudah dalam ukuran normal", Duration = 3 })
+end
+end)
+end)
+end
+})
+
+Tabs.Utility:Space()
+
+local JumpPadValue = 360
+-- FIX CRASH saat load: versi lama `local originalUse = JumpPadModule.Use` error
+-- "attempt to index nil" bila module JumpPad berubah path (safeRequire mengembalikan nil).
+-- Kini di-guard: fitur dimatikan dengan warn, script tetap jalan.
+if JumpPadModule and type(JumpPadModule.Use) == "function" then
+local originalUse = JumpPadModule.Use
+
+JumpPadToggle = Tabs.Utility:Toggle({
+Title = "Jump Pad Bounce Modifier",
+Flag = "JumpPadToggle",
+Value = false,
+Callback = function(state)
+if state then
+function JumpPadModule.Use(p1, p2)
+if p2 == nil or (p2 ~= Players.LocalPlayer.Character or p2:GetAttribute("JumpPadInEffect") == true) then
+return originalUse(p1, p2)
+end
+
+p1.Model.AnimationController:LoadAnimation(p1.Model.Animations.Use):Play(0.1)
+p1.Model.BoundingBox.Launch:Play()
+Players.LocalPlayer.Character.HumanoidRootPart:ApplyImpulse(Vector3.new(0, JumpPadValue, 0))
+
+p2:SetAttribute("JumpPadInEffect", true)
+task.spawn(function()
+task.wait(1.5)
+p2:SetAttribute("JumpPadInEffect", nil)
+end)
+end
+else
+JumpPadModule.Use = originalUse
+end
+end
+})
+
+JumpPadValueInput = Tabs.Utility:Input({
+Title = "Jump Value",
+Flag = "JumpPadValueInput",
+Placeholder = "0",
+Value = "360",
+NumbersOnly = true,
+Callback = function(text)
+local num = parseNumberInput(text, 360)
+JumpPadValue = num
+end
+})
+else
+warn("[JoblessHub] JumpPadModule tidak ditemukan - Jump Pad Bounce Modifier dinonaktifkan")
+Tabs.Utility:Paragraph({ Title = "Jump Pad Not Available" })
+end
+
+
+
+Tabs.Utility:Space()
+
+-- ADD: Set Time (input HH:MM) - port dari file asli (Time Changer), mengubah jam in-game via Lighting.ClockTime
+TimeChangerInput = Tabs.Utility:Input({
+Title = "Set Time",
+Value = "12:00",
+Flag = "TimeChangerInput",
+Placeholder = "HH:MM"
+})
+
+TimeChangerInput.Callback = function(value)
+value = value:gsub("^%s*(.-)%s*$", "%1")
+local h_str, m_str = value:match("(%d+):(%d+)")
+
+if h_str and m_str then
+local h = tonumber(h_str)
+local m = tonumber(m_str)
+
+if h and m and h >= 0 and h <= 23 and m >= 0 and m <= 59 and #h_str <= 2 and #m_str <= 2 then
+local totalHours = h + (m / 60)
+pcall(function()
+game:GetService("Lighting").ClockTime = totalHours
+end)
+
+WindUI:Notify({
+Title = "Time Updated",
+Content = "In-game time set to " .. string.format("%02d:%02d", h, m),
+Duration = 3
+})
+else
+WindUI:Notify({
+Title = "Invalid Time",
+Content = "Please enter a valid time between 00:00 and 23:59.",
+Duration = 3
+})
+end
+else
+WindUI:Notify({
+Title = "Invalid Format",
+Content = "Please use the HH:MM format (e.g., 14:30).",
+Duration = 3
+})
+end
+end
+end)
+if ok_TU then
+DaraSectionDone("TAB UTILITY")
+else
+DaraSectionFail("TAB UTILITY", err_TU)
+end
+DaraSectionStart("CUSTOM GRAVITY")
+local ok_CG, err_CG = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA): CUSTOM GRAVITY - port dari DaraHub BETA (tab Utility).
+-- Toggle Custom Gravity + input Gravity Value + tombol layar Gravity (floating button,
+-- ukurannya diatur terpisah di tab Settings - Screen Button Size Per Tombol).
+-- INPUT KOSONG = kembali ke default (gravity asli game saat script dimuat).
+-- ============================================================
+Tabs.Utility:Space()
+do
+local originalGameGravity = workspace.Gravity
+local CustomGravity = false
+local GravityValue = workspace.Gravity
+
+GravityToggle = Tabs.Utility:Toggle({
+Title = "Custom Gravity",
+Flag = "GravityToggle",
+Value = false,
+Callback = function(state)
+CustomGravity = state
+pcall(function()
+if state then
+workspace.Gravity = GravityValue
+else
+workspace.Gravity = originalGameGravity
+end
+end)
+end
+})
+
+DaraWaitButtonLib(10) -- FIX v1.5.1: pastikan ButtonLib siap
+ButtonLib.Create:Toggle({
+Text = "Gravity",
+Flag = "GravityToggle",
+Default = false,
+Visible = false,
+Callback = function(s)
+if GravityToggle then
+GravityToggle:Set(s)
+end
+end
+}).Position = UDim2.new(0.5, -125, 0.4, 0)
+
+ShowGravityButtonToggle = Tabs.Utility:Toggle({
+Title = "Show Gravity Button",
+Flag = "ShowGravityButton",
+Value = false,
+Callback = function(state)
+if ButtonLib and ButtonLib.GravityToggle then
+ButtonLib.GravityToggle:SetVisible(state)
+end
+end
+})
+
+GravityInput = Tabs.Utility:Input({
+Title = "Gravity Value",
+Flag = "GravityInput",
+Placeholder = tostring(originalGameGravity),
+Value = tostring(GravityValue),
+Callback = function(text)
+-- ADD (permintaan user): input kosong = set default (gravity asli)
+GravityValue = parseNumberInput(text, originalGameGravity)
+if CustomGravity then
+pcall(function()
+workspace.Gravity = GravityValue
+end)
+end
+end
+})
+end
+
+
+Tabs.Utility:Space()
+Tabs.Utility:Section({ Title = "Graphics / FPS Boost", TextSize = 20 })
+
+-- ADD: Remove Textures (tombol sekali jalan) - port dari file asli: haluskan semua material,
+-- hapus TextureID MeshPart & semua Texture/Decal agar rendering jauh lebih ringan.
+RemoveTexturesButton = Tabs.Utility:Button({
+Title = "Remove Textures",
+Callback = function()
+task.spawn(function()
+pcall(function()
+for _, part in ipairs(workspace:GetDescendants()) do
+if part:IsA("BasePart") or part:IsA("MeshPart") or part:IsA("UnionOperation") or part:IsA("WedgePart") or part:IsA("CornerWedgePart") then
+part.Material = Enum.Material.SmoothPlastic
+
+if part:IsA("MeshPart") and part.TextureID ~= "" then
+part.TextureID = ""
+end
+
+for _, texture in ipairs(part:GetChildren()) do
+if texture:IsA("Texture") then
+texture.Texture = "rbxassetid://0"
+elseif texture:IsA("Decal") then
+texture.Texture = "rbxassetid://0"
+end
+end
+end
+end
+end)
+
+WindUI:Notify({
+Title = "Textures Removed",
+Content = "All textures and materials have been removed",
+Duration = 3
+})
+end)
+end
+})
+
+-- ADD: Clear MaterialService (tombol sekali jalan) - port dari file asli:
+-- menghapus semua override material di MaterialService (mengembalikan material ke default plastik)
+Tabs.Utility:Button({
+Title = "Clear MaterialService",
+Desc = "Remove All Clear MaterialService Texture",
+Callback = function()
+pcall(function()
+local materialService = game:GetService("MaterialService")
+
+for _, child in ipairs(materialService:GetChildren()) do
+child:Destroy()
+end
+end)
+
+WindUI:Notify({
+Title = "MaterialService Cleared",
+Content = "All materials have been removed from MaterialService",
+Duration = 3
+})
+end
+})
+
+Tabs.Utility:Space()
+
+-- ADD: Low Quality (tombol sekali jalan) - port dari file asli:
+-- matikan tekstur/partikel/efek visual/sky sekaligus untuk FPS maksimal di HP kentang.
+-- FIX: dijalankan via task.spawn + pcall agar iterasi game:GetDescendants() yang besar tidak membekukan UI
+LowQualityButton = Tabs.Utility:Button({
+Title = "Low Quality",
+Desc = "Disable textures, effects, and optimize graphics",
+Callback = function()
+task.spawn(function()
+pcall(function()
+local Lighting = game:GetService("Lighting")
+
+local ToDisable = {
+Textures = true,
+VisualEffects = true,
+Parts = true,
+Particles = true,
+Sky = true
+}
+
+local ToEnable = {
+FullBright = false
+}
+
+local Stuff = {}
+
+for _, v in next, game:GetDescendants() do
+if ToDisable.Parts then
+if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("BasePart") then
+v.Material = Enum.Material.SmoothPlastic
+table.insert(Stuff, 1, v)
+end
+end if ToDisable.Particles then
+if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Explosion") or v:IsA("Sparkles") or v:IsA("Fire") then
+v.Enabled = false
+table.insert(Stuff, 1, v)
+end
+end if ToDisable.VisualEffects then
+if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("SunRaysEffect") then
+v.Enabled = false
+table.insert(Stuff, 1, v)
+end
+end if ToDisable.Textures then
+if v:IsA("Decal") or v:IsA("Texture") then
+v.Texture = ""
+table.insert(Stuff, 1, v)
+end
+end if ToDisable.Sky then
+if v:IsA("Sky") then
+v.Parent = nil
+table.insert(Stuff, 1, v)
+end
+end
+end
+
+if ToEnable.FullBright then Lighting.FogColor = Color3.fromRGB(255, 255, 255)
+Lighting.FogEnd = math.huge
+Lighting.FogStart = math.huge
+Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+Lighting.Brightness = 5
+Lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
+Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+Lighting.Outlines = true
+end
+end)
+end)
+end
+})
+end)
+if ok_CG then
+        DaraSectionDone("CUSTOM GRAVITY")
+else
+        DaraSectionFail("CUSTOM GRAVITY", err_CG)
+end
+DaraSectionStart("VIP COMMAND")
+local ok_VC, err_VC = pcall(function()
+-- ============================================================
+-- ADD (UPDATE BETA + permintaan user "unlock vip commands"): SECTION VIP COMMAND.
+-- Di Beta, section ini HANYA muncul bila VIPCommandsAccess == true. Sesuai permintaan,
+-- section kini SELALU tampil (unlock) dan tombol "Unlock VIP Commands" menampilkan
+-- menu VIP di GUI game + memaksa attribute VIPCommandsAccess = true (client-side).
+-- Catatan: command VIP yang divalidasi server (mis. di server publik) tetap butuh VIP asli.
+-- ============================================================
+Tabs.Utility:Space()
+Tabs.Utility:Section({
+Title = "VIP COMMAND",
+TextSize = 20
+})
+Tabs.Utility:Divider()
+Tabs.Utility:Button({
+Title = "Unlock VIP Commands",
+Desc = "Restore access to VIP commands if accidentally locked (port DaraHub BETA)",
+Icon = "unlock",
+Callback = function()
+local unlocked = false
+-- FIX: Beta mengindeks PlayerGui.Shared.Popups.VIPMenu.Create.Frame langsung (error bila
+-- GUI tidak ada) -> kini dicari bertahap dengan FindFirstChild + pcall.
+pcall(function()
+local shared = PlayerGui:FindFirstChild("Shared")
+local popups = shared and shared:FindFirstChild("Popups")
+local vipMenu = popups and popups:FindFirstChild("VIPMenu")
+local create = vipMenu and vipMenu:FindFirstChild("Create")
+local frame = create and create:FindFirstChild("Frame")
+if frame then
+local commands = frame:FindFirstChild("Commands")
+local locked = frame:FindFirstChild("Locked")
+if commands then
+commands.Visible = true
+end
+if locked then
+locked.Visible = false
+end
+unlocked = true
+end
+end)
+pcall(function()
+LocalPlayer:SetAttribute("VIPCommandsAccess", true)
+end)
+pcall(function()
+WindUI:Notify({
+Title = "VIP Commands",
+Content = unlocked and "VIP Menu di-unlock (Commands ditampilkan)." or "VIPMenu game tidak ditemukan - attribute VIPCommandsAccess dipaksa true.",
+Duration = 4
+})
+end)
+end
+})
+Tabs.Utility:Button({
+Title = "VIP CMD Macro",
+Icon = "rbxassetid://107814281854748",
+Desc = "Buka macro VIP built-in (100% dalam script, tanpa load remote DaraHub)",
+Callback = function()
+-- UPDATE v1.4.4 (ATURAN USER): macro VIP kini 100% built-in - tombol TIDAK lagi me-load GUI
+-- remote dari darahub.pages.dev (aturan: dilarang load DaraHub asli). Tombol memindahkan
+-- tampilan ke tab Auto tempat section "VIP CMD Macro" built-in berada.
+local switched = false
+pcall(function()
+if Window and Tabs and Tabs.Auto then
+Window:SelectTab(Tabs.Auto)
+switched = true
+end
+end)
+if not switched then
+pcall(function()
+if Window then
+Window:SelectTab(4)
+switched = true
+end
+end)
+end
+pcall(function()
+WindUI:Notify({
+Title = "VIP CMD Macro (built-in)",
+Content = switched and "Macro VIP 100% built-in ada di tab Auto - section VIP CMD Macro." or "Buka tab Auto -> section VIP CMD Macro.",
+Duration = 4
+})
+end)
+end
+})
+do
+local SelectedMapSetting = "BrickMaze"
+local function isValidMap(mapName)
+local mapsFolder = ReplicatedStorage:FindFirstChild("Info")
+if mapsFolder then
+mapsFolder = mapsFolder:FindFirstChild("Maps")
+if mapsFolder then
+for _, map in ipairs(mapsFolder:GetChildren()) do
+if map.Name == mapName then
+return true
+end
+end
+end
+end
+return false
+end
+Tabs.Utility:Space()
+mapSettingsInput = Tabs.Utility:Input({
+Title = "Set Map Settings",
+Flag = "MapSettingsInput",
+Placeholder = "Enter map name (e.g., BrickMaze)",
+Value = "BrickMaze",
+Callback = function(value)
+SelectedMapSetting = value
+end
+})
+Tabs.Utility:Button({
+Title = "Add Map",
+Desc = "Add the specified map to rotation",
+Icon = "plus",
+Callback = function()
+local mapName = SelectedMapSetting or "BrickMaze"
+if mapName and mapName ~= "" then
+if isValidMap(mapName) then
+pcall(function()
+local adminEvents = ReplicatedStorage:FindFirstChild("Events")
+local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
+local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+if vipCommand then
+vipCommand:FireServer("AddMap", mapName)
+WindUI:Notify({
+Title = "Custom Server",
+Content = "Added map: " .. mapName,
+Duration = 3
+})
+end
+end)
+else
+WindUI:Notify({
+Title = "Custom Server",
+Content = "Invalid map name: " .. mapName,
+Duration = 3
+})
+end
+end
+end
+})
+Tabs.Utility:Button({
+Title = "Remove Map",
+Desc = "Remove the specified map from rotation",
+Icon = "minus",
+Callback = function()
+local mapName = SelectedMapSetting or "BrickMaze"
+if mapName and mapName ~= "" then
+if isValidMap(mapName) then
+pcall(function()
+local adminEvents = ReplicatedStorage:FindFirstChild("Events")
+local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
+local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+if vipCommand then
+vipCommand:FireServer("RemoveMap", mapName)
+WindUI:Notify({
+Title = "Custom Server",
+Content = "Removed map: " .. mapName,
+Duration = 3
+})
+end
+end)
+else
+WindUI:Notify({
+Title = "Custom Server",
+Content = "Invalid map name: " .. mapName,
+Duration = 3
+})
+end
+end
+end
+})
+end
+Tabs.Utility:Space()
+end)
+if ok_VC then
+        DaraSectionDone("VIP COMMAND")
+else
+        DaraSectionFail("VIP COMMAND", err_VC)
+end
+
+
+
+DaraSectionStart("TAB TELEPORT")
+local ok_TL, err_TL = pcall(function()
+-- ================= TAB TELEPORT =================
+-- Helper teleport (dipindah utuh dari file asli, hanya dipakai tab Teleport)
+function isNPCModel(model)
+if not model or not model:IsA("Model") then return false end
+if model:GetAttribute("AI") == true then return true end
+if model:FindFirstChild("HumanoidRootPart") and model:FindFirstChild("Humanoid") then
+local parent = model.Parent
+if parent and parent.Name == "Players" then
+if model:GetAttribute("AI") == true then
+return true
+end
+end
+end
+return false
+end
+
+function isModelDowned(model)
+if not model or not model:IsA("Model") then return false end
+local humanoid = model:FindFirstChild("Humanoid")
+if humanoid and humanoid.Health <= 0 then return true end
+return false
+end
+
+function getCurrentHRP()
+local char = LocalPlayer.Character
+if char then
+return char:FindFirstChild("HumanoidRootPart")
+end
+return nil
+end
+
+function getPlayersWithHRP()
+local result = {}
+for _, plr in ipairs(Players:GetPlayers()) do
+if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+table.insert(result, plr)
+end
+end
+return result
+end
+
+function getDownedPlayers()
+local downed = {}
+function scanFolder(folder)
+if not folder then return end
+for _, model in ipairs(folder:GetChildren()) do
+if model:IsA("Model") and isModelDowned(model) and model.Name ~= LocalPlayer.Name then
+local hrp = model:FindFirstChild("HumanoidRootPart")
+if hrp then
+table.insert(downed, model)
+end
+end
+end
+end
+scanFolder(workspace:FindFirstChild("Players"))
+local gameFolder = workspace:FindFirstChild("Game")
+if gameFolder then
+scanFolder(gameFolder:FindFirstChild("Players"))
+end
+return downed
+end
+
+function getNPCs()
+local bots = {}
+function scanFolder(folder)
+if not folder then return end
+for _, model in ipairs(folder:GetChildren()) do
+if model:IsA("Model") and isNPCModel(model) then
+local hrp = model:FindFirstChild("HumanoidRootPart")
+if hrp then
+table.insert(bots, model)
+end
+end
+end
+end
+scanFolder(workspace:FindFirstChild("Players"))
+local gameFolder = workspace:FindFirstChild("Game")
+if gameFolder then
+scanFolder(gameFolder:FindFirstChild("Players"))
+end
+return bots
+end
+
+function getSpawns()
+local spawnsFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parts") and workspace.Map.Parts:FindFirstChild("Spawns")
+if not spawnsFolder then
+spawnsFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parts") and workspace.Map.Parts:FindFirstChild("Spawns")
+end
+if spawnsFolder then
+return spawnsFolder:GetChildren()
+end
+return {}
+end
+
+function getTickets()
+local tickets = workspace:FindFirstChild("Effects") and workspace.Effects:FindFirstChild("Tickets")
+if not tickets then
+tickets = workspace:FindFirstChild("Effects") and workspace.Effects:FindFirstChild("Tickets")
+end
+if tickets then
+return tickets:GetChildren()
+end
+return {}
+end
+
+function teleportToCFrame(cframeOffset)
+local hrp = getCurrentHRP()
+if hrp then
+hrp.CFrame = cframeOffset
+end
+end
+
+function teleportToRandomFromList(list, offset)
+if #list > 0 then
+local target = list[math.random(1, #list)]
+local hrp = target:FindFirstChild("HumanoidRootPart")
+if hrp then
+teleportToCFrame(hrp.CFrame + offset)
+end
+end
+end
+
+function teleportToRandomPlayer(offset)
+local players = getPlayersWithHRP()
+if #players > 0 then
+local target = players[math.random(1, #players)]
+teleportToCFrame(target.Character.HumanoidRootPart.CFrame + offset)
+end
+end
+
+function teleportToRandomDowned(offset)
+local downed = getDownedPlayers()
+teleportToRandomFromList(downed, offset)
+end
+
+function teleportToRandomNPC(offset)
+local bots = getNPCs()
+teleportToRandomFromList(bots, offset)
+end
+
+function teleportToRandomSpawn(offset)
+local spawns = getSpawns()
+if #spawns > 0 then
+local target = spawns[math.random(1, #spawns)]
+teleportToCFrame(target.CFrame + offset)
+end
+end
+
+function teleportToRandomTicket(offset)
+local tickets = getTickets()
+if #tickets > 0 then
+local target = tickets[math.random(1, #tickets)]
+local part = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChildWhichIsA("BasePart")
+if part then
+teleportToCFrame(part.CFrame + offset)
+end
+end
+end
+function teleportToSecurityPart(offset)
+local existingPart = SecurityPart or workspace:FindFirstChild("SecurityPart")
+if existingPart then
+local character = game.Players.LocalPlayer.Character
+if character and character:FindFirstChild("HumanoidRootPart") then
+character.HumanoidRootPart.CFrame = CFrame.new(existingPart.Position + offset)
+end
+else
+print("SecurityPart not found")
+end
+end
+
+Tabs.Teleport:Section({ Title = "Teleports", TextSize = 20 })
+Tabs.Teleport:Divider()
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to Spawn",
+Desc = "Teleport to a random spawn location",
+Icon = "home",
+Callback = function()
+teleportToRandomSpawn(Vector3.new(0, 3, 0))
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to Random Player",
+Desc = "Teleport to a random online Players",
+Icon = "users",
+Callback = function()
+teleportToRandomPlayer(Vector3.new(0, 3, 0))
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to Downed Player",
+Desc = "Teleport to a random Downed Players",
+Icon = "heart",
+Callback = function()
+teleportToRandomDowned(Vector3.new(0, 3, 0))
+end
+})
+
+local playerList = {}
+Tabs.Teleport:Space()
+
+PlayerDropdown = Tabs.Teleport:Dropdown({
+Title = "Select Player or NPC",
+Flag = "PlayerDropdown",
+Values = {{Title = "No players found", Desc = "", Icon = "user"}},
+Value = "No players found",
+Callback = function(selectedOption) end
+})
+
+function getNPCIcon(model)
+local hrp = model:FindFirstChild("HumanoidRootPart")
+if not hrp then return nil end
+local billboard = hrp:FindFirstChild("BillboardGui")
+if not billboard then return nil end
+local icon = billboard:FindFirstChild("Icon")
+if not icon then return nil end
+if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
+return icon.Image
+end
+return nil
+end
+
+function findWorkspaceCharacterForPlayer(plr)
+local playersFolder = workspace:FindFirstChild("Players")
+if not playersFolder then return nil end
+local byName = playersFolder:FindFirstChild(plr.Name)
+if byName and byName:IsA("Model") then
+return byName
+end
+for _, model in ipairs(playersFolder:GetChildren()) do
+if model:IsA("Model") then
+local attrName = model:GetAttribute("Name")
+local attrTag = model:GetAttribute("Tag")
+local userId = model:GetAttribute("UserId") or model:GetAttribute("PlayerUserId")
+if attrName == plr.Name or attrName == plr.DisplayName then
+return model
+end
+if attrTag == plr.Name or attrTag == plr.DisplayName then
+return model
+end
+if typeof(userId) == "number" and userId == plr.UserId then
+return model
+end
+if model.Name == tostring(plr.UserId) then
+return model
+end
+end
+end
+if plr.Character and plr.Character.Parent == playersFolder then
+return plr.Character
+end
+return nil
+end
+
+function getModelChildIndex(model)
+local parent = model and model.Parent
+if not parent then return 0 end
+for i, child in ipairs(parent:GetChildren()) do
+if child == model then
+return i
+end
+end
+return 0
+end
+
+function updatePlayerList()
+playerList = {}
+local dropdownValues = {}
+local listedModels = {}
+
+for _, plr in ipairs(Players:GetPlayers()) do
+if plr ~= LocalPlayer then
+local model = findWorkspaceCharacterForPlayer(plr)
+local childIndex = model and getModelChildIndex(model) or 0
+local entry = {
+player = plr,
+model = model,
+kind = "player",
+childIndex = childIndex
+}
+table.insert(playerList, entry)
+
+local title = plr.DisplayName
+if model and childIndex > 0 then
+title = title .. " [ChildIndex:" .. tostring(childIndex) .. "]"
+end
+local desc
+local iconUrl = "user"
+
+local ok, thumb = pcall(function()
+return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+end)
+if ok and thumb then
+iconUrl = thumb
+end
+
+if not model then
+desc = "No Character Found | @" .. plr.Name
+else
+local team = model:GetAttribute("Team") or "Unknown"
+desc = "Team: " .. tostring(team) .. " | @" .. plr.Name .. " | Index:" .. tostring(childIndex)
+listedModels[model] = true
+end
+
+table.insert(dropdownValues, {
+Title = title,
+Desc = desc,
+Icon = iconUrl
+})
+end
+end
+
+local playersFolder = workspace:FindFirstChild("Players")
+if playersFolder then
+local myChar = LocalPlayer.Character
+local myModel = findWorkspaceCharacterForPlayer(LocalPlayer)
+if myModel then listedModels[myModel] = true end
+if myChar then listedModels[myChar] = true end
+
+for index, model in ipairs(playersFolder:GetChildren()) do
+if model:IsA("Model") and not listedModels[model] then
+local attrName = model:GetAttribute("Name")
+local attrTag = model:GetAttribute("Tag")
+local userId = model:GetAttribute("UserId") or model:GetAttribute("PlayerUserId")
+local isMe = (model.Name == LocalPlayer.Name)
+or (attrName == LocalPlayer.Name)
+or (attrName == LocalPlayer.DisplayName)
+or (attrTag == LocalPlayer.Name)
+or (typeof(userId) == "number" and userId == LocalPlayer.UserId)
+or (model.Name == tostring(LocalPlayer.UserId))
+or (model == myChar)
+or (model == myModel)
+
+if not isMe then
+local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+if hrp then
+local team = model:GetAttribute("Team") or "Unknown"
+local displayName = model:GetAttribute("Name") or model.Name
+local childIndex = index
+local iconUrl = "user"
+
+if tostring(team) == "NPC" then
+local nbIcon = getNPCIcon(model)
+if nbIcon and nbIcon ~= "" then
+iconUrl = nbIcon
+end
+else
+if typeof(userId) == "number" then
+local ok, thumb = pcall(function()
+return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+end)
+if ok and thumb then
+iconUrl = thumb
+end
+end
+if iconUrl == "user" then
+local nbIcon = getNPCIcon(model)
+if nbIcon and nbIcon ~= "" then
+iconUrl = nbIcon
+end
+end
+end
+
+table.insert(playerList, {
+player = nil,
+model = model,
+kind = "character",
+childIndex = childIndex
+})
+table.insert(dropdownValues, {
+Title = tostring(displayName) .. " [ChildIndex:" .. tostring(childIndex) .. "]",
+Desc = "Team: " .. tostring(team) .. " | " .. model.Name .. " | Index:" .. tostring(childIndex),
+Icon = iconUrl
+})
+listedModels[model] = true
+end
+end
+end
+end
+end
+
+if #dropdownValues == 0 then
+dropdownValues = {{Title = "No players found", Desc = "", Icon = "user"}}
+end
+PlayerDropdown:Refresh(dropdownValues, true)
+end
+
+Tabs.Teleport:Button({
+Title = "Refresh Player List",
+Desc = "Refresh Player and NPC list",
+Icon = "refresh-cw",
+Callback = function()
+updatePlayerList()
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to Selected",
+Desc = "Teleport to selected player or NPC",
+Icon = "user",
+Callback = function()
+local selectedOption = PlayerDropdown.Value
+if not selectedOption or selectedOption.Title == "No players found" then
+return
+end
+if selectedOption.Desc and string.find(selectedOption.Desc, "No Character Found", 1, true) then
+return
+end
+
+local selectedIndex = nil
+local indexMatch = string.match(selectedOption.Title or "", "%[ChildIndex:(%d+)%]")
+if indexMatch then
+selectedIndex = tonumber(indexMatch)
+end
+
+for _, entry in ipairs(playerList) do
+local title
+if entry.player then
+title = entry.player.DisplayName
+if entry.model and entry.childIndex and entry.childIndex > 0 then
+title = title .. " [ChildIndex:" .. tostring(entry.childIndex) .. "]"
+end
+elseif entry.model then
+local displayName = entry.model:GetAttribute("Name") or entry.model.Name
+title = tostring(displayName) .. " [ChildIndex:" .. tostring(entry.childIndex or 0) .. "]"
+end
+
+local titleMatch = tostring(title) == selectedOption.Title
+local indexMatchOk = selectedIndex and entry.childIndex == selectedIndex
+
+if titleMatch or (indexMatchOk and entry.model) then
+local model = entry.model
+if model and (not selectedIndex or entry.childIndex == selectedIndex) then
+local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+if hrp then
+teleportToCFrame(hrp.CFrame + Vector3.new(0, 3, 0))
+end
+return
+elseif entry.player and entry.player.Character then
+local hrp = entry.player.Character:FindFirstChild("HumanoidRootPart")
+if hrp then
+teleportToCFrame(hrp.CFrame + Vector3.new(0, 3, 0))
+end
+return
+end
+end
+end
+
+if selectedIndex then
+local playersFolder = workspace:FindFirstChild("Players")
+if playersFolder then
+local children = playersFolder:GetChildren()
+local model = children[selectedIndex]
+if model and model:IsA("Model") then
+local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+if hrp then
+teleportToCFrame(hrp.CFrame + Vector3.new(0, 3, 0))
+end
+end
+end
+end
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to Ticket",
+Desc = "Teleport to a random ticket",
+Icon = "ticket",
+Callback = function()
+teleportToRandomTicket(Vector3.new(0, 3, 0))
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to NPC",
+Desc = "Teleport to a random NPC",
+Icon = "ghost",
+Callback = function()
+teleportToRandomNPC(Vector3.new(0, 10, 0))
+end
+})
+
+Tabs.Teleport:Space()
+
+Tabs.Teleport:Button({
+Title = "Teleport to SecurityPart",
+Icon = "shield",
+Callback = function()
+teleportToSecurityPart(Vector3.new(0, 3, 0))
+end
+})
+Tabs.Teleport:Section({ Title = "Teleport to Coordinates", TextSize = 20 })
+local teleInputValue = ""
+Tabs.Teleport:Input({
+Title = "Target Coordinates",
+Flag = "CoordTeleInput",
+Placeholder = "X Y Z",
+Value = "",
+Callback = function(value)
+teleInputValue = value
+end
+})
+
+Tabs.Teleport:Button({
+Title = "Teleport NOW!!! >:(",
+Icon = "target",
+Callback = function()
+function parseCoordinate(token, current)
+if not token or token == "" then return nil end
+token = token:gsub("%s+", "")
+local num = tonumber(token)
+if num then return num end
+if token:sub(1,1) == "~" then
+local rest = token:sub(2)
+if rest == "" then return current end
+local op = rest:sub(1,1)
+local valuePart = rest:sub(2)
+if op == "+" or op == "-" or op == "*" then
+local val = tonumber(valuePart)
+if val then
+if op == "+" then return current + val
+elseif op == "-" then return current - val
+elseif op == "*" then return current * val end
+end
+else
+local val = tonumber(rest)
+if val then return current + val end
+end
+end
+return nil
+end
+
+local tokens = {}
+for token in string.gmatch(teleInputValue, "%S+") do
+table.insert(tokens, token)
+end
+if #tokens < 3 then
+WindUI:Notify({
+Title = "Invalid Input",
+Content = "Please enter three values for X, Y, Z separated by spaces",
+Duration = 3
+})
+return
+end
+
+local character = LocalPlayer.Character
+if not character then
+WindUI:Notify({
+Title = "Error",
+Content = "Character not found",
+Duration = 3
+})
+return
+end
+local root = character:FindFirstChild("HumanoidRootPart")
+if not root then
+WindUI:Notify({
+Title = "Error",
+Content = "HumanoidRootPart not found",
+Duration = 3
+})
+return
+end
+
+local currentPos = root.Position
+local x = parseCoordinate(tokens[1], currentPos.X)
+local y = parseCoordinate(tokens[2], currentPos.Y)
+local z = parseCoordinate(tokens[3], currentPos.Z)
+
+if x == nil or y == nil or z == nil then
+WindUI:Notify({
+Title = "Invalid Expression",
+Content = "One or more coordinates could not be parsed",
+Duration = 3
+})
+return
+end
+
+root.CFrame = CFrame.new(x, y, z)
+end
+})
+
+end)
+if ok_TL then
+DaraSectionDone("TAB TELEPORT")
+else
+DaraSectionFail("TAB TELEPORT", err_TL)
+end
+DaraSectionStart("TAB SHOP")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_TS, err_TS = pcall(function()
+-- ================= TAB SHOP (SINKRON DARAHUB BETA) =================
+-- UPDATE BETA: shop automation mengikuti DaraHub BETA - Daily/Token dari service Shops,
+-- Event Shop dibaca dari EventTiers (harga Tickets, tier, status) + live keys (slot Event),
+-- section Event hanya dibuat saat event aktif (ensureEventSection - persis Beta).
+-- Ditambah: section Auto Exchange (Beta) + Redeem Code.
+-- FIX: pencarian folder Items tetap bertahap + warn agar tidak crash bila berubah lagi.
+local ItemsFolder = ReplicatedStorage:FindFirstChild("Items")
+local ItemRegistry = ItemsFolder and ItemsFolder:FindFirstChild("Registry")
+if not ItemRegistry then
+warn("[JoblessHub] ReplicatedStorage.Items.Registry tidak ditemukan - fitur shop terbatas")
+end
+
+-- ADD: Redeem Code (memakai PlayerData.RedeemCode dari service Codes - Client.Services.UserData)
+do
+Tabs.Shop:Section({ Title = "Redeem Code", TextSize = 20 })
+Tabs.Shop:Divider()
+local redeemInput = Tabs.Shop:Input({
+Title = "Kode Redeem",
+Flag = "RedeemCodeInput",
+Placeholder = "Masukkan kode (mis. TEST)",
+Callback = function(value) end
+})
+Tabs.Shop:Button({
+Title = "Redeem Code",
+Icon = "gift",
+Callback = function()
+local code = redeemInput and redeemInput.Value
+if type(code) == "table" then
+code = code.Text or code.Value
+end
+if not code or tostring(code):gsub("%s+", "") == "" then
+pcall(function()
+WindUI:Notify({ Title = "Redeem Code", Content = "Kode masih kosong.", Duration = 3 })
+end)
+return
+end
+-- UPDATE v1.4.4 (SINKRON BETA): redeem kini PERSIS DaraHub Beta - remote asli game
+-- (ReplicatedStorage.Shared.UserData.Remotes.RedeemCode) dicoba DULU, lalu fallback ke service
+-- Codes (Client.Services.UserData.Codes). Dua jalur, dua-duanya pcall - yang penting ada tetap jalan.
+local already = false
+pcall(function()
+already = PlayerData.IsRedeemed(code)
+end)
+if already then
+pcall(function()
+WindUI:Notify({ Title = "Redeem Code", Content = "Kode sudah pernah dipakai: " .. tostring(code), Duration = 3 })
+end)
+return
+end
+local okRedeem = false
+local redeemVia = nil
+-- Jalur 1 (persis Beta): remote Shared.UserData.Remotes.RedeemCode
+pcall(function()
+local sharedUD = ReplicatedStorage:FindFirstChild("Shared")
+local userData = sharedUD and sharedUD:FindFirstChild("UserData")
+local remotes = userData and userData:FindFirstChild("Remotes")
+local redeemRemote = remotes and remotes:FindFirstChild("RedeemCode")
+if redeemRemote then
+redeemRemote:FireServer(code)
+okRedeem = true
+redeemVia = "remote game (jalur Beta)"
+end
+end)
+-- Jalur 2 (fallback): service Codes
+if not okRedeem then
+okRedeem = PlayerData.RedeemCode(code)
+redeemVia = "service Codes (fallback)"
+end
+pcall(function()
+WindUI:Notify({
+Title = "Redeem Code",
+Content = okRedeem and ("Kode dikirim via " .. redeemVia .. ": " .. tostring(code)) or ("Gagal redeem kode: " .. tostring(code)),
+Duration = 4
+})
+end)
+end
+})
+Tabs.Shop:Space()
+end
+
+LoadAutoShop = Tabs.Shop:Button({
+Title = "Load Shop Automation",
+Callback = function()
+local success, err = pcall(function()
+LoadAutoShop:Destroy()
+
+if not ItemRegistry then
+warn("[JoblessHub] ItemRegistry tidak ditemukan - Load Shop Automation dibatalkan")
+return
+end
+-- FIX: service Shops baru dicek lebih dulu; belum tersedia = warn (GUI tetap dibangun)
+if not PlayerData.Shop("Daily") and not PlayerData.Shop("Event") then
+warn("[JoblessHub] Service Shops (Client.Services.UserData) belum tersedia - slot shop mungkin kosong")
+end
+
+local loops = {}
+
+local function startLoop(key, delaySeconds, action)
+if loops[key] then
+loops[key]()
+loops[key] = nil
+end
+loops[key] = HeartbeatLoop(delaySeconds, function()
+local okLoop, loopErr = pcall(action)
+if not okLoop then
+warn("[JoblessHub] Shop loop " .. key .. ":", loopErr)
+end
+end)
+end
+
+local function stopLoop(key)
+if loops[key] then
+loops[key]()
+loops[key] = nil
+end
+end
+
+local function configOf(key)
+local id = tonumber(key)
+if not id then
+return nil
+end
+local ok, config = pcall(ItemRegistry.GetConfig, ItemRegistry, id)
+if ok then
+return config
+end
+return nil
+end
+
+local function nameOf(key)
+local config = configOf(key)
+if config and config.AppearanceInfo and config.AppearanceInfo.Name then
+return config.AppearanceInfo.Name
+end
+local ok, entry = pcall(function()
+return ItemRegistry.TryGetById(tonumber(key))
+end)
+if ok and entry and entry.Module then
+return entry.Module.Name
+end
+return "Item " .. key
+end
+
+local function isMultiple(key)
+local config = configOf(key)
+return config ~= nil and config.PurchaseInfo ~= nil and config.PurchaseInfo.OwnershipType == "Multiple"
+end
+
+-- pembelian 1 unit via service Shops baru (bukan remote lama yang sudah dihapus game)
+local function buyUnit(key)
+local record = PlayerData.StockRecord(key)
+if not record or record.Currency == "Robux" then
+return false
+end
+if PlayerData.OwnsStock(key) and not isMultiple(key) then
+return false
+end
+local price = PlayerData.PriceOf(key)
+if not price then
+return false
+end
+local increment = record.Increment or 1
+local units = record.MinAmount or 1
+if PlayerData.Balance(record.Currency) < price * units then
+return false
+end
+return PlayerData.Buy(key, increment * units)
+end
+
+local function slotItemKeys(shopName)
+local keys, seen = {}, {}
+local shop = PlayerData.Shop(shopName)
+if not shop or type(shop.Slots) ~= "function" then
+return keys
+end
+local ok, slots = pcall(shop.Slots)
+if not ok or type(slots) ~= "table" then
+return keys
+end
+local slotNumbers = {}
+for slotNum in pairs(slots) do
+table.insert(slotNumbers, slotNum)
+end
+table.sort(slotNumbers)
+for _, slotNum in ipairs(slotNumbers) do
+local slot = slots[slotNum]
+local itemId = slot and slot.itemId
+if itemId ~= nil then
+local key = tostring(itemId)
+if not seen[key] then
+seen[key] = true
+table.insert(keys, key)
+end
+end
+end
+return keys
+end
+
+local function tokenItemKeys()
+local keys = {}
+local ok, ids = pcall(function()
+return ItemRegistry.Query():Include(function(entry)
+local okCfg, config = pcall(ItemRegistry.GetConfig, ItemRegistry, entry.Id)
+config = okCfg and config or nil
+return config ~= nil and config.PurchaseInfo ~= nil
+and config.PurchaseInfo.Currency == "Tokens"
+and config.PurchaseInfo.AppearsIn == "Shop"
+end):Ids()
+end)
+if not ok or type(ids) ~= "table" then
+return keys
+end
+for _, id in ipairs(ids) do
+local key = tostring(id)
+if PlayerData.StockRecord(key) then
+table.insert(keys, key)
+end
+end
+return keys
+end
+
+-- UPDATE BETA: meta item Event dari EventTiers (harga Tickets, tier, status owned) - persis Beta
+local eventMeta = {}
+local function eventItemKeys()
+local keys, seen = {}, {}
+table.clear(eventMeta)
+local function add(key)
+key = tostring(key)
+if not seen[key] then
+seen[key] = true
+table.insert(keys, key)
+end
+end
+
+for _, key in ipairs(slotItemKeys("Event")) do
+add(key)
+end
+
+local okTiers, tiers = pcall(function()
+return PlayerData.EventTiers()
+end)
+if okTiers and type(tiers) == "table" then
+for _, tier in ipairs(tiers) do
+for _, item in ipairs(tier.Items or {}) do
+if item.ItemId ~= nil then
+local key = tostring(item.ItemId)
+eventMeta[key] = { Tier = tier.Index, Price = item.Price, Owned = item.Owned, State = tier.State }
+add(key)
+end
+end
+end
+end
+return keys
+end
+
+local function buildOptions(keys, liveSet)
+if #keys == 0 then
+return {
+{
+Title = "No items available",
+Desc = "Check back later or refresh",
+Value = "none"
+}
+}
+end
+local options = {}
+for _, key in ipairs(keys) do
+local record = PlayerData.StockRecord(key) or {}
+local meta = eventMeta[key]
+local purchase = (configOf(key) or {}).PurchaseInfo or {}
+local desc
+if next(record) == nil and meta then
+local owned = meta.Owned or PlayerData.Owns(tonumber(key))
+desc = string.format("Tier %s | Price: %s Tickets | Status: %s | %s",
+tostring(meta.Tier), tostring(meta.Price or "?"),
+owned and "OWNED" or "NOT OWNED", tostring(meta.State or "?"))
+else
+local price = PlayerData.PriceOf(key) or purchase.Price or "?"
+local currency = record.Currency or purchase.Currency or ""
+local status = PlayerData.OwnsStock(key) and "OWNED" or "NOT OWNED"
+if next(record) == nil then
+status = status .. " | Not on sale right now"
+elseif liveSet and not liveSet[key] then
+status = status .. " | Not in current lineup"
+end
+desc = string.format("Price: %s %s | Status: %s", tostring(price), tostring(currency), status)
+end
+table.insert(options, {
+Title = nameOf(key),
+Desc = desc,
+Value = key
+})
+end
+return options
+end
+
+local refreshAll
+local function makeShopSection(title, side, getKeys, getLiveKeys)
+local section = Tabs.Shop:Section({
+Title = title,
+Side = side
+})
+local selected = {}
+local dropdown
+local lastSignature = nil
+
+local function liveSetOf()
+if not getLiveKeys then
+return nil
+end
+local set = {}
+local okLive, liveKeys = pcall(getLiveKeys)
+if okLive and type(liveKeys) == "table" then
+for _, key in ipairs(liveKeys) do
+set[key] = true
+end
+end
+return set
+end
+
+local function signatureOf(options)
+local parts = {}
+for _, option in ipairs(options) do
+table.insert(parts, option.Value .. "|" .. option.Desc)
+end
+return table.concat(parts, "\n")
+end
+
+local function refresh()
+local okOpts, options = pcall(buildOptions, getKeys(), liveSetOf())
+if not okOpts or type(options) ~= "table" then
+return
+end
+local signature = signatureOf(options)
+if signature == lastSignature then
+return
+end
+lastSignature = signature
+local valueSet = {}
+for _, option in ipairs(options) do
+valueSet[option.Value] = true
+end
+local valid = {}
+for _, value in ipairs(selected) do
+if valueSet[value] then
+table.insert(valid, value)
+end
+end
+selected = valid
+if dropdown then
+pcall(dropdown.Refresh, dropdown, options, valid)
+end
+end
+
+local initialOptions = buildOptions(getKeys(), liveSetOf())
+lastSignature = signatureOf(initialOptions)
+dropdown = section:Dropdown({
+Title = "Select " .. title .. " Items",
+SearchBarEnabled = true,
+Values = initialOptions,
+Multi = true,
+AllowNone = true,
+Callback = function(choices)
+selected = {}
+-- FIX: kompatibel 2 format callback lib WindUI (objek {Value=...} era 2.1 / string era 2.2)
+for _, choice in ipairs(choices or {}) do
+local v = type(choice) == "table" and choice.Value or choice
+if v and v ~= "none" then
+table.insert(selected, v)
+end
+end
+end
+})
+
+section:Button({
+Title = "Refresh " .. title,
+Callback = function()
+if refreshAll then
+refreshAll()
+else
+refresh()
+end
+end
+})
+
+section:Toggle({
+Title = "Auto Buy All " .. title .. " Items",
+Value = false,
+Callback = function(state)
+if state then
+local getForBuy = getLiveKeys or getKeys
+startLoop(title .. "_all", 0.4, function()
+local okKeys, listKeys = pcall(getForBuy)
+if okKeys and type(listKeys) == "table" then
+for _, key in ipairs(listKeys) do
+buyUnit(key)
+end
+end
+end)
+else
+stopLoop(title .. "_all")
+end
+end
+})
+
+section:Toggle({
+Title = "Auto Buy Selected " .. title .. " Items",
+Value = false,
+Callback = function(state)
+if state then
+startLoop(title .. "_selected", 0.4, function()
+for _, key in ipairs(selected) do
+buyUnit(key)
+end
+end)
+else
+stopLoop(title .. "_selected")
+end
+end
+})
+
+return { refresh = refresh }
+end
+
+local daily = makeShopSection("Daily Shop", "Left", function()
+return slotItemKeys("Daily")
+end)
+task.wait()
+local tokens = makeShopSection("Token Shop", "Right", tokenItemKeys)
+task.wait()
+-- UPDATE BETA: section Event hanya dibuat saat event aktif (ensureEventSection - persis Beta)
+local event = nil
+local function ensureEventSection()
+if event ~= nil then
+return true
+end
+if not PlayerData.EventActive() then
+return false
+end
+event = makeShopSection("Event Shop", "Left", eventItemKeys, function()
+return slotItemKeys("Event")
+end)
+return true
+end
+ensureEventSection()
+task.wait()
+
+refreshAll = function()
+pcall(daily.refresh)
+pcall(tokens.refresh)
+if ensureEventSection() then
+pcall(event.refresh)
+end
+end
+
+-- FIX (dipertahankan dari Ringkas): refresh otomatis saat stok/harga berubah
+-- (Observe service Daily & Event + Currency) dengan debounce agar tidak numpuk.
+local refreshQueued = false
+local function refreshAllDebounced()
+if refreshQueued then
+return
+end
+refreshQueued = true
+task.defer(function()
+refreshQueued = false
+if refreshAll then
+pcall(refreshAll)
+end
+end)
+end
+
+for _, shopName in ipairs({ "Daily", "Event" }) do
+local shop = PlayerData.Shop(shopName)
+if shop and type(shop.Observe) == "function" then
+pcall(shop.Observe, refreshAllDebounced)
+end
+end
+pcall(function()
+PlayerData.Observe("Currency", refreshAllDebounced)
+end)
+
+refreshAll()
+end)
+if not success then
+warn("[JoblessHub] LoadAutoShop callback error:", err)
+end
+end
+})
+
+-- ============================================================
+-- ADD (UPDATE BETA): AUTO EXCHANGE - port dari DaraHub BETA (tab Shop).
+-- Menukar Tickets ke mata uang pilihan sesuai rate yang dibaca dari game
+-- (PlayerData.EventExchanges), manual lewat dropdown atau otomatis via toggle.
+-- ============================================================
+do
+Tabs.Shop:Section({
+Title = "Auto Exchange",
+TextSize = 20
+})
+Tabs.Shop:Divider()
+local exchangeOptions = {}
+local exchangeLabels = {}
+local selectedExchange = nil
+local exchangeConn = nil
+local exchangePending = false
+local exchangeFailures = 0
+local exchangeDelay = 2
+local autoExchangeToggle = nil
+local exchangeDropdown = nil
+local currencyLabels = {
+Experience = "XP"
+}
+local function prettyNumber(n)
+if n ~= math.floor(n) then
+return tostring(n)
+end
+local formatted = tostring(math.floor(n)):reverse():gsub("(%d%d%d)", "%1,"):reverse()
+return (formatted:gsub("^,", ""))
+end
+local function currencyLabel(to)
+return currencyLabels[to] or tostring(to)
+end
+local function notifyExchange(content)
+pcall(function()
+WindUI:Notify({
+Title = "Auto Exchange",
+Content = content,
+Duration = 5
+})
+end)
+end
+local function buildExchangeOptions()
+exchangeOptions = {}
+exchangeLabels = {}
+local top = math.max(PlayerData.Tickets(), 100)
+local okEx, exchanges = pcall(function()
+return PlayerData.EventExchanges()
+end)
+if okEx and type(exchanges) == "table" then
+for _, entry in ipairs(exchanges) do
+-- FIX: Beta memakai `continue` (tidak didukung Lua 5.1 murni) -> diganti if/else
+if type(entry) == "table" and entry.To ~= nil and type(entry.Rate) == "number" then
+local name = currencyLabel(entry.To)
+local maxPower = 0
+pcall(function()
+maxPower = math.floor(math.log10(top))
+end)
+for power = 0, maxPower do
+local amount = 10 ^ power
+local label = string.format("%s %s [%s Ticket%s]", prettyNumber(entry.Rate * amount), name, prettyNumber(amount), amount == 1 and "" or "s")
+exchangeOptions[label] = {
+to = entry.To,
+amount = amount
+}
+table.insert(exchangeLabels, label)
+end
+local allLabel = string.format("%s %s per Ticket [All Tickets]", prettyNumber(entry.Rate), name)
+exchangeOptions[allLabel] = {
+to = entry.To,
+all = true
+}
+table.insert(exchangeLabels, allLabel)
+end
+end
+end
+if #exchangeLabels == 0 then
+exchangeLabels = {
+"No exchange available"
+}
+end
+if not exchangeOptions[selectedExchange] then
+selectedExchange = exchangeLabels[1]
+end
+end
+local function refreshExchangeDropdown()
+buildExchangeOptions()
+if exchangeDropdown then
+local okRefresh = pcall(function()
+exchangeDropdown:Refresh(exchangeLabels, selectedExchange)
+end)
+if not okRefresh then
+pcall(function()
+exchangeDropdown:Refresh(exchangeLabels)
+end)
+end
+end
+end
+local function runExchangeOnce()
+if exchangePending then
+return
+end
+local choice = exchangeOptions[selectedExchange]
+if not choice then
+return
+end
+local tickets = PlayerData.Tickets()
+local amount = choice.all and tickets or choice.amount
+if tickets <= 0 or tickets < amount then
+return
+end
+exchangePending = true
+pcall(function()
+PlayerData.Exchange(choice.to, amount)
+end)
+task.delay(1.5, function()
+exchangePending = false
+if PlayerData.Tickets() >= tickets then
+exchangeFailures = exchangeFailures + 1
+if exchangeFailures >= 3 and autoExchangeToggle then
+exchangeFailures = 0
+pcall(function()
+autoExchangeToggle:Set(false)
+end)
+notifyExchange("The server did not take the exchange (event phase: " .. tostring(PlayerData.EventPhase()) .. "). Stopped.")
+end
+else
+exchangeFailures = 0
+end
+end)
+end
+local function StopAutoExchange()
+if exchangeConn then
+exchangeConn:Disconnect()
+exchangeConn = nil
+end
+exchangePending = false
+exchangeFailures = 0
+end
+local function StartAutoExchange()
+StopAutoExchange()
+refreshExchangeDropdown()
+exchangeConn = HeartbeatLoop(exchangeDelay, runExchangeOnce)
+end
+buildExchangeOptions()
+exchangeDropdown = Tabs.Shop:Dropdown({
+Title = "Exchange Option",
+Desc = "Read from the game: what each exchange gives for how many Tickets",
+Flag = "AutoExchangeOption",
+Values = exchangeLabels,
+Value = selectedExchange,
+Callback = function(value)
+if exchangeOptions[value] then
+selectedExchange = value
+end
+end
+})
+Tabs.Shop:Button({
+Title = "Refresh Exchange List",
+Icon = "refresh-cw",
+Callback = function()
+refreshExchangeDropdown()
+if exchangeOptions[selectedExchange] then
+notifyExchange("Loaded " .. #exchangeLabels .. " exchange options (event phase: " .. tostring(PlayerData.EventPhase()) .. ")")
+else
+notifyExchange("No exchange is available right now (event phase: " .. tostring(PlayerData.EventPhase()) .. ")")
+end
+end
+})
+Tabs.Shop:Input({
+Title = "Exchange Delay",
+Desc = "Seconds between exchange attempts",
+Flag = "AutoExchangeDelay",
+Placeholder = "2",
+Value = "2",
+Callback = function(value)
+local n = parseNumberInput(value, 2)
+if n and n >= 0.5 then
+exchangeDelay = n
+if exchangeConn then
+StartAutoExchange()
+end
+end
+end
+})
+autoExchangeToggle = Tabs.Shop:Toggle({
+Title = "Auto Exchange",
+Desc = "Exchanges your Tickets with the selected option whenever you have enough",
+Flag = "AutoExchangeToggle",
+Value = false,
+Callback = function(state)
+if state then
+StartAutoExchange()
+else
+StopAutoExchange()
+end
+end
+})
+Tabs.Shop:Space()
+end
+
+
+
+-- ============================================================
+-- TAB SETTINGS - dipindah dari tab Utility sesuai permintaan:
+-- pengaturan ukuran SEMUA tombol layar ButtonLib (Supper Bounce, Bunny Hop, Lag Switch).
+-- X = lebar tombol (pixel), Y = tinggi tombol (pixel), Z = skala keseluruhan (1 = normal).
+-- Tombol ButtonLib berupa Frame 250x90 bernama sama dengan Flag-nya di CoreGui "Darahub",
+-- di dalamnya ada UIScale (kompensasi DPI) -> Z mengalikan skala dasar tersebut, jadi proporsional di semua HP.
+-- ============================================================
+-- ADD (Task 24): Drag Control - tahan 5 detik tombol layar untuk lock/unlock drag
+end)
+if ok_TS then
+DaraSectionDone("TAB SHOP")
+else
+DaraSectionFail("TAB SHOP", err_TS)
+end
+DaraSectionStart("SETTINGS: DRAG CONTROL")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_SD, err_SD = pcall(function()
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "Drag Control", TextSize = 20 })
+Tabs.Settings:Toggle({
+Title = "Drag Control (Lock/Unlock Button)",
+Flag = "DragControlToggle",
+Desc = "Aktifkan lalu TAHAN tombol layar (Supper Bounce / Bunny Hop / Lag Switch) selama 5 detik untuk lock/unlock drag tombol itu: LOCK = tidak bisa di drag, UNLOCK = bisa di drag lagi. Notifikasi muncul setiap keadaan berubah. Matikan fitur = semua tombol unlock.",
+Value = false,
+Callback = function(state)
+DC.Enabled = state
+if not state then
+unlockAllDragControl()
+end
+end
+})
+
+end)
+if ok_SD then
+DaraSectionDone("SETTINGS: DRAG CONTROL")
+else
+DaraSectionFail("SETTINGS: DRAG CONTROL", err_SD)
+end
+DaraSectionStart("SCREEN BUTTON SIZE")
+local ok_BS, err_BS = pcall(function()
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "Screen Button Size (Per Tombol)", TextSize = 20 })
+
+-- ============================================================
+-- ADD (permintaan user): ukuran tombol layar kini PER TOMBOL - setiap floating button
+-- punya input Width (X) / Height (Y) / Scale (Z) sendiri + tombol reset sendiri,
+-- TIDAK dijadikan satu untuk semua tombol lagi.
+-- Tombol ButtonLib berupa Frame bernama sama dengan Flag-nya di CoreGui "Darahub",
+-- di dalamnya ada UIScale (kompensasi DPI) -> Z mengalikan skala dasar tersebut.
+-- ============================================================
+do
+local screenButtons = {
+{ flag = "SuperBounce",    label = "Supper Bounce", w = 250, h = 90, s = 1 },
+{ flag = "BunnyHopToggle", label = "Bunny Hop",     w = 250, h = 90, s = 1 },
+{ flag = "LagSwitch",      label = "Lag Switch",    w = 250, h = 90, s = 1 },
+{ flag = "GravityToggle",  label = "Gravity",       w = 250, h = 90, s = 1 },
+}
+local baseScales = {}
+
+local function getButtonFrame(flag)
+local okGui, darahubGui = pcall(function()
+return game:GetService("CoreGui"):FindFirstChild("Darahub")
+end)
+if not okGui or not darahubGui then
+return nil
+end
+return darahubGui:FindFirstChild(flag)
+end
+
+local function applyOneButton(btn)
+pcall(function()
+local frame = getButtonFrame(btn.flag)
+if not frame then
+return
+end
+frame.Size = UDim2.new(0, btn.w, 0, btn.h)
+local uiScale = frame:FindFirstChildOfClass("UIScale")
+if uiScale then
+if baseScales[btn.flag] == nil then
+baseScales[btn.flag] = uiScale.Scale
+end
+uiScale.Scale = baseScales[btn.flag] * btn.s
+end
+end)
+end
+
+local function applyAllButtons()
+for _, btn in ipairs(screenButtons) do
+applyOneButton(btn)
+end
+end
+
+for _, btn in ipairs(screenButtons) do
+Tabs.Settings:Input({
+Title = btn.label .. " - Width (X)",
+Flag = "BtnW_" .. btn.flag,
+Placeholder = tostring(btn.w),
+Value = tostring(btn.w),
+NumbersOnly = true,
+Callback = function(text)
+btn.w = math.floor(parseNumberInput(text, btn.w))
+if btn.w < 60 then btn.w = 60 end
+if btn.w > 1000 then btn.w = 1000 end
+applyOneButton(btn)
+end
+})
+Tabs.Settings:Input({
+Title = btn.label .. " - Height (Y)",
+Flag = "BtnH_" .. btn.flag,
+Placeholder = tostring(btn.h),
+Value = tostring(btn.h),
+NumbersOnly = true,
+Callback = function(text)
+btn.h = math.floor(parseNumberInput(text, btn.h))
+if btn.h < 40 then btn.h = 40 end
+if btn.h > 1000 then btn.h = 1000 end
+applyOneButton(btn)
+end
+})
+Tabs.Settings:Input({
+Title = btn.label .. " - Scale (Z, 1 = normal)",
+Flag = "BtnS_" .. btn.flag,
+Placeholder = "1",
+Value = "1",
+NumbersOnly = true,
+Callback = function(text)
+btn.s = parseNumberInput(text, 1)
+if btn.s < 0.2 then btn.s = 0.2 end
+if btn.s > 5 then btn.s = 5 end
+applyOneButton(btn)
+end
+})
+Tabs.Settings:Button({
+Title = "Reset Ukuran " .. btn.label,
+Icon = "rotate-ccw",
+Callback = function()
+btn.w, btn.h, btn.s = 250, 90, 1
+applyOneButton(btn)
+pcall(function()
+WindUI:Notify({ Title = "Screen Button Size", Content = "Ukuran " .. btn.label .. " dikembalikan ke 250 x 90 (scale 1).", Duration = 2 })
+end)
+end
+})
+Tabs.Settings:Space()
+end
+
+Tabs.Settings:Button({
+Title = "Apply Semua Ukuran Tombol",
+Icon = "check",
+Desc = "Terapkan ulang ukuran semua tombol layar sekaligus (mis. setelah ganti map/respawn).",
+Callback = function()
+applyAllButtons()
+pcall(function()
+WindUI:Notify({ Title = "Screen Button Size", Content = "Semua ukuran tombol layar diterapkan.", Duration = 2 })
+end)
+end
+})
+
+-- terapkan sekali saat load (nilai default = ukuran asli, tidak mengubah apa pun)
+applyAllButtons()
+end
+end)
+if ok_BS then
+        DaraSectionDone("SCREEN BUTTON SIZE")
+else
+        DaraSectionFail("SCREEN BUTTON SIZE", err_BS)
+end
+
+
+
+DaraSectionStart("PLATFORM PC & SENSITIVITAS")
+-- FIX v1.4.3: section dibungkus pcall (anti mati-total)
+local ok_PP, err_PP = pcall(function()
+-- ============================================================
+-- UPDATE PC: DUKUNGAN PLATFORM PC (tab Settings).
+-- 1) Show Top GUI on PC  : tombol layar Zoom / Front View-Reload / Leaderboard kini
+--    bisa dibuat di PC (sebelumnya mobile-only) dan dimatikan kembali dengan bersih.
+-- 2) Sensitivity Controls: Mouse + Touch sensitivity (port DaraHub BETA) via hook
+--    PlayerModule.CameraModule.CameraInput.getRotation; hook DILEPAS saat kedua toggle
+--    OFF / Reset (FIX: versi BETA tidak pernah melepas hook getRotation).
+-- 3) Keybinds asli       : elemen :Keybind native WindUI (persis DaraHub asli) di tab
+--    Settings: Super Bounce (N), Bhop (B), Bhop Hold, Lag Switch (L).
+-- ============================================================
+
+Tabs.Settings:Space()
+Tabs.Settings:Section({ Title = "Top GUI (Zoom / Reload / Leaderboard)", TextSize = 20 })
+TopGuiPCToggle = Tabs.Settings:Toggle({
+Title = IsTouchDevice and "Show Top GUI" or "Show Top GUI on PC",
+Flag = "TopGuiPCToggle",
+Desc = IsTouchDevice and "Top GUI dibuat otomatis di perangkat mobile" or "Tampilkan tombol layar Zoom / Front View-Reload / Leaderboard di PC",
+Value = TopGUICreated,
+Callback = function(state)
+if state then
+ensureTopGUI()
+elseif TopGUICreated then
+destroyTopGUI()
+pcall(function()
+WindUI:Notify({ Title = "Top GUI", Content = "Top GUI dimatikan. Nyalakan lagi kapan saja dari tab Settings.", Duration = 3 })
+end)
+end
+end
+})
+
+do
+-- ---------------- Sensitivity Controls (port dari DaraHub BETA + FIX v1.6.0) ----------------
+local MouseSensitivityEnabled = false
+local MouseSensitivityValue = 1.0
+local TouchSensitivityEnabled = false
+local TouchSensitivityValue = 1.0
+local defaultSensitivity = 1.0
+local sensitivityHookedModules = {}
+local sensitivityUIS = game:GetService("UserInputService")
+
+-- ==================== FIX v1.6.0 (SENSITIVITAS MOBILE MATI - akar masalah ditemukan) ====================
+-- Di kamera Roblox modern yang dipakai Evade, rotasi kamera dari MOUSE mengalir lewat
+-- modul CameraInput, tetapi rotasi kamera dari SENTUH (mobile) mengalir lewat modul
+-- TouchInput yang TERPISAH - keduanya punya fungsi getRotation() sendiri.
+-- Hook lama (warisan DaraHub BETA, sama persis) HANYA membungkus CameraInput, sehingga
+-- di mobile getRotation CameraInput mengembalikan (0,0) untuk gerakan sentuh ->
+-- (0,0) x nilai sensitivitas apa pun tetap (0,0) -> slider Touch Sensitivity tidak
+-- pernah berefek ("sensitivitas mobile mati"; di DaraHub asli pun cacat yang sama).
+-- SOLUSI: SEMUA modul input di folder CameraModule yang punya getRotation dibungkus:
+--   - CameraInput  -> memakai logika Mouse (jalur mouse/PC; cabang Touch tetap ada
+--                      untuk layout kamera lama yang menggabungkan input sentuh)
+--   - TouchInput & modul input lain -> memakai nilai Touch (jalur sentuh/mobile)
+-- Hook dipasang saat toggle dinyalakan dan DILEPAS kembali saat kedua toggle OFF /
+-- Reset (perilaku bersih khas JoblessHub - dipertahankan).
+local function sensitivityWrapCameraInput(original)
+return function(disableRotation)
+local rotation = original(disableRotation)
+if MouseSensitivityEnabled and sensitivityUIS.MouseEnabled then
+return rotation * MouseSensitivityValue
+elseif TouchSensitivityEnabled and sensitivityUIS.TouchEnabled then
+return rotation * TouchSensitivityValue
+end
+return rotation
+end
+end
+
+local function sensitivityWrapTouch(original)
+return function(disableRotation)
+local rotation = original(disableRotation)
+if TouchSensitivityEnabled and sensitivityUIS.TouchEnabled then
+return rotation * TouchSensitivityValue
+end
+return rotation
+end
+end
+
+local function setupSensitivityHook()
+if next(sensitivityHookedModules) then
+return true
+end
+local ok, err = pcall(function()
+-- FIX: pencarian bertingkat + WaitForChild timeout (maks 10 detik) agar thread tidak
+-- menggantung selamanya bila struktur PlayerModule berubah; semua error ditangkap pcall.
+local playerScripts = LocalPlayer.PlayerScripts
+local playerModule = playerScripts and (playerScripts:FindFirstChild("PlayerModule") or playerScripts:WaitForChild("PlayerModule", 10))
+local cameraModule = playerModule and playerModule:FindFirstChild("CameraModule")
+if not cameraModule then
+error("PlayerModule.CameraModule tidak ditemukan")
+end
+local hooked = 0
+for _, child in ipairs(cameraModule:GetChildren()) do
+if child:IsA("ModuleScript") and tostring(child.Name):find("Input") then
+local okReq, mod = pcall(require, child)
+if okReq and type(mod) == "table" and type(mod.getRotation) == "function" then
+local original = mod.getRotation
+if child.Name == "CameraInput" then
+mod.getRotation = sensitivityWrapCameraInput(original)
+else
+mod.getRotation = sensitivityWrapTouch(original)
+end
+sensitivityHookedModules[child.Name] = { module = mod, original = original }
+hooked = hooked + 1
+end
+end
+end
+if hooked == 0 then
+error("tidak ada modul input dengan getRotation di CameraModule")
+end
+end)
+if not ok then
+warn("[JoblessHub] Gagal hook Sensitivity: " .. tostring(err))
+end
+return ok
+end
+
+-- FIX: berbeda dari BETA yang memasang hook sekali dan tidak pernah melepasnya,
+-- toggle OFF / Reset di sini mengembalikan SEMUA getRotation ke fungsi asli agar game
+-- kembali 100% bersih (sejalan dengan aturan toggle OFF = putus koneksi).
+local function maybeUnhookSensitivity()
+if not MouseSensitivityEnabled and not TouchSensitivityEnabled then
+for _, info in pairs(sensitivityHookedModules) do
+pcall(function()
+info.module.getRotation = info.original
+end)
+end
+sensitivityHookedModules = {}
+end
+end
+
+MouseSensitivityToggle = Tabs.Settings:Toggle({
+Title = "Mouse Sensitivity (PC)",
+Flag = "MouseSensitivityToggle",
+Desc = "Sesuaikan sensitivitas mouse kamera",
+Value = false,
+Callback = function(state)
+MouseSensitivityEnabled = state
+if state then
+if not setupSensitivityHook() then
+pcall(function()
+WindUI:Notify({ Title = "Mouse Sensitivity", Content = "Gagal hook sistem. Coba rejoin lalu nyalakan lagi.", Duration = 3 })
+end)
+MouseSensitivityToggle:Set(false)
+MouseSensitivityEnabled = false
+end
+else
+maybeUnhookSensitivity()
+end
+end
+})
+MouseSensitivitySlider = Tabs.Settings:Slider({
+Title = "Mouse Sensitivity Value",
+Flag = "MouseSensitivitySlider",
+Desc = "Kecil = lambat, besar = cepat (Max: 20)",
+Step = 0.1,
+Value = { Min = 0.1, Max = 20, Default = 1.0 },
+Callback = function(value)
+MouseSensitivityValue = tonumber(value) or defaultSensitivity
+end
+})
+Tabs.Settings:Space()
+TouchSensitivityToggle = Tabs.Settings:Toggle({
+Title = "Touch Sensitivity",
+Flag = "TouchSensitivityToggle",
+-- FIX v1.6.0: kini BENAR-BENAR bekerja di mobile - hook juga membungkus modul TouchInput
+-- (jalur input sentuh kamera yang terpisah dari CameraInput; lihat catatan FIX v1.6.0 di atas).
+Desc = "Sesuaikan sensitivitas sentuh kamera (mobile) - kini hook jalur TouchInput",
+Value = false,
+Callback = function(state)
+TouchSensitivityEnabled = state
+if state then
+if not setupSensitivityHook() then
+pcall(function()
+WindUI:Notify({ Title = "Touch Sensitivity", Content = "Gagal hook sistem. Coba rejoin lalu nyalakan lagi.", Duration = 3 })
+end)
+TouchSensitivityToggle:Set(false)
+TouchSensitivityEnabled = false
+end
+else
+maybeUnhookSensitivity()
+end
+end
+})
+TouchSensitivitySlider = Tabs.Settings:Slider({
+Title = "Touch Sensitivity Value",
+Flag = "TouchSensitivitySlider",
+Desc = "Kecil = lambat, besar = cepat (Max: 20)",
+Step = 0.1,
+Value = { Min = 0.1, Max = 20, Default = 1.0 },
+Callback = function(value)
+TouchSensitivityValue = tonumber(value) or defaultSensitivity
+end
+})
+Tabs.Settings:Button({
+Title = "Reset Sensitivity Settings",
+Desc = "Kembalikan sensitivitas mouse & touch ke default (1.0)",
+Icon = "refresh-cw",
+Callback = function()
+MouseSensitivityEnabled = false
+TouchSensitivityEnabled = false
+MouseSensitivityValue = defaultSensitivity
+TouchSensitivityValue = defaultSensitivity
+maybeUnhookSensitivity()
+if MouseSensitivityToggle then
+pcall(function() MouseSensitivityToggle:Set(false) end)
+end
+if MouseSensitivitySlider then
+pcall(function() MouseSensitivitySlider:Set(1.0) end)
+end
+if TouchSensitivityToggle then
+pcall(function() TouchSensitivityToggle:Set(false) end)
+end
+if TouchSensitivitySlider then
+pcall(function() TouchSensitivitySlider:Set(1.0) end)
+end
+pcall(function()
+WindUI:Notify({ Title = "Sensitivity Reset", Content = "Semua setting sensitivitas kembali ke default", Duration = 3 })
+end)
+end
+})
+end
+
+do
+-- ---------------- Keybinds (asli DaraHub, tab Settings) ----------------
+-- Port PERSIS dari DaraHub asli: elemen :Keybind native WindUI (bukan Input manual).
+-- Klik kotak keybind lalu tekan tombol keyboard untuk mengubahnya; Value default sama
+-- dengan asli: Super Bounce = N, Bhop = B, Bhop Hold = (kosong), Lag Switch = L.
+-- FIX: pembuatan elemen dibungkus guard + pcall agar WindUI versi lama tanpa :Keybind
+-- hanya warn, tidak membuat tab Settings kosong.
+if type(Tabs.Settings.Keybind) ~= "function" then
+warn("[JoblessHub] WindUI versi ini tidak punya elemen :Keybind - Keybind asli dilewati")
+else
+SuperBounceKeybind = Tabs.Settings:Keybind({
+Title = "Trigger Super Bounce",
+Desc = "Keybind to trigger super bounce",
+Value = "N",
+Flag = "SuperBounceKeybind",
+Callback = function(v)
+if SuperBounceEnabled then
+triggerSuperBounce()
+end
+end
+})
+BhopKeybind = Tabs.Settings:Keybind({
+Title = "Bhop Toggle Key",
+Desc = "Keybind to toggle Bhop",
+Value = "B",
+Flag = "BhopKeybind",
+Callback = function(v)
+BhopToggle:Set(not BhopToggle.Value)
+end
+})
+BhopHoldKeybind = Tabs.Settings:Keybind({
+Title = "Bhop Hold JUMP",
+Desc = "Keybind to toggle Bhop Hold",
+Value = "",
+Flag = "BhopHoldKeybind",
+Callback = function(v)
+BhopHoldToggle:Set(not BhopHoldToggle.Value)
+end
+})
+LagSwitchKeybind = Tabs.Settings:Keybind({
+Title = "Trigger Lag Switch",
+Desc = "Keybind to trigger lag switch",
+Value = "L",
+Flag = "LagSwitchKeybind",
+-- FIX (Task 21): trigger keybind Lag Switch mati total di PC. Callback lama
+-- hanya jalan bila toggle "Lag Switch" (tab Utility) aktif (lagSwitchEnabled)
+-- padahal toggle itu fungsinya hanya menampilkan/menyembunyikan tombol layar
+-- versi mobile. Di PC tombol layar tidak dipakai sehingga toggle sering OFF
+-- -> tekan L diam saja tanpa pesan apa pun. Keybind kini langsung memicu lag
+-- tanpa bergantung toggle (perilaku sama seperti tombol layar). Sekalian:
+-- lag() dibungkus pcall dan isLagActive selalu direset - versi lama bisa
+-- meninggalkan isLagActive = true selamanya bila satu mode error (jalur tombol
+-- layar sudah pcall, jalur keybind belum), membuat SEMUA trigger (keybind +
+-- tombol layar) mati permanen sampai rejoin.
+Callback = function(v)
+if not isLagActive then
+isLagActive = true
+task.spawn(function()
+pcall(lag)
+isLagActive = false
+end)
+end
+end
+})
+end
+
+end
+
+end)
+if ok_PP then
+DaraSectionDone("PLATFORM PC & SENSITIVITAS")
+else
+DaraSectionFail("PLATFORM PC & SENSITIVITAS", err_PP)
+end
+
+-- FIX v1.4.3: dibungkus pcall (baris telanjang setelah semua section)
+pcall(function()
+Window:SelectTab(1)
+end)
+
+-- v1.4.2: LAPORAN LOAD - ringkasan status semua section (notif + console)
+pcall(DaraHubFinalReport)
