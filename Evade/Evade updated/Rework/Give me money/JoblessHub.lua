@@ -1,8 +1,39 @@
 --[[
-    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.0
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.1
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
 
-    ============================ UPDATE v1.6.0 (FIX KAMERA KAKU/LAMBAT/ACAK + SENSITIVITAS MOBILE MATI) ============================
+    ============================ UPDATE v1.6.1 (AKAR MASALAH KAMERA LAMBAT/KAKU/NGEBUG ACAK DITEMUKAN) ============================
+    GEJALA: kamera terasa lemot/lambat/kaku/ngebug secara ACAK bahkan sering (PC & mobile),
+    makin lama / makin sering eksekusi-ulang makin parah; sensitivitas mobile mati; muncul
+    error/warning "getconnections".
+    AKAR MASALAH (baru ditemukan di v1.6.1): hook sensitivitas getRotation TIDAK tahan
+    eksekusi-ulang. Setiap re-execute: toggle sensitivitas yang pernah ON bisa ter-restore
+    otomatis oleh config WindUI (Folder JoblessHub/Games/Evade) atau dinyalakan lagi ->
+    hook dipasang DI ATAS hook eksekusi lama (MENUMPUK) -> nilai sensitivitas DIKALI
+    BERULANG per lapis (contoh: 0.5 x 0.5 x 0.5 = 0.125 -> kamera merangkak; nilai > 1 ->
+    kamera liar/ngebug). Inilah mengapa v1.6.0 terasa "tidak ada perubahan": anti-stacking
+    sudah diterapkan di hook Movement.Update tapi BELUM di hook sensitivitas kamera ini.
+    DaraHub asli tidak pernah mengalami ini karena guard "Already Loaded" memblokir
+    eksekusi ulang sama sekali (harus rejoin).
+    FIX v1.6.1:
+    - ANTI-STACKING HOOK SENSITIVITAS: fungsi ASLI getRotation disimpan di registry global
+      (getgenv, per identitas modul). Hook SELALU dipasang di atas FUNGSI ASLI game, dan
+      saat script dieksekusi ulang SEMUA hook lama langsung dikembalikan ke fungsi asli
+      lebih dulu -> berapa kali pun re-execute, efek = TEPAT SATU lapis (persis perilaku
+      DaraHub asli yang tidak bisa di-execute ulang).
+    - MovementValueSet DIKEMBALIKAN PERSIS ALUR ASLI DARAHUB (sinkron, tanpa antrian):
+      FireClient -> event CharacterTask -> ModifyMovement. Fallback tulis-langsung tetap
+      ada untuk executor tanpa getconnections (perbaikan error "getconnection tidak
+      ditemukan" tetap berlaku).
+    - Hook sensitivitas tetap membungkus DUA jalur input kamera Roblox: CameraInput (jalur
+      mouse/PC -> nilai Mouse) dan TouchInput (jalur sentuh/mobile -> nilai Touch) - fix
+      sensitivitas mobile mati dipertahankan; modul lain TIDAK disentuh (anti mishook).
+    - Semua fungsi/data bersama diverifikasi ulang terhadap DARAHUBBETA.txt asli: jalur
+      utama FireClient, defaultMovementValues, alur bhop/friction, timer, FullBright, defib,
+      teleport, keybind N/B/L - identik. Fitur tambahan user TETAP UTUH SEMUA, tidak ada
+      fitur DaraHub yang ditambahkan.
+
+    ============================ HISTORI: UPDATE v1.6.0 (FIX KAMERA KAKU/LAMBAT/ACAK + SENSITIVITAS MOBILE MATI) ============================
     Analisis penuh terhadap DARAHUBBETA.txt (asli) vs script ini menemukan akar masalah berikut:
     - FIX 1 (SENSITIVITAS MOBILE MATI - akar masalah ditemukan): di kamera Roblox modern yang
       dipakai Evade, rotasi kamera dari MOUSE mengalir lewat modul CameraInput, sedangkan rotasi
@@ -313,6 +344,24 @@ if _oldStats then
 _oldStats:Destroy()
 end
 end)
+-- FIX v1.6.1 (AKAR MASALAH KAMERA LAMBAT/KAKU/NGEBUG ACAK): SEMUA hook getRotation modul
+-- input kamera dari eksekusi lama LANGSUNG dikembalikan ke FUNGSI ASLI game saat script
+-- dieksekusi ulang. Tanpa ini tiap eksekusi ulang menumpuk satu lapis hook sensitivitas:
+-- nilai sensitivitas dikali berulang per lapis (mis. 0.5 x 0.5 x 0.5 = 0.125 -> kamera
+-- merangkak; nilai > 1 -> liar/ngebug) secara acak, makin parah makin sering re-execute.
+-- DaraHub asli aman dari ini karena guard "Already Loaded" memblokir eksekusi ulang;
+-- JoblessHub mengizinkan re-execute, maka semua hook lama dibersihkan lebih dulu di sini.
+-- (Registry diisi oleh setupSensitivityHook - lihat tab Settings bagian Sensitivity.)
+pcall(function()
+local _sensReg = getgenv().__JoblessHub_SensRegistry
+if type(_sensReg) == "table" then
+for _, _info in pairs(_sensReg) do
+if type(_info) == "table" and type(_info.module) == "table" and type(_info.original) == "function" then
+_info.module.getRotation = _info.original
+end
+end
+end
+end)
 local function DaraTrackConn(c)
 if c then
 table.insert(getgenv().__JoblessHubConns, c)
@@ -417,7 +466,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[JoblessHub] ============ LAPORAN LOAD v1.6.0 ============")
+        print("[JoblessHub] ============ LAPORAN LOAD v1.6.1 ============")
         print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -434,7 +483,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "JoblessHub Ringkas v1.6.0 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.6.1 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -1195,7 +1244,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.6.0",
+Title = "v1.6.1",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -1946,87 +1995,21 @@ local velocity = hrp.AssemblyLinearVelocity
 return (velocity.X * velocity.X + velocity.Z * velocity.Z) ^ 0.5
 end
 local movementFallbackNotified = false
--- FIX v1.6.0 (GERAKAN & KAMERA KAKU/LAMBAT/NGEBUG SECARA ACAK): pengiriman nilai
--- movement dirombak jadi ANTRIAN TERSUSUN + PENGGABUNGAN (coalescing), hanya SATU
--- pengiriman aktif pada satu waktu. Versi lama menjalankan tiap pengiriman di
--- task.spawn terpisah: saat friction bhop flip-flop cepat (tiap lompat/mendarat,
--- beberapa kali per detik) beberapa thread berjalan BARENG; begitu handler game
--- yield di dalam pcall, urutan penerapan bisa TERBALIK -> nilai Friction /
--- BhopEnabled di game salah secara acak -> gerakan mendadak kaku/aneh dan kamera
--- pengikut ikut tersentak (gejala "kaku, lambat, ngebug, secara acak bahkan sering").
--- Antrian baru: urutan selalu terjaga, nilai berulang untuk MovementType yang sama
--- digabung (nilai terakhir menang - persis semantik ModifyMovement game), dan jumlah
--- thread/alokasi jauh lebih hemat -> frame lebih stabil (terasa terutama di HP).
-local movementPending = {}
-local movementPendingOrder = {}
-local movementQueueBusy = false
-local movementLastRequested = {}
--- FIX v1.4.3 (dipertahankan): tabel Movement game sering BELUM siap saat script baru
--- load (karakter belum spawn) - retry otomatis 3 detik kemudian, warn hanya bila tetap gagal.
+-- FIX v1.6.1 (SAMA PERSIS DARAHUB ASLI): MovementValueSet kini SINKRON persis alur asli
+-- DaraHub (panggil FireClient event CharacterTask langsung - TANPA antrian, TANPA task.spawn;
+-- antrian FIFO buatan v1.6.0 dihapus sesuai permintaan agar fungsi sama seperti DaraHub asli).
+-- Yang dipertahankan HANYA perbaikan error:
+-- (1) guard nilai nil (Task 19),
+-- (2) FALLBACK jalur-langsung saat getconnections tidak tersedia/gagal di executor (fix
+--     "getconnection tidak ditemukan"): nilai ditulis langsung ke tabel Movement game via
+--     CharacterService (tabel yang sama dibaca game),
+-- (3) retry 3 detik saat tabel Movement belum siap (karakter belum spawn) + kirim ulang
+--     memakai nilai TERAKHIR (bukan nilai basi).
 local movementRetryScheduled = {}
+local movementLastRequested = {}
 -- FIX (Task 20): cache tabel Movement game yang valid; diisi hook Movement.Update
 -- berkala saat data tersedia, dipakai fallback pengiriman di bawah.
 local cachedMovementData = nil
-
-local function movementSendValue(movementType, value)
--- Jalur 1 (persis DaraHub asli): fire event CharacterTask milik game lewat getconnections
-local sent = false
-if CharacterTag then
-sent = SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", CharacterTag, "ModifyMovement", {movementType, value})
-end
-if sent then return end
--- Jalur 2 (fallback tanpa getconnections, dipertahankan dari Task 19): tulis langsung ke
--- tabel Movement milik game via CharacterService (script membaca tabel yang sama untuk
--- state/mirror) - membuat Jump Cap & Air Strafe tetap bekerja walau executor tidak
--- mendukung getconnections, sekaligus menutup kasus CharacterTag nil.
-local okFall, errFall = pcall(function()
-local data = CharacterService and CharacterService:GetCharacterFromPlayer(LocalPlayer)
-local movement = (data and data.Movement) or cachedMovementData
-if not movement then
-error("tabel Movement game tidak ditemukan")
-end
-movement[movementType] = value
-cachedMovementData = movement
-end)
-if not okFall and not movementFallbackNotified then
-if not movementRetryScheduled[movementType] then
-movementRetryScheduled[movementType] = true
-task.delay(3, function()
-movementRetryScheduled[movementType] = nil
--- FIX v1.6.0: kirim ulang memakai nilai TERAKHIR yang diminta, BUKAN nilai basi dari
--- 3 detik lalu (versi lama bisa memakai nilai basi yang menimpa nilai baru dan
--- mematikan bhop/movement secara acak).
-local latest = movementLastRequested[movementType]
-if latest ~= nil then
-MovementValueSet(movementType, latest)
-end
-end)
-return
-end
-movementFallbackNotified = true
-warn("[JoblessHub] Gagal mengubah movement '" .. tostring(movementType) .. "': " .. tostring(errFall))
-pcall(WindUI.Notify, WindUI, {
-Title = "JoblessHub",
-Content = "Gagal mengubah " .. tostring(movementType) .. ": executor tidak mendukung getconnections dan jalur langsung juga gagal.",
-Duration = 5
-})
-end
-end
-
-local function movementDequeue()
-while true do
-local movementType = table.remove(movementPendingOrder, 1)
-if not movementType then
-break
-end
-local value = movementPending[movementType]
-movementPending[movementType] = nil
-if value ~= nil then
-movementSendValue(movementType, value)
-end
-end
-movementQueueBusy = false
-end
 
 function MovementValueSet(MovementType, value)
 -- FIX (Task 19, dipertahankan): guard nilai nil - versi lama mengirim nil diam-diam
@@ -2035,26 +2018,50 @@ if value == nil then
 warn("[JoblessHub] MovementValueSet('" .. tostring(MovementType) .. "'): nilai tidak valid (nil) - dilewati")
 return
 end
+movementLastRequested[MovementType] = value
 if not CharacterTag then
 CharacterTag = GetCharacterTag(LocalPlayer.Character)
 end
-movementLastRequested[MovementType] = value
-movementPending[MovementType] = value
-local alreadyQueued = false
-for i = 1, #movementPendingOrder do
-if movementPendingOrder[i] == MovementType then
-alreadyQueued = true
-break
+-- Jalur 1 (PERSIS DaraHub asli): fire event CharacterTask milik game lewat getconnections
+if CharacterTag then
+local sent = SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", CharacterTag, "ModifyMovement", {MovementType, value})
+if sent then
+return
 end
 end
-if not alreadyQueued then
-movementPendingOrder[#movementPendingOrder + 1] = MovementType
+-- Jalur 2 (fallback tanpa getconnections - fix executor PC): tulis langsung ke tabel
+-- Movement milik game via CharacterService - membuat Jump Cap & Air Strafe tetap bekerja
+-- walau executor tidak mendukung getconnections, sekaligus menutup kasus CharacterTag nil
+-- (jalur DaraHub asli hanya melempar error 'Failed to Overwrite Movement Data').
+local okFall, errFall = pcall(function()
+local data = CharacterService and CharacterService:GetCharacterFromPlayer(LocalPlayer)
+local movement = (data and data.Movement) or cachedMovementData
+if not movement then
+error("tabel Movement game tidak ditemukan")
 end
--- hanya satu worker aktif; worker yang sedang yield akan mengambil nilai baru pada
--- iterasi berikutnya (urutan terjaga, tidak pernah dua pengiriman berjalan bareng)
-if not movementQueueBusy then
-movementQueueBusy = true
-task.spawn(movementDequeue)
+movement[MovementType] = value
+cachedMovementData = movement
+end)
+if not okFall and not movementFallbackNotified then
+if not movementRetryScheduled[MovementType] then
+movementRetryScheduled[MovementType] = true
+task.delay(3, function()
+movementRetryScheduled[MovementType] = nil
+-- kirim ulang memakai nilai TERAKHIR yang diminta, bukan nilai basi 3 detik lalu
+local latest = movementLastRequested[MovementType]
+if latest ~= nil then
+MovementValueSet(MovementType, latest)
+end
+end)
+return
+end
+movementFallbackNotified = true
+warn("[JoblessHub] Gagal mengubah movement '" .. tostring(MovementType) .. "': " .. tostring(errFall))
+pcall(WindUI.Notify, WindUI, {
+Title = "JoblessHub",
+Content = "Gagal mengubah " .. tostring(MovementType) .. ": executor tidak mendukung getconnections dan jalur langsung juga gagal.",
+Duration = 5
+})
 end
 end
 local originalMovementUpdate = nil
@@ -8421,7 +8428,7 @@ end
 })
 
 do
--- ---------------- Sensitivity Controls (port dari DaraHub BETA + FIX v1.6.0) ----------------
+-- ---------------- Sensitivity Controls (port dari DaraHub BETA + FIX v1.6.1) ----------------
 local MouseSensitivityEnabled = false
 local MouseSensitivityValue = 1.0
 local TouchSensitivityEnabled = false
@@ -8430,18 +8437,24 @@ local defaultSensitivity = 1.0
 local sensitivityHookedModules = {}
 local sensitivityUIS = game:GetService("UserInputService")
 
--- ==================== FIX v1.6.0 (SENSITIVITAS MOBILE MATI - akar masalah ditemukan) ====================
+-- ==================== FIX v1.6.1 (SENSITIVITAS + ANTI-STACKING - akar masalah kamera ditemukan) ====================
 -- Di kamera Roblox modern yang dipakai Evade, rotasi kamera dari MOUSE mengalir lewat
--- modul CameraInput, tetapi rotasi kamera dari SENTUH (mobile) mengalir lewat modul
--- TouchInput yang TERPISAH - keduanya punya fungsi getRotation() sendiri.
--- Hook lama (warisan DaraHub BETA, sama persis) HANYA membungkus CameraInput, sehingga
--- di mobile getRotation CameraInput mengembalikan (0,0) untuk gerakan sentuh ->
--- (0,0) x nilai sensitivitas apa pun tetap (0,0) -> slider Touch Sensitivity tidak
--- pernah berefek ("sensitivitas mobile mati"; di DaraHub asli pun cacat yang sama).
--- SOLUSI: SEMUA modul input di folder CameraModule yang punya getRotation dibungkus:
---   - CameraInput  -> memakai logika Mouse (jalur mouse/PC; cabang Touch tetap ada
---                      untuk layout kamera lama yang menggabungkan input sentuh)
---   - TouchInput & modul input lain -> memakai nilai Touch (jalur sentuh/mobile)
+-- modul CameraInput, sedangkan rotasi dari SENTUH (mobile) mengalir lewat modul TouchInput
+-- yang TERPISAH - keduanya punya fungsi getRotation() sendiri. Hook warisan DaraHub BETA
+-- hanya membungkus CameraInput -> di mobile (0,0) x nilai sensitivitas apa pun tetap (0,0)
+-- -> slider Touch Sensitivity tidak pernah berefek (cacat yang sama ada di DaraHub asli).
+-- Pembagian hook (hanya modul yang PASTI jalur input kamera - anti mishook modul lain):
+--   - CameraInput -> logika Mouse (jalur mouse/PC; cabang Touch tetap ada untuk layout
+--                    kamera lama yang menggabungkan input sentuh)
+--   - TouchInput  -> nilai Touch (jalur sentuh/mobile)
+-- ANTI-STACKING (FIX UTAMA v1.6.1 - penyebab kamera makin lambat/kaku secara acak):
+-- fungsi ASLI getRotation disimpan di registry global getgenv (per identitas modul).
+-- Hook SELALU dipasang di atas FUNGSI ASLI game, bukan di atas wrap eksekusi lama, dan
+-- blok RE-EXECUTION SAFETY di awal script mengembalikan semua hook lama ke fungsi asli
+-- saat script dieksekusi ulang. Tanpa ini tiap re-execute menumpuk satu lapis hook ->
+-- nilai sensitivitas DIKALI BERULANG (contoh 0.5 x 0.5 x 0.5 = 0.125 -> kamera merangkak;
+-- nilai > 1 -> liar/ngebug). DaraHub asli aman karena guard "Already Loaded" memblokir
+-- eksekusi ulang; JoblessHub mengizinkan re-execute maka hook dibuat tahan-tumpuk.
 -- Hook dipasang saat toggle dinyalakan dan DILEPAS kembali saat kedua toggle OFF /
 -- Reset (perilaku bersih khas JoblessHub - dipertahankan).
 local function sensitivityWrapCameraInput(original)
@@ -8479,12 +8492,31 @@ local cameraModule = playerModule and playerModule:FindFirstChild("CameraModule"
 if not cameraModule then
 error("PlayerModule.CameraModule tidak ditemukan")
 end
+-- ANTI-STACKING v1.6.1: registry global menyimpan FUNGSI ASLI game per identitas modul
+-- (diisi/di-refresh oleh blok RE-EXECUTION SAFETY & sini; identitas modul dipakai sebagai
+-- penanda agar setelah rejoin - module baru di-require - nilai asli otomatis di-refresh).
+local sensReg = getgenv().__JoblessHub_SensRegistry
+if type(sensReg) ~= "table" then
+sensReg = {}
+getgenv().__JoblessHub_SensRegistry = sensReg
+end
 local hooked = 0
 for _, child in ipairs(cameraModule:GetChildren()) do
-if child:IsA("ModuleScript") and tostring(child.Name):find("Input") then
+-- hanya modul jalur input kamera yang PASTI (CameraInput / TouchInput) - modul lain
+-- yang kebetulan mengandung kata "Input" TIDAK disentuh (anti mishook).
+if child:IsA("ModuleScript") and (child.Name == "CameraInput" or child.Name == "TouchInput" or child.Name == "TouchCameraInput") then
 local okReq, mod = pcall(require, child)
 if okReq and type(mod) == "table" and type(mod.getRotation) == "function" then
-local original = mod.getRotation
+-- ambil FUNGSI ASLI dari registry bila sudah tercatat & identitas modul sama;
+-- bila modul baru (rejoin / belum pernah dihook), fungsi saat ini = fungsi asli.
+local entry = sensReg[child.Name]
+local original
+if type(entry) == "table" and entry.module == mod and type(entry.original) == "function" then
+original = entry.original
+else
+original = mod.getRotation
+sensReg[child.Name] = { module = mod, original = original }
+end
 if child.Name == "CameraInput" then
 mod.getRotation = sensitivityWrapCameraInput(original)
 else
@@ -8553,9 +8585,9 @@ Tabs.Settings:Space()
 TouchSensitivityToggle = Tabs.Settings:Toggle({
 Title = "Touch Sensitivity",
 Flag = "TouchSensitivityToggle",
--- FIX v1.6.0: kini BENAR-BENAR bekerja di mobile - hook juga membungkus modul TouchInput
--- (jalur input sentuh kamera yang terpisah dari CameraInput; lihat catatan FIX v1.6.0 di atas).
-Desc = "Sesuaikan sensitivitas sentuh kamera (mobile) - kini hook jalur TouchInput",
+-- FIX v1.6.1: bekerja di mobile - hook membungkus modul TouchInput (jalur input sentuh
+-- kamera yang terpisah dari CameraInput) dan ANTI-STACKING saat eksekusi ulang.
+Desc = "Sesuaikan sensitivitas sentuh kamera (mobile) - hook jalur TouchInput",
 Value = false,
 Callback = function(state)
 TouchSensitivityEnabled = state
