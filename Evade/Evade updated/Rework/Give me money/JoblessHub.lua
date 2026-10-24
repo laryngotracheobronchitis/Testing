@@ -1,6 +1,30 @@
 --[[
-    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.1
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.2
     Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
+
+    ============================ UPDATE v1.6.2 (PERBAIKAN MODE FFLAG LAG SWITCH: FastFlag & FFlag+Demon) ============================
+    GEJALA: kedua mode FFlag di Lag Switch tidak bekerja - "FastFlag" terasa sama dengan
+    "Normal", dan pada "FFlag+Demon" yang berfungsi hanya bagian Demon-nya (laporan user:
+    "FFlag itu tidak bekerja dan yang berfungsi hanya Demon").
+    AKAR MASALAH: setLagFFlag("9999") dipanggil SETELAH busy-loop freeze selesai, lalu
+    LANGSUNG di-restoreLagFFlag() dalam frame Lua yang sama. Busy-loop membekukan engine
+    total, sehingga set + restore selesai SEBELUM engine sempat membaca nilai 9999 ->
+    FFlag tidak pernah aktif sama sekali (no-op murni). Sebagai pembanding, mode CPU
+    Cycle & OS.ClockFFlag yang terbukti bekerja memasang flag SEBELUM freeze - sama
+    seperti DaraHub asli (setfflag dipanggil sebelum busy-loop).
+    FIX v1.6.2 (HANYA menyentuh jalur FFlag, tidak mengubah mode lain):
+    - FFlag 9999 kini dipasang SEBELUM busy-loop freeze (pola DaraHub asli).
+    - Setelah freeze diberi jeda task.wait(0.1) supaya engine memproses resume/catch-up
+      world-step yang terlewat SELAGI nilai 9999 masih aktif, BARU dikembalikan ke nilai
+      asli. Tanpa jeda ini restore tetap terjadi sebelum engine membaca nilainya.
+    - Anti-bocor Task 23 tetap terjaga: nilai besar hanya aktif selama freeze + 0.1
+      detik, TIDAK menetap permanen (dulu menyebabkan render acak/terpotong/lag menetap).
+    - Urutan "FFlag+Demon" kini benar: freeze -> catch-up FFlag (karakter meluncur
+      dengan kecepatan simpanan) -> dash Demon (teleport + boost + hitbox resize).
+      Kombinasi keduanya benar-benar terasa, bukan lagi Demon saja.
+    - Mode "Demon" murni TIDAK tersentuh (tanpa flag, tanpa jeda - dash langsung setelah
+      freeze, persis seperti sebelumnya). Mode CPU Cycle / OS.ClockFFlag / Normal juga
+      tidak diubah sama sekali. Tidak ada fitur ditambah/dihapus; fitur user tetap utuh.
 
     ============================ UPDATE v1.6.1 (AKAR MASALAH KAMERA LAMBAT/KAKU/NGEBUG ACAK DITEMUKAN) ============================
     GEJALA: kamera terasa lemot/lambat/kaku/ngebug secara ACAK bahkan sering (PC & mobile),
@@ -466,7 +490,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[JoblessHub] ============ LAPORAN LOAD v1.6.1 ============")
+        print("[JoblessHub] ============ LAPORAN LOAD v1.6.2 ============")
         print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -483,7 +507,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "JoblessHub Ringkas v1.6.1 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.6.2 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -1244,7 +1268,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.6.1",
+Title = "v1.6.2",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -6048,22 +6072,44 @@ if not hrp then return end
 local storedVelocity = hrp.AssemblyLinearVelocity
 if storedVelocity.Magnitude < 1 then return end
 
+-- FIX (v1.6.2 - PERBAIKAN MODE FFLAG: "FastFlag" & "FFlag+Demon" tidak bekerja):
+-- FFlag 9999 kini dipasang SEBELUM busy-loop freeze. Dulu setLagFFlag("9999") dipanggil
+-- SETELAH freeze selesai lalu LANGSUNG restoreLagFFlag() dalam frame Lua yang sama;
+-- karena busy-loop memblokir engine total, set + restore selesai SEBELUM engine sempat
+-- membaca nilai 9999 -> FFlag tidak pernah berefek (no-op murni): "FastFlag" terasa
+-- sama dengan "Normal", dan "FFlag+Demon" terasa hanya "Demon" saja. Pola yang benar
+-- sama seperti mode CPU Cycle / OS.ClockFFlag yang terbukti bekerja (dan sama seperti
+-- DaraHub asli): pasang flag SEBELUM freeze -> freeze -> beri engine waktu memproses
+-- -> baru kembalikan ke nilai asli.
+local usesFFlagLag = (method == "FastFlag" or method == "FFlag+Demon" or LagTime < 0.2)
+if usesFFlagLag then
+setLagFFlag("9999")
+end
+
 local start = tick()
 while tick() - start < LagTime do end
 
-if method == "FastFlag" or LagTime < 0.2 then
--- FIX (Task 23): FFlag 9999 kini dikembalikan ke nilai asli setelah dipakai
-setLagFFlag("9999")
+-- FIX (v1.6.2): setelah freeze, engine butuh beberapa frame untuk memproses
+-- resume/catch-up world-step yang terlewat SELAGI nilai 9999 masih aktif. Tanpa jeda,
+-- restore terjadi sebelum engine membaca nilainya (flag dipasang tapi tak pernah
+-- terlihat). Jeda tetap singkat (0.1 dtk) sehingga anti-bocor Task 23 tetap terjaga:
+-- nilai besar TIDAK menetap permanen (dulu menyebabkan render acak/terpotong/lag
+-- menetap sampai rejoin).
+if usesFFlagLag then
+task.wait(0.1)
 restoreLagFFlag()
+end
+
+if method == "FastFlag" or LagTime < 0.2 then
 return
 end
 
--- ADD (Task 23): mode "FFlag+Demon" (permintaan user) - gabungan metode FFlag + dash Demon:
--- FFlag dipasang lalu DIKEMBALIKAN ke nilai asli, lalu lanjut ke dash Demon di bawah.
-if method == "FFlag+Demon" then
-setLagFFlag("9999")
-restoreLagFFlag()
-elseif method ~= "Demon" then
+-- ADD (Task 23): mode "FFlag+Demon" (permintaan user) - gabungan metode FFlag + dash
+-- Demon: catch-up FFlag sudah berjalan di atas (freeze + jeda 0.1 dtk dengan flag
+-- aktif), lanjut ke dash Demon di bawah. Mode "Demon" murni TIDAK tersentuh oleh flag
+-- & jeda di atas (usesFFlagLag false) - dash tetap langsung setelah freeze, persis
+-- perilaku sebelumnya yang sudah berfungsi.
+if method ~= "Demon" and method ~= "FFlag+Demon" then
 return
 end
 
