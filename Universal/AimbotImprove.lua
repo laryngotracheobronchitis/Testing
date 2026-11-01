@@ -31,7 +31,7 @@ WindUI.TransparencyValue = 0.7
 Window:ToggleTransparency(true)
 Window:SetToggleKey(Enum.KeyCode.RightControl)
 pcall(function() Window:DisableTopbarButtons({ "Fullscreen" }) end)
-Window:Tag({ Title = "v1.5" })
+Window:Tag({ Title = "v1.6" })
 
 Tabs = {
     Combat  = Window:Tab({ Title = "Combat",  Icon = "sword" }),
@@ -58,7 +58,6 @@ end
 if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(setupCharacter)
 
--- Lighting snapshot untuk restore
 local lightingSnapshot = {
     Brightness = Lighting.Brightness,
     Ambient = Lighting.Ambient,
@@ -70,7 +69,7 @@ local lightingSnapshot = {
 }
 
 -- =========================================================
--- AIMBOT (PROFILE 2 + FOV 55 + DEATH-CHECK FIX)
+-- AIMBOT + FOV (DECOUPLED)
 -- =========================================================
 local AimbotEnabled      = false
 local ShowFOV            = false
@@ -86,11 +85,11 @@ local maxDistance        = 300
 local teamCheckEnabled   = true
 local targetTypes        = { "Player" }
 
-local AimbotCircle, aimbotRenderConnection, aimbotRunning, aimbotConnection
+local AimbotCircle, fovRenderConnection = nil, nil
+local aimbotRunning, aimbotConnection
 local cameraLockEnabled, lockedTarget, cameraLockConnection
 local npcCache, lastNPCCacheTime = {}, 0
 
--- Helper: deteksi target mati / dying (fix kamera nunduk saat kill)
 local function isTargetDeadOrDying(hum)
     if not hum then return true end
     if hum.Health <= 0 then return true end
@@ -212,12 +211,32 @@ local function getClosestEnemyInFOV()
     return closestTarget
 end
 
-local function createFOVCircle()
-    if AimbotCircle then AimbotCircle:Remove(); AimbotCircle = nil end
+-- ============ FOV CIRCLE (INDEPENDENT) ============
+local function destroyFOVCircle()
+    if fovRenderConnection then
+        fovRenderConnection:Disconnect()
+        fovRenderConnection = nil
+    end
+    if AimbotCircle then
+        pcall(function() AimbotCircle:Remove() end)
+        AimbotCircle = nil
+    end
+end
+
+local function buildFOVCircle()
+    destroyFOVCircle()
     if not ShowFOV then return end
     local Camera = workspace.CurrentCamera
     if not Camera then return end
-    local circle = Drawing.new("Circle")
+
+    local ok, circle = pcall(function() return Drawing.new("Circle") end)
+    if not ok or not circle then
+        warn("[Darahub] Drawing library not supported — Show FOV disabled.")
+        ShowFOV = false
+        if ShowFOVToggle then pcall(function() ShowFOVToggle:Set(false) end) end
+        return
+    end
+
     circle.Visible = true
     circle.Radius = fovRadius
     circle.Color = FOVColor
@@ -228,30 +247,33 @@ local function createFOVCircle()
         and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         or UserInputService:GetMouseLocation()
     AimbotCircle = circle
-    if aimbotRenderConnection then aimbotRenderConnection:Disconnect() end
-    aimbotRenderConnection = RunService.RenderStepped:Connect(function()
-        if AimbotCircle and ShowFOV then
-            local cam = workspace.CurrentCamera
-            if cam then
-                AimbotCircle.Position = lockFOVToCenter
-                    and Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-                    or UserInputService:GetMouseLocation()
-            end
-        end
+
+    fovRenderConnection = RunService.RenderStepped:Connect(function()
+        if not AimbotCircle or not ShowFOV then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        AimbotCircle.Position = lockFOVToCenter
+            and Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+            or UserInputService:GetMouseLocation()
     end)
 end
 
 local function updateFOVCircle()
-    if AimbotCircle then
+    if not ShowFOV then
+        destroyFOVCircle()
+        return
+    end
+    if not AimbotCircle then
+        buildFOVCircle()
+    else
         AimbotCircle.Radius = fovRadius
         AimbotCircle.Color = FOVColor
         AimbotCircle.Thickness = FOVThickness
-        AimbotCircle.Visible = ShowFOV
-    elseif ShowFOV then
-        createFOVCircle()
+        AimbotCircle.Visible = true
     end
 end
 
+-- ============ CAMERA LOCK ============
 local function unlockCamera()
     cameraLockEnabled = false
     lockedTarget = nil
@@ -260,7 +282,6 @@ end
 
 local function lockCameraToTarget(target)
     if not target or not target.aimPart then unlockCamera(); return end
-    -- Jangan pernah lock ke target yang sudah mati/dying
     if isTargetDeadOrDying(target.humanoid) then unlockCamera(); return end
     lockedTarget = target
     cameraLockEnabled = true
@@ -272,7 +293,6 @@ local function lockCameraToTarget(target)
         if not lockedTarget.aimPart.Parent then
             unlockCamera(); return
         end
-        -- Strict per-frame death check (fix kamera nunduk saat kill)
         if isTargetDeadOrDying(lockedTarget.humanoid) then
             unlockCamera(); return
         end
@@ -280,7 +300,6 @@ local function lockCameraToTarget(target)
         if not cam then return end
         local camPos = cam.CFrame.Position
         local targetPos = lockedTarget.aimPart.Position
-        -- Guard: kalau aim part jauh di bawah kamera (ragdoll jatuh), jangan lerp
         if targetPos.Y < camPos.Y - 30 then
             unlockCamera(); return
         end
@@ -296,7 +315,6 @@ end
 
 local function startAimbot()
     if aimbotRunning then return end
-    createFOVCircle()
     aimbotRunning = true
     aimbotConnection = RunService.RenderStepped:Connect(function()
         if not AimbotEnabled or not aimbotRunning then
@@ -311,7 +329,6 @@ local function startAimbot()
             if cameraLockEnabled then unlockCamera() end
             return
         end
-        -- FIX: kalau target yang lagi dikunci mati, langsung unlock sebelum cari target baru
         if lockedTarget then
             local lt = lockedTarget
             if not lt.humanoid or not lt.aimPart or not lt.aimPart.Parent or isTargetDeadOrDying(lt.humanoid) then
@@ -331,10 +348,10 @@ local function stopAimbot()
     aimbotRunning = false
     unlockCamera()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
-    if AimbotCircle then AimbotCircle:Remove(); AimbotCircle = nil end
-    if aimbotRenderConnection then aimbotRenderConnection:Disconnect(); aimbotRenderConnection = nil end
+    -- FOV circle TIDAK disentuh di sini — diurus terpisah oleh ShowFOV toggle
 end
 
+-- ============ AIMBOT UI ============
 Tabs.Combat:Section({ Title = "Aimbot" })
 AimbotToggle = Tabs.Combat:Toggle({
     Title = "Aimbot (F8)",
@@ -365,8 +382,21 @@ Tabs.Combat:Toggle({ Title = "Team Check", Flag = "TeamCheckToggle", Value = tru
 Tabs.Combat:Toggle({ Title = "Wall Check", Flag = "WallCheckToggle", Value = true, Callback = function(s) wallCheckEnabled = s end })
 
 Tabs.Combat:Section({ Title = "FOV" })
-Tabs.Combat:Toggle({ Title = "Show FOV Circle",  Flag = "ShowFOVToggle", Value = false, Callback = function(s) ShowFOV = s; updateFOVCircle() end })
-Tabs.Combat:Toggle({ Title = "Lock FOV To Center", Flag = "LockFOVToggle", Value = true, Callback = function(s) lockFOVToCenter = s; updateFOVCircle() end })
+ShowFOVToggle = Tabs.Combat:Toggle({
+    Title = "Show FOV Circle",
+    Flag = "ShowFOVToggle",
+    Value = false,
+    Callback = function(s)
+        ShowFOV = s
+        updateFOVCircle()
+    end
+})
+Tabs.Combat:Toggle({
+    Title = "Lock FOV To Center",
+    Flag = "LockFOVToggle",
+    Value = true,
+    Callback = function(s) lockFOVToCenter = s; updateFOVCircle() end
+})
 
 Tabs.Combat:Input({
     Title = "FOV Radius", Flag = "FOVRadiusInput",
@@ -374,17 +404,27 @@ Tabs.Combat:Input({
     NumbersOnly = true,
     Callback = function(v)
         local n = tonumber(v)
-        if n and n >= 10 and n <= 500 then fovRadius = n; updateFOVCircle() end
+        if n and n >= 10 and n <= 500 then
+            fovRadius = n
+            updateFOVCircle()
+        end
     end
 })
-Tabs.Combat:Colorpicker({ Title = "FOV Color", Flag = "FOVColorPicker", Default = Color3.fromRGB(0, 255, 0), Callback = function(c) FOVColor = c; updateFOVCircle() end })
+Tabs.Combat:Colorpicker({
+    Title = "FOV Color", Flag = "FOVColorPicker",
+    Default = Color3.fromRGB(0, 255, 0),
+    Callback = function(c) FOVColor = c; updateFOVCircle() end
+})
 Tabs.Combat:Input({
     Title = "FOV Thickness", Flag = "FOVThicknessInput",
     Value = "2", Placeholder = "1 - 10",
     NumbersOnly = true,
     Callback = function(v)
         local n = tonumber(v)
-        if n and n >= 1 and n <= 10 then FOVThickness = n; updateFOVCircle() end
+        if n and n >= 1 and n <= 10 then
+            FOVThickness = n
+            updateFOVCircle()
+        end
     end
 })
 
@@ -1291,11 +1331,12 @@ Tabs.ESP:Toggle({ Title = "Tool Distance",   Value = false, Callback = function(
 Tabs.ESP:Toggle({ Title = "Tool Highlights", Value = false, Callback = function(s) toolHighlights = s end })
 
 -- =========================================================
--- FULL CLEANUP (dipanggil saat reload / OnDestroy)
+-- FULL CLEANUP
 -- =========================================================
 local function fullCleanup()
     AimbotEnabled = false
     pcall(stopAimbot)
+    pcall(destroyFOVCircle)
     if f8Connection then pcall(function() f8Connection:Disconnect() end); f8Connection = nil end
 
     HitboxSettings.Enabled = false
@@ -1307,7 +1348,6 @@ local function fullCleanup()
     for _, c in ipairs(hitboxCharAddedConns) do pcall(function() c:Disconnect() end) end
     hitboxCharAddedConns = {}
 
-    -- Visual Server Desync cleanup
     vsdEnabled = false
     pcall(function() vsdApplyTransparency(false) end)
     pcall(vsdStopHeartbeat)
