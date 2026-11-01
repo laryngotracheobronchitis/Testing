@@ -31,7 +31,7 @@ WindUI.TransparencyValue = 0.7
 Window:ToggleTransparency(true)
 Window:SetToggleKey(Enum.KeyCode.RightControl)
 pcall(function() Window:DisableTopbarButtons({ "Fullscreen" }) end)
-Window:Tag({ Title = "v1.2" })
+Window:Tag({ Title = "v1.4" })
 
 Tabs = {
     Combat  = Window:Tab({ Title = "Combat",  Icon = "sword" }),
@@ -70,7 +70,7 @@ local lightingSnapshot = {
 }
 
 -- =========================================================
--- AIMBOT
+-- AIMBOT (PROFILE 2 + FOV 55)
 -- =========================================================
 local AimbotEnabled      = false
 local ShowFOV            = false
@@ -78,12 +78,12 @@ local FOVThickness       = 2
 local FOVColor           = Color3.fromRGB(0, 255, 0)
 local aimPart            = "Head"
 local aimLockType        = "Realistic"
-local smoothnessValue    = 7.5
-local wallCheckEnabled   = false
-local fovRadius          = 75
+local smoothnessValue    = 8
+local wallCheckEnabled   = true
+local fovRadius          = 55
 local lockFOVToCenter    = true
 local maxDistance        = 300
-local teamCheckEnabled   = false
+local teamCheckEnabled   = true
 local targetTypes        = { "Player" }
 
 local AimbotCircle, aimbotRenderConnection, aimbotRunning, aimbotConnection
@@ -312,10 +312,9 @@ Tabs.Combat:Dropdown({ Title = "Aim Part", Flag = "AimPartDropdown", Values = { 
 Tabs.Combat:Dropdown({ Title = "Target Type", Flag = "TargetTypeDropdown", Values = { "Player", "NPC" }, Value = { "Player" }, Multi = true, AllowNone = true, Callback = function(v) targetTypes = v end })
 Tabs.Combat:Dropdown({ Title = "Aim Lock Type", Flag = "AimLockTypeDropdown", Values = { "Realistic", "Stimulate" }, Value = "Realistic", Callback = function(v) aimLockType = v; if cameraLockEnabled then unlockCamera() end end })
 
--- INPUT instead of Slider
 Tabs.Combat:Input({
     Title = "Smoothness", Flag = "SmoothnessInput",
-    Value = "7.5", Placeholder = "0.01 - 20",
+    Value = "8", Placeholder = "0.01 - 20",
     NumbersOnly = true,
     Callback = function(v)
         local n = tonumber(v)
@@ -328,8 +327,8 @@ Tabs.Combat:Input({
     NumbersOnly = true,
     Callback = function(v) local n = tonumber(v); if n then maxDistance = n end end
 })
-Tabs.Combat:Toggle({ Title = "Team Check", Flag = "TeamCheckToggle", Value = false, Callback = function(s) teamCheckEnabled = s end })
-Tabs.Combat:Toggle({ Title = "Wall Check", Flag = "WallCheckToggle", Value = false, Callback = function(s) wallCheckEnabled = s end })
+Tabs.Combat:Toggle({ Title = "Team Check", Flag = "TeamCheckToggle", Value = true, Callback = function(s) teamCheckEnabled = s end })
+Tabs.Combat:Toggle({ Title = "Wall Check", Flag = "WallCheckToggle", Value = true, Callback = function(s) wallCheckEnabled = s end })
 
 Tabs.Combat:Section({ Title = "FOV" })
 Tabs.Combat:Toggle({ Title = "Show FOV Circle",  Flag = "ShowFOVToggle", Value = false, Callback = function(s) ShowFOV = s; updateFOVCircle() end })
@@ -337,7 +336,7 @@ Tabs.Combat:Toggle({ Title = "Lock FOV To Center", Flag = "LockFOVToggle", Value
 
 Tabs.Combat:Input({
     Title = "FOV Radius", Flag = "FOVRadiusInput",
-    Value = "75", Placeholder = "10 - 500",
+    Value = "55", Placeholder = "10 - 500",
     NumbersOnly = true,
     Callback = function(v)
         local n = tonumber(v)
@@ -481,31 +480,79 @@ local hitboxLoopConnection = RunService.Heartbeat:Connect(function()
 end)
 
 -- =========================================================
--- VISUAL SERVER DESYNC
+-- VISUAL SERVER DESYNC (original Darahub)
 -- =========================================================
-local vsdEnabled, vsdConnection = false, nil
-local function toggleVisualServerDesync(state)
-    vsdEnabled = state
-    if vsdConnection then vsdConnection:Disconnect(); vsdConnection = nil end
-    if state then
-        vsdConnection = RunService.Heartbeat:Connect(function()
-            if not vsdEnabled then return end
-            local char = LocalPlayer.Character
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-            if hum and hrp then
-                local oldCF, oldOffset = hrp.CFrame, hum.CameraOffset
-                hrp.CFrame = oldCF * CFrame.new(0, 50000, 0)
-                hum.CameraOffset = hrp.CFrame:ToObjectSpace(CFrame.new(oldCF.Position)).Position
-                RunService.RenderStepped:Wait()
-                if hrp and hrp.Parent and hum and hum.Parent then
-                    hrp.CFrame = oldCF
-                    hum.CameraOffset = oldOffset
-                end
-            end
-        end)
+local vsdCharacter, vsdHumanoid, vsdRoot = nil, nil, nil
+local vsdParts = {}
+local vsdEnabled = false
+local vsdHeartbeatConn = nil
+
+local function vsdRefresh()
+    vsdCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    vsdHumanoid = vsdCharacter:WaitForChild("Humanoid")
+    vsdRoot = vsdCharacter:WaitForChild("HumanoidRootPart")
+    vsdParts = {}
+    for _, v in pairs(vsdCharacter:GetDescendants()) do
+        if v:IsA("BasePart") and v.Transparency == 0 then
+            vsdParts[#vsdParts + 1] = v
+        end
     end
 end
+
+local function vsdApplyTransparency(state)
+    for _, v in pairs(vsdParts) do
+        if state then
+            v.Transparency = v.Transparency == 0 and 0.5 or 0
+        else
+            v.Transparency = 0
+        end
+    end
+end
+
+local function vsdStartHeartbeat()
+    if vsdHeartbeatConn then return end
+    vsdHeartbeatConn = RunService.Heartbeat:Connect(function()
+        if not vsdEnabled then return end
+        if not (vsdRoot and vsdRoot.Parent and vsdHumanoid and vsdHumanoid.Parent) then return end
+        local savedCFrame = vsdRoot.CFrame
+        local savedOffset = vsdHumanoid.CameraOffset
+        local newCFrame   = savedCFrame * CFrame.new(0, 50000, 0)
+        vsdRoot.CFrame = newCFrame
+        vsdHumanoid.CameraOffset = newCFrame:ToObjectSpace(CFrame.new(savedCFrame.Position)).Position
+        RunService.RenderStepped:Wait()
+        if vsdRoot and vsdRoot.Parent and vsdHumanoid and vsdHumanoid.Parent then
+            vsdRoot.CFrame = savedCFrame
+            vsdHumanoid.CameraOffset = savedOffset
+        end
+    end)
+end
+
+local function vsdStopHeartbeat()
+    if vsdHeartbeatConn then
+        vsdHeartbeatConn:Disconnect()
+        vsdHeartbeatConn = nil
+    end
+end
+
+local function toggleVisualServerDesync(state)
+    vsdEnabled = state
+    if state then
+        vsdApplyTransparency(true)
+        vsdStartHeartbeat()
+    else
+        vsdApplyTransparency(false)
+        vsdStopHeartbeat()
+    end
+end
+
+task.spawn(vsdRefresh)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    vsdEnabled = false
+    vsdStopHeartbeat()
+    task.wait(0.5)
+    vsdRefresh()
+end)
 
 -- =========================================================
 -- ANTI AFK / ANTI KILL PARTS
@@ -1019,32 +1066,47 @@ local espRenderConnection = RunService.RenderStepped:Connect(function()
 end)
 
 -- =========================================================
--- FORCE UNLOCK MOUSE (LEFT ALT)
+-- FORCE UNLOCK MOUSE (HOLD LEFT ALT)
 -- =========================================================
-local mouseUnlocked, mouseUnlockConnection = false, nil
-local function setMouseUnlocked(state)
-    mouseUnlocked = state
-    if mouseUnlockConnection then mouseUnlockConnection:Disconnect(); mouseUnlockConnection = nil end
-    if state then
-        pcall(function()
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-            UserInputService.MouseIconEnabled = true
-        end)
-        mouseUnlockConnection = RunService.Heartbeat:Connect(function()
-            if mouseUnlocked then
-                pcall(function()
-                    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-                    UserInputService.MouseIconEnabled = true
-                end)
-            end
-        end)
-    else
-        pcall(function() UserInputService.MouseBehavior = Enum.MouseBehavior.Default end)
+local mouseUnlockConnection = nil
+local isHoldingAlt = false
+
+local function startMouseUnlock()
+    if isHoldingAlt then return end
+    isHoldingAlt = true
+    if mouseUnlockConnection then mouseUnlockConnection:Disconnect() end
+    pcall(function()
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        UserInputService.MouseIconEnabled = true
+    end)
+    mouseUnlockConnection = RunService.Heartbeat:Connect(function()
+        if isHoldingAlt then
+            pcall(function()
+                UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+                UserInputService.MouseIconEnabled = true
+            end)
+        end
+    end)
+end
+
+local function stopMouseUnlock()
+    if not isHoldingAlt then return end
+    isHoldingAlt = false
+    if mouseUnlockConnection then
+        mouseUnlockConnection:Disconnect()
+        mouseUnlockConnection = nil
     end
 end
-local altConnection = UserInputService.InputBegan:Connect(function(input)
+
+local altBeginConn = UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.LeftAlt then
-        setMouseUnlocked(not mouseUnlocked)
+        startMouseUnlock()
+    end
+end)
+
+local altEndConn = UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftAlt then
+        stopMouseUnlock()
     end
 end)
 
@@ -1102,7 +1164,12 @@ Tabs.Player:Dropdown({
 Tabs.Misc:Section({ Title = "Misc" })
 Tabs.Misc:Toggle({ Title = "Anti AFK", Value = false, Callback = function(s) if s then startAntiAFK() else stopAntiAFK() end end })
 Tabs.Misc:Toggle({ Title = "Anti Kill Parts", Value = false, Callback = function(s) toggleAntiKillParts(s) end })
-Tabs.Misc:Toggle({ Title = "Visual Server Desync", Value = false, Callback = function(s) toggleVisualServerDesync(s) end })
+Tabs.Misc:Toggle({
+    Title = "Visual Server Desync",
+    Desc = "Desync visual/server + karakter semi-transparan",
+    Value = false,
+    Callback = function(s) toggleVisualServerDesync(s) end
+})
 
 Tabs.Misc:Section({ Title = "Hitbox" })
 Tabs.Misc:Toggle({
@@ -1206,8 +1273,10 @@ local function fullCleanup()
     for _, c in ipairs(hitboxCharAddedConns) do pcall(function() c:Disconnect() end) end
     hitboxCharAddedConns = {}
 
+    -- Visual Server Desync cleanup
     vsdEnabled = false
-    if vsdConnection then pcall(function() vsdConnection:Disconnect() end); vsdConnection = nil end
+    pcall(function() vsdApplyTransparency(false) end)
+    pcall(vsdStopHeartbeat)
 
     pcall(stopAntiAFK)
     if AntiKillPartsEnabled then pcall(function() toggleAntiKillParts(false) end) end
@@ -1233,9 +1302,10 @@ local function fullCleanup()
     pcall(cleanupToolESP)
     if espRenderConnection then pcall(function() espRenderConnection:Disconnect() end); espRenderConnection = nil end
 
-    mouseUnlocked = false
+    isHoldingAlt = false
     if mouseUnlockConnection then pcall(function() mouseUnlockConnection:Disconnect() end); mouseUnlockConnection = nil end
-    if altConnection then pcall(function() altConnection:Disconnect() end); altConnection = nil end
+    if altBeginConn        then pcall(function() altBeginConn:Disconnect() end); altBeginConn = nil end
+    if altEndConn          then pcall(function() altEndConn:Disconnect() end); altEndConn = nil end
     pcall(function() UserInputService.MouseBehavior = Enum.MouseBehavior.Default end)
 
     pcall(function() Window:Destroy() end)
