@@ -1,6 +1,5 @@
 -- =========================================================
--- RELOAD SYSTEM: kalau sudah ada instance lama, cleanup dulu
--- semua fitur dimatikan, lighting/hitbox/mouse/dll di-restore
+-- RELOAD SYSTEM: cleanup instance lama dulu
 -- =========================================================
 if type(getgenv().DaraHubCleanup) == "function" then
     pcall(getgenv().DaraHubCleanup)
@@ -26,23 +25,29 @@ Window = WindUI:CreateWindow({
     SideBarWidth = 200,
     OpenButton = { ShowIconOnly = true }
 })
-Window:Tag({ Title = "v1.1" })
+
+-- ============ FIX WindUI SHOW/HIDE ============
+WindUI.TransparencyValue = 0.7
+Window:ToggleTransparency(true)
+Window:SetToggleKey(Enum.KeyCode.RightControl)
+pcall(function() Window:DisableTopbarButtons({ "Fullscreen" }) end)
+Window:Tag({ Title = "v1.2" })
 
 Tabs = {
-    Combat = Window:Tab({ Title = "Combat", Icon = "sword" }),
+    Combat  = Window:Tab({ Title = "Combat",  Icon = "sword" }),
     Visuals = Window:Tab({ Title = "Visuals", Icon = "camera" }),
-    Player = Window:Tab({ Title = "Player", Icon = "user" }),
-    Misc = Window:Tab({ Title = "Misc", Icon = "star" }),
-    ESP = Window:Tab({ Title = "ESP", Icon = "eye" }),
+    Player  = Window:Tab({ Title = "Player",  Icon = "user" }),
+    Misc    = Window:Tab({ Title = "Misc",    Icon = "star" }),
+    ESP     = Window:Tab({ Title = "ESP",     Icon = "eye" }),
 }
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
-local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local LocalPlayer = Players.LocalPlayer
+local Players            = game:GetService("Players")
+local RunService         = game:GetService("RunService")
+local VirtualUser        = game:GetService("VirtualUser")
+local Lighting           = game:GetService("Lighting")
+local UserInputService   = game:GetService("UserInputService")
+local CoreGui            = game:GetService("CoreGui")
+local LocalPlayer        = Players.LocalPlayer
 
 local Character, Humanoid, HumanoidRootPart
 local function setupCharacter(c)
@@ -53,46 +58,37 @@ end
 if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(setupCharacter)
 
--- =========================================================
--- LIGHTING SNAPSHOT (untuk restore saat cleanup)
--- =========================================================
+-- Lighting snapshot untuk restore
 local lightingSnapshot = {
-    Brightness        = Lighting.Brightness,
-    Ambient           = Lighting.Ambient,
-    OutdoorAmbient    = Lighting.OutdoorAmbient,
-    ColorShift_Top    = Lighting.ColorShift_Top,
+    Brightness = Lighting.Brightness,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    ColorShift_Top = Lighting.ColorShift_Top,
     ColorShift_Bottom = Lighting.ColorShift_Bottom,
-    FogEnd            = Lighting.FogEnd,
-    GlobalShadows     = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
 }
 
 -- =========================================================
 -- AIMBOT
 -- =========================================================
-local AimbotEnabled = false
-local ShowFOV = false
-local FOVThickness = 2
-local FOVColor = Color3.fromRGB(0, 255, 0)
-local aimPart = "Head"
-local aimLockType = "Realistic"
-local smoothnessValue = 7.5
-local wallCheckEnabled = false
-local fovRadius = 75
-local lockFOVToCenter = true
-local maxDistance = 300
-local teamCheckEnabled = false
-local targetTypes = { "Player" }
+local AimbotEnabled      = false
+local ShowFOV            = false
+local FOVThickness       = 2
+local FOVColor           = Color3.fromRGB(0, 255, 0)
+local aimPart            = "Head"
+local aimLockType        = "Realistic"
+local smoothnessValue    = 7.5
+local wallCheckEnabled   = false
+local fovRadius          = 75
+local lockFOVToCenter    = true
+local maxDistance        = 300
+local teamCheckEnabled   = false
+local targetTypes        = { "Player" }
 
-local AimbotCircle = nil
-local aimbotRenderConnection = nil
-local aimbotRunning = false
-local aimbotConnection = nil
-local cameraLockEnabled = false
-local lockedTarget = nil
-local cameraLockConnection = nil
-
-local npcCache = {}
-local lastNPCCacheTime = 0
+local AimbotCircle, aimbotRenderConnection, aimbotRunning, aimbotConnection
+local cameraLockEnabled, lockedTarget, cameraLockConnection
+local npcCache, lastNPCCacheTime = {}, 0
 
 local function updateNPCCache()
     if tick() - lastNPCCacheTime < 2 then return end
@@ -105,7 +101,7 @@ local function updateNPCCache()
     local function scan(parent)
         for _, child in ipairs(parent:GetChildren()) do
             if child:IsA("Model") and not playerChars[child] then
-                local hum = child:FindFirstChildOfClass("Humanoid")
+                local hum  = child:FindFirstChildOfClass("Humanoid")
                 local root = child:FindFirstChild("HumanoidRootPart")
                     or child:FindFirstChild("Torso")
                     or child:FindFirstChild("UpperTorso")
@@ -121,8 +117,7 @@ end
 
 local function getAimPart(character)
     if not character then return nil end
-    if aimPart == "Head" then
-        return character:FindFirstChild("Head")
+    if aimPart == "Head" then return character:FindFirstChild("Head")
     elseif aimPart == "Body" then
         return character:FindFirstChild("HumanoidRootPart")
             or character:FindFirstChild("Torso")
@@ -139,7 +134,7 @@ end
 local function isVisible(part)
     if not wallCheckEnabled or not part then return true end
     local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
     local origin, target = hrp.Position, part.Position
     local dir = target - origin
@@ -150,11 +145,10 @@ local function isVisible(part)
 end
 
 local function getAllTargets()
-    local targets = {}
-    local char = LocalPlayer.Character
+    local targets   = {}
+    local char      = LocalPlayer.Character
     local playerPos = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.Position
     local localTeam = LocalPlayer.Team
-
     for _, targetType in ipairs(targetTypes) do
         if targetType == "Player" then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -164,10 +158,7 @@ local function getAllTargets()
                         if hum and hum.Health > 0 then
                             local ap = getAimPart(player.Character)
                             if ap and (not playerPos or (ap.Position - playerPos).Magnitude <= maxDistance) then
-                                table.insert(targets, {
-                                    type = "Player", character = player.Character,
-                                    aimPart = ap, humanoid = hum
-                                })
+                                table.insert(targets, { type = "Player", character = player.Character, aimPart = ap, humanoid = hum })
                             end
                         end
                     end
@@ -179,10 +170,7 @@ local function getAllTargets()
                 if npcData.humanoid and npcData.humanoid.Health > 0 then
                     local ap = getAimPart(npcData.character)
                     if ap and (not playerPos or (ap.Position - playerPos).Magnitude <= maxDistance) then
-                        table.insert(targets, {
-                            type = "NPC", character = npcData.character,
-                            aimPart = ap, humanoid = npcData.humanoid
-                        })
+                        table.insert(targets, { type = "NPC", character = npcData.character, aimPart = ap, humanoid = npcData.humanoid })
                     end
                 end
             end
@@ -197,7 +185,6 @@ local function getClosestEnemyInFOV()
     local screenCenter = lockFOVToCenter
         and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         or UserInputService:GetMouseLocation()
-
     local closestTarget, closestDistance = nil, math.huge
     for _, td in ipairs(getAllTargets()) do
         if td.aimPart then
@@ -219,7 +206,6 @@ local function createFOVCircle()
     if not ShowFOV then return end
     local Camera = workspace.CurrentCamera
     if not Camera then return end
-
     local circle = Drawing.new("Circle")
     circle.Visible = true
     circle.Radius = fovRadius
@@ -231,7 +217,6 @@ local function createFOVCircle()
         and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         or UserInputService:GetMouseLocation()
     AimbotCircle = circle
-
     if aimbotRenderConnection then aimbotRenderConnection:Disconnect() end
     aimbotRenderConnection = RunService.RenderStepped:Connect(function()
         if AimbotCircle and ShowFOV then
@@ -259,10 +244,7 @@ end
 local function unlockCamera()
     cameraLockEnabled = false
     lockedTarget = nil
-    if cameraLockConnection then
-        cameraLockConnection:Disconnect()
-        cameraLockConnection = nil
-    end
+    if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
 end
 
 local function lockCameraToTarget(target)
@@ -271,9 +253,7 @@ local function lockCameraToTarget(target)
     cameraLockEnabled = true
     if cameraLockConnection then cameraLockConnection:Disconnect() end
     cameraLockConnection = RunService.RenderStepped:Connect(function(dt)
-        if not cameraLockEnabled or not lockedTarget or not lockedTarget.aimPart then
-            unlockCamera(); return
-        end
+        if not cameraLockEnabled or not lockedTarget or not lockedTarget.aimPart then unlockCamera(); return end
         local cam = workspace.CurrentCamera
         if not cam then return end
         local camPos = cam.CFrame.Position
@@ -296,10 +276,9 @@ local function startAimbot()
             if cameraLockEnabled then unlockCamera() end
             return
         end
-        local cam = workspace.CurrentCamera
-        if not cam then return end
+        if not workspace.CurrentCamera then return end
         local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
         if #targetTypes == 0 then
             if cameraLockEnabled then unlockCamera() end
@@ -327,83 +306,59 @@ AimbotToggle = Tabs.Combat:Toggle({
     Title = "Aimbot (F8)",
     Flag = "AimbotToggle",
     Value = false,
-    Callback = function(state)
-        AimbotEnabled = state
-        if state then startAimbot() else stopAimbot() end
+    Callback = function(s) AimbotEnabled = s; if s then startAimbot() else stopAimbot() end end
+})
+Tabs.Combat:Dropdown({ Title = "Aim Part", Flag = "AimPartDropdown", Values = { "Head", "Body", "Legs" }, Value = "Head", Callback = function(v) aimPart = v end })
+Tabs.Combat:Dropdown({ Title = "Target Type", Flag = "TargetTypeDropdown", Values = { "Player", "NPC" }, Value = { "Player" }, Multi = true, AllowNone = true, Callback = function(v) targetTypes = v end })
+Tabs.Combat:Dropdown({ Title = "Aim Lock Type", Flag = "AimLockTypeDropdown", Values = { "Realistic", "Stimulate" }, Value = "Realistic", Callback = function(v) aimLockType = v; if cameraLockEnabled then unlockCamera() end end })
+
+-- INPUT instead of Slider
+Tabs.Combat:Input({
+    Title = "Smoothness", Flag = "SmoothnessInput",
+    Value = "7.5", Placeholder = "0.01 - 20",
+    NumbersOnly = true,
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 0.01 and n <= 20 then smoothnessValue = n end
+    end
+})
+Tabs.Combat:Input({
+    Title = "Max Distance", Flag = "MaxDistanceInput",
+    Value = "300", Placeholder = "angka jarak",
+    NumbersOnly = true,
+    Callback = function(v) local n = tonumber(v); if n then maxDistance = n end end
+})
+Tabs.Combat:Toggle({ Title = "Team Check", Flag = "TeamCheckToggle", Value = false, Callback = function(s) teamCheckEnabled = s end })
+Tabs.Combat:Toggle({ Title = "Wall Check", Flag = "WallCheckToggle", Value = false, Callback = function(s) wallCheckEnabled = s end })
+
+Tabs.Combat:Section({ Title = "FOV" })
+Tabs.Combat:Toggle({ Title = "Show FOV Circle",  Flag = "ShowFOVToggle", Value = false, Callback = function(s) ShowFOV = s; updateFOVCircle() end })
+Tabs.Combat:Toggle({ Title = "Lock FOV To Center", Flag = "LockFOVToggle", Value = true, Callback = function(s) lockFOVToCenter = s; updateFOVCircle() end })
+
+Tabs.Combat:Input({
+    Title = "FOV Radius", Flag = "FOVRadiusInput",
+    Value = "75", Placeholder = "10 - 500",
+    NumbersOnly = true,
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 10 and n <= 500 then fovRadius = n; updateFOVCircle() end
+    end
+})
+Tabs.Combat:Colorpicker({ Title = "FOV Color", Flag = "FOVColorPicker", Default = Color3.fromRGB(0, 255, 0), Callback = function(c) FOVColor = c; updateFOVCircle() end })
+Tabs.Combat:Input({
+    Title = "FOV Thickness", Flag = "FOVThicknessInput",
+    Value = "2", Placeholder = "1 - 10",
+    NumbersOnly = true,
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 1 and n <= 10 then FOVThickness = n; updateFOVCircle() end
     end
 })
 
-Tabs.Combat:Dropdown({
-    Title = "Aim Part", Flag = "AimPartDropdown",
-    Values = { "Head", "Body", "Legs" }, Value = "Head",
-    Callback = function(v) aimPart = v end
-})
-
-Tabs.Combat:Dropdown({
-    Title = "Target Type", Flag = "TargetTypeDropdown",
-    Values = { "Player", "NPC" }, Value = { "Player" },
-    Multi = true, AllowNone = true,
-    Callback = function(v) targetTypes = v end
-})
-
-Tabs.Combat:Dropdown({
-    Title = "Aim Lock Type", Flag = "AimLockTypeDropdown",
-    Values = { "Realistic", "Stimulate" }, Value = "Realistic",
-    Callback = function(v) aimLockType = v; if cameraLockEnabled then unlockCamera() end end
-})
-
-Tabs.Combat:Slider({
-    Title = "Smoothness", Flag = "SmoothnessSlider",
-    Step = 0.01, Value = { Min = 0.01, Max = 20, Default = 7.5 },
-    Callback = function(v) smoothnessValue = v end
-})
-
-Tabs.Combat:Input({
-    Title = "Max Distance", Flag = "MaxDistanceInput",
-    Value = "300", Placeholder = "300",
-    Callback = function(v) local n = tonumber(v); if n then maxDistance = n end end
-})
-
-Tabs.Combat:Toggle({
-    Title = "Team Check", Flag = "TeamCheckToggle", Value = false,
-    Callback = function(s) teamCheckEnabled = s end
-})
-
-Tabs.Combat:Toggle({
-    Title = "Wall Check", Flag = "WallCheckToggle", Value = false,
-    Callback = function(s) wallCheckEnabled = s end
-})
-
-Tabs.Combat:Section({ Title = "FOV" })
-Tabs.Combat:Toggle({
-    Title = "Show FOV Circle", Flag = "ShowFOVToggle", Value = false,
-    Callback = function(s) ShowFOV = s; updateFOVCircle() end
-})
-Tabs.Combat:Toggle({
-    Title = "Lock FOV To Center", Flag = "LockFOVToggle", Value = true,
-    Callback = function(s) lockFOVToCenter = s; updateFOVCircle() end
-})
-Tabs.Combat:Slider({
-    Title = "FOV Radius", Flag = "FOVRadiusSlider",
-    Value = { Min = 10, Max = 500, Default = 75, Step = 5 },
-    Callback = function(v) fovRadius = v; updateFOVCircle() end
-})
-Tabs.Combat:Colorpicker({
-    Title = "FOV Color", Flag = "FOVColorPicker",
-    Default = Color3.fromRGB(0, 255, 0),
-    Callback = function(c) FOVColor = c; updateFOVCircle() end
-})
-Tabs.Combat:Slider({
-    Title = "FOV Thickness", Flag = "FOVThicknessSlider",
-    Value = { Min = 1, Max = 10, Default = 2, Step = 1 },
-    Callback = function(v) FOVThickness = v; updateFOVCircle() end
-})
-
--- F8 keybind for aimbot
-local f8Connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F8 then
-        if AimbotToggle then AimbotToggle:Set(not AimbotToggle.Value) end
+local f8Connection = UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.F8 and AimbotToggle then
+        AimbotToggle:Set(not AimbotToggle.Value)
     end
 end)
 
@@ -490,19 +445,16 @@ end
 
 local hitboxPlayerAddedConn = Players.PlayerAdded:Connect(function(plr)
     if HitboxSettings.Enabled then
-        task.wait(0.5)
-        ExpandHitboxes()
+        task.wait(0.5); ExpandHitboxes()
         if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
     end
     plr.CharacterAdded:Connect(function()
         if HitboxSettings.Enabled then
-            task.wait(0.5)
-            ExpandHitboxes()
+            task.wait(0.5); ExpandHitboxes()
             if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
         end
     end)
 end)
-
 local hitboxPlayerRemovingConn = Players.PlayerRemoving:Connect(function(plr)
     HitboxSettings.OriginalSizes[plr] = nil
     if HitboxSettings.VisualAdornments[plr] then
@@ -510,20 +462,17 @@ local hitboxPlayerRemovingConn = Players.PlayerRemoving:Connect(function(plr)
         HitboxSettings.VisualAdornments[plr] = nil
     end
 end)
-
 local hitboxCharAddedConns = {}
 for _, plr in ipairs(Players:GetPlayers()) do
     if plr ~= LocalPlayer then
         table.insert(hitboxCharAddedConns, plr.CharacterAdded:Connect(function()
             if HitboxSettings.Enabled then
-                task.wait(0.5)
-                ExpandHitboxes()
+                task.wait(0.5); ExpandHitboxes()
                 if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
             end
         end))
     end
 end
-
 local hitboxLoopConnection = RunService.Heartbeat:Connect(function()
     if HitboxSettings.Enabled then
         ExpandHitboxes()
@@ -534,8 +483,7 @@ end)
 -- =========================================================
 -- VISUAL SERVER DESYNC
 -- =========================================================
-local vsdEnabled = false
-local vsdConnection = nil
+local vsdEnabled, vsdConnection = false, nil
 local function toggleVisualServerDesync(state)
     vsdEnabled = state
     if vsdConnection then vsdConnection:Disconnect(); vsdConnection = nil end
@@ -543,8 +491,8 @@ local function toggleVisualServerDesync(state)
         vsdConnection = RunService.Heartbeat:Connect(function()
             if not vsdEnabled then return end
             local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
             if hum and hrp then
                 local oldCF, oldOffset = hrp.CFrame, hum.CameraOffset
                 hrp.CFrame = oldCF * CFrame.new(0, 50000, 0)
@@ -560,7 +508,7 @@ local function toggleVisualServerDesync(state)
 end
 
 -- =========================================================
--- ANTI AFK
+-- ANTI AFK / ANTI KILL PARTS
 -- =========================================================
 local antiAFKConnection = nil
 local function startAntiAFK()
@@ -574,9 +522,6 @@ local function stopAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect(); antiAFKConnection = nil end
 end
 
--- =========================================================
--- ANTI KILL PARTS
--- =========================================================
 local AntiKillPartsEnabled = false
 local function toggleAntiKillParts(state)
     AntiKillPartsEnabled = state
@@ -584,7 +529,7 @@ local function toggleAntiKillParts(state)
         coroutine.wrap(function()
             while AntiKillPartsEnabled and task.wait() do
                 local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
                 if hrp then
                     for _, part in ipairs(workspace:GetPartBoundsInRadius(hrp.Position, 10)) do
                         part.CanTouch = false
@@ -594,7 +539,7 @@ local function toggleAntiKillParts(state)
         end)()
     else
         local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
         if hrp then
             for _, part in ipairs(workspace:GetPartBoundsInRadius(hrp.Position, 15000)) do
                 part.CanTouch = true
@@ -606,58 +551,45 @@ end
 -- =========================================================
 -- LIGHTING
 -- =========================================================
-local FullBright = false
-local NoFog = false
-local globalShadowsEnabled = false
-
-local function setFullBright(state)
-    FullBright = state
-    if state then
-        Lighting.Brightness = 1
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-        Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+local FullBright, NoFog, globalShadowsEnabled = false, false, false
+local function setFullBright(s)
+    FullBright = s
+    if s then
+        Lighting.Brightness        = 1
+        Lighting.Ambient           = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient    = Color3.fromRGB(255, 255, 255)
+        Lighting.ColorShift_Top    = Color3.fromRGB(255, 255, 255)
         Lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
     else
-        Lighting.Brightness = lightingSnapshot.Brightness
-        Lighting.Ambient = lightingSnapshot.Ambient
-        Lighting.OutdoorAmbient = lightingSnapshot.OutdoorAmbient
-        Lighting.ColorShift_Top = lightingSnapshot.ColorShift_Top
+        Lighting.Brightness        = lightingSnapshot.Brightness
+        Lighting.Ambient           = lightingSnapshot.Ambient
+        Lighting.OutdoorAmbient    = lightingSnapshot.OutdoorAmbient
+        Lighting.ColorShift_Top    = lightingSnapshot.ColorShift_Top
         Lighting.ColorShift_Bottom = lightingSnapshot.ColorShift_Bottom
     end
 end
-
-local function setNoFog(state)
-    NoFog = state
-    Lighting.FogEnd = state and 100000 or lightingSnapshot.FogEnd
+local function setNoFog(s)
+    NoFog = s
+    Lighting.FogEnd = s and 100000 or lightingSnapshot.FogEnd
 end
-
-local function toggleGlobalShadows(state)
-    globalShadowsEnabled = state
-    Lighting.GlobalShadows = state
+local function toggleGlobalShadows(s)
+    globalShadowsEnabled = s
+    Lighting.GlobalShadows = s
 end
-
-local function setBrightness(value)
-    Lighting.Brightness = value
-end
+local function setBrightness(v) Lighting.Brightness = v end
 
 -- =========================================================
 -- FLOATING
 -- =========================================================
 local floatingEnabled = false
-local floatPart = nil
-local floatConnection = nil
+local floatPart, floatConnection, floatBeganCon, floatEndCon, floatDiedCon
 local floatUpDown = -3.1
-local floatBeganCon, floatEndCon, floatDiedCon
-
 local function toggleFloating(state)
     floatingEnabled = state
     if state then
         if not LocalPlayer.Character then return end
         local char = LocalPlayer.Character
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
+        if not char:FindFirstChild("HumanoidRootPart") then return end
         floatPart = Instance.new("Part")
         floatPart.Name = "FloatPart"
         floatPart.Size = Vector3.new(2, 0.2, 1.5)
@@ -665,27 +597,23 @@ local function toggleFloating(state)
         floatPart.Anchored = true
         floatPart.CanCollide = false
         floatPart.Parent = workspace
-
         floatConnection = RunService.Heartbeat:Connect(function()
             if floatPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 floatPart.Position = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, floatUpDown, 0)
             end
         end)
-
-        floatBeganCon = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
+        floatBeganCon = UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
             if input.KeyCode == Enum.KeyCode.Q then floatUpDown = floatUpDown - 0.5
             elseif input.KeyCode == Enum.KeyCode.E then floatUpDown = floatUpDown + 1.5 end
         end)
-        floatEndCon = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
+        floatEndCon = UserInputService.InputEnded:Connect(function(input, gp)
+            if gp then return end
             if input.KeyCode == Enum.KeyCode.Q then floatUpDown = floatUpDown + 0.5
             elseif input.KeyCode == Enum.KeyCode.E then floatUpDown = floatUpDown - 1.5 end
         end)
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            floatDiedCon = hum.Died:Connect(function() toggleFloating(false) end)
-        end
+        if hum then floatDiedCon = hum.Died:Connect(function() toggleFloating(false) end) end
     else
         if floatConnection then floatConnection:Disconnect(); floatConnection = nil end
         if floatPart then floatPart:Destroy(); floatPart = nil end
@@ -696,19 +624,56 @@ local function toggleFloating(state)
 end
 
 -- =========================================================
--- GOD MODE
+-- GOD MODE (2 metode)
 -- =========================================================
-local godModeEnabled = false
-local godModeConnection = nil
-local godModeOrigMaxHealth = nil
+local godModeEnabled, godModeConnection = false, nil
+local godModeMethod = "Health Math.huge"
+local godModeAppliedMethod = nil
+local godModeOriginalMaxHealth = nil
+
+local function applyHumanoidReplacement()
+    local char = LocalPlayer.Character
+    local Human = char and char:FindFirstChildWhichIsA("Humanoid")
+    if not Human then return end
+    if godModeOriginalMaxHealth == nil then godModeOriginalMaxHealth = Human.MaxHealth end
+    local nHuman = Human:Clone()
+    nHuman.Parent = char
+    LocalPlayer.Character = nil
+    pcall(function()
+        nHuman:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        nHuman:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        nHuman:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+    end)
+    nHuman.BreakJointsOnDeath = true
+    nHuman.MaxHealth = math.huge
+    nHuman.Health = math.huge
+    Human:Destroy()
+    LocalPlayer.Character = char
+    nHuman.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    local anim = char:FindFirstChild("Animate")
+    if anim then
+        anim.Disabled = true
+        task.wait()
+        anim.Disabled = false
+    end
+    godModeAppliedMethod = "replacement"
+end
+
+local function applyHealthMathHuge()
+    local char = LocalPlayer.Character
+    local Human = char and char:FindFirstChildWhichIsA("Humanoid")
+    if not Human then return end
+    if godModeOriginalMaxHealth == nil then godModeOriginalMaxHealth = Human.MaxHealth end
+    Human.MaxHealth = math.huge
+    Human.Health = math.huge
+    godModeAppliedMethod = "health"
+end
 
 local function applyGodMode()
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        if godModeOrigMaxHealth == nil then godModeOrigMaxHealth = hum.MaxHealth end
-        hum.MaxHealth = math.huge
-        hum.Health = math.huge
+    if godModeMethod == "Humanoid Replacement (Very buggy)" then
+        applyHumanoidReplacement()
+    else
+        applyHealthMathHuge()
     end
 end
 
@@ -717,10 +682,9 @@ local function startGodMode()
     godModeConnection = RunService.Heartbeat:Connect(function()
         if godModeEnabled then
             local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.MaxHealth = math.huge
-                if hum.Health < math.huge then hum.Health = math.huge end
+            local hum  = char and char:FindFirstChildWhichIsA("Humanoid")
+            if hum and hum.Health < math.huge then
+                applyGodMode()
             end
         end
     end)
@@ -730,31 +694,32 @@ local function stopGodMode()
     if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
 end
 
-local function restoreGodModeHealth()
-    if godModeOrigMaxHealth == nil then return end
+local function restoreGodMode()
     local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
+    local hum  = char and char:FindFirstChildWhichIsA("Humanoid")
+    if hum and godModeOriginalMaxHealth then
         pcall(function()
-            hum.MaxHealth = godModeOrigMaxHealth
-            if hum.Health > godModeOrigMaxHealth then
-                hum.Health = godModeOrigMaxHealth
+            hum.MaxHealth = godModeOriginalMaxHealth
+            if hum.Health > godModeOriginalMaxHealth then
+                hum.Health = godModeOriginalMaxHealth
             end
         end)
     end
-    godModeOrigMaxHealth = nil
+    godModeOriginalMaxHealth = nil
+    godModeAppliedMethod = nil
 end
 
 -- =========================================================
--- ESP PLAYER & TOOL
+-- ESP PLAYER & TOOL (2D + 3D box)
 -- =========================================================
 local playerBoxes, playerNames, playerDistance, playerHealth, playerHighlights = false, false, false, false, false
 local toolBoxes, toolNames, toolDistance, toolHighlights = false, false, false, false
+local playerBoxType, toolBoxType = "2D", "2D"
 local playerESPData, toolESPData = {}, {}
 
-local function getESPBoxScale(distance)
-    if distance <= 17 then return 1 end
-    return math.max(17 / distance, 0.013)
+local function getESPBoxScale(dist)
+    if dist <= 17 then return 1 end
+    return math.max(17 / dist, 0.013)
 end
 
 local function createESPBox(part, color)
@@ -791,6 +756,29 @@ local function removeESPBox(part)
     if part then
         local b = part:FindFirstChild("DaraESP_Box")
         if b then b:Destroy() end
+    end
+end
+
+local function create3DBox(part, color, size)
+    if not part then return nil end
+    local existing = part:FindFirstChild("DaraESP_3DBox")
+    if existing then existing:Destroy() end
+    local adorn = Instance.new("BoxHandleAdornment")
+    adorn.Name = "DaraESP_3DBox"
+    adorn.Adornee = part
+    adorn.Size = size or Vector3.new(4, 5, 3)
+    adorn.Color3 = color
+    adorn.Transparency = 0.5
+    adorn.AlwaysOnTop = true
+    adorn.ZIndex = 5
+    adorn.Parent = part
+    return adorn
+end
+
+local function remove3DBox(part)
+    if part then
+        local a = part:FindFirstChild("DaraESP_3DBox")
+        if a then a:Destroy() end
     end
 end
 
@@ -857,8 +845,8 @@ local function updatePlayerESP()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
             local char = plr.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
             if char and hrp and hum and hum.Health > 0 then
                 alive[char] = true
                 local data = playerESPData[char]
@@ -868,11 +856,24 @@ local function updatePlayerESP()
                 local color = (plr.TeamColor and plr.TeamColor.Color) or Color3.fromRGB(255, 255, 255)
 
                 if playerBoxes then
-                    if not data.box then data.box = createESPBox(hrp, color) end
-                    updateESPBox(data.box, color, scale)
-                elseif data.box then
-                    removeESPBox(hrp); data.box = nil
+                    if playerBoxType == "2D" then
+                        if not data.box2D then data.box2D = createESPBox(hrp, color) end
+                        updateESPBox(data.box2D, color, scale)
+                        if data.box3D then remove3DBox(hrp); data.box3D = nil end
+                    else
+                        if data.box2D then removeESPBox(hrp); data.box2D = nil end
+                        local boxSize = Vector3.new(4, (hum.HipHeight or 2) + 5, 3)
+                        if not data.box3D then data.box3D = create3DBox(hrp, color, boxSize) end
+                        if data.box3D then
+                            data.box3D.Color3 = color
+                            data.box3D.Size = boxSize
+                        end
+                    end
+                else
+                    if data.box2D then removeESPBox(hrp); data.box2D = nil end
+                    if data.box3D then remove3DBox(hrp); data.box3D = nil end
                 end
+
                 if playerHighlights then
                     if not data.highlight then data.highlight = createESPHighlight(char, color) end
                     data.highlight.FillColor = color
@@ -880,13 +881,14 @@ local function updatePlayerESP()
                 elseif data.highlight then
                     removeESPHighlight(char); data.highlight = nil
                 end
+
                 local needBill = playerNames or playerDistance or playerHealth
                 if needBill then
                     if not data.bill then data.bill = createESPBillboard(hrp, color) end
                     local lines = {}
-                    if playerNames then table.insert(lines, plr.Name) end
+                    if playerNames    then table.insert(lines, plr.Name) end
                     if playerDistance then table.insert(lines, string.format("Distance: %.0f", dist)) end
-                    if playerHealth then table.insert(lines, string.format("Health: %.0f/%.0f", hum.Health, hum.MaxHealth)) end
+                    if playerHealth   then table.insert(lines, string.format("Health: %.0f/%.0f", hum.Health, hum.MaxHealth)) end
                     updateESPBillboard(data.bill, table.concat(lines, "\n"), color)
                 elseif data.bill then
                     removeESPBillboard(hrp); data.bill = nil
@@ -897,7 +899,8 @@ local function updatePlayerESP()
     for char, data in pairs(playerESPData) do
         if not alive[char] then
             local hrp = char:FindFirstChild("HumanoidRootPart")
-            if data.box then removeESPBox(hrp) end
+            if data.box2D then removeESPBox(hrp) end
+            if data.box3D then remove3DBox(hrp) end
             if data.highlight then removeESPHighlight(char) end
             if data.bill then removeESPBillboard(hrp) end
             playerESPData[char] = nil
@@ -929,16 +932,27 @@ local function updateToolESP()
             local data = toolESPData[tool]
             if not data then data = {}; toolESPData[tool] = data end
             data.part = part
-            local dist = (part.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
+            local dist  = (part.Position - workspace.CurrentCamera.CFrame.Position).Magnitude
             local scale = getESPBoxScale(dist)
             local color = Color3.fromRGB(0, 255, 255)
 
             if toolBoxes then
-                if not data.box then data.box = createESPBox(part, color) end
-                updateESPBox(data.box, color, scale)
-            elseif data.box then
-                removeESPBox(part); data.box = nil
+                if toolBoxType == "2D" then
+                    if not data.box2D then data.box2D = createESPBox(part, color) end
+                    updateESPBox(data.box2D, color, scale)
+                    if data.box3D then remove3DBox(part); data.box3D = nil end
+                else
+                    if data.box2D then removeESPBox(part); data.box2D = nil end
+                    if not data.box3D then
+                        data.box3D = create3DBox(part, color, Vector3.new(part.Size.X, part.Size.Y, part.Size.Z))
+                    end
+                    if data.box3D then data.box3D.Color3 = color end
+                end
+            else
+                if data.box2D then removeESPBox(part); data.box2D = nil end
+                if data.box3D then remove3DBox(part); data.box3D = nil end
             end
+
             if toolHighlights then
                 if not data.highlight then data.highlight = createESPHighlight(tool, color) end
                 data.highlight.FillColor = color
@@ -946,11 +960,12 @@ local function updateToolESP()
             elseif data.highlight then
                 removeESPHighlight(tool); data.highlight = nil
             end
+
             local needBill = toolNames or toolDistance
             if needBill then
                 if not data.bill then data.bill = createESPBillboard(part, color) end
                 local lines = {}
-                if toolNames then table.insert(lines, tool.Name) end
+                if toolNames    then table.insert(lines, tool.Name) end
                 if toolDistance then table.insert(lines, string.format("Distance: %.0f", dist)) end
                 updateESPBillboard(data.bill, table.concat(lines, "\n"), color)
             elseif data.bill then
@@ -960,7 +975,8 @@ local function updateToolESP()
     end
     for tool, data in pairs(toolESPData) do
         if not alive[tool] then
-            if data.box and data.part then removeESPBox(data.part) end
+            if data.box2D and data.part then removeESPBox(data.part) end
+            if data.box3D and data.part then remove3DBox(data.part) end
             if data.highlight then removeESPHighlight(tool) end
             if data.bill and data.part then removeESPBillboard(data.part) end
             toolESPData[tool] = nil
@@ -971,7 +987,8 @@ end
 local function cleanupPlayerESP()
     for char, data in pairs(playerESPData) do
         local hrp = char:FindFirstChild("HumanoidRootPart")
-        if data.box then removeESPBox(hrp) end
+        if data.box2D then removeESPBox(hrp) end
+        if data.box3D then remove3DBox(hrp) end
         if data.highlight then removeESPHighlight(char) end
         if data.bill then removeESPBillboard(hrp) end
     end
@@ -980,7 +997,8 @@ end
 
 local function cleanupToolESP()
     for tool, data in pairs(toolESPData) do
-        if data.box and data.part then removeESPBox(data.part) end
+        if data.box2D and data.part then removeESPBox(data.part) end
+        if data.box3D and data.part then remove3DBox(data.part) end
         if data.highlight then removeESPHighlight(tool) end
         if data.bill and data.part then removeESPBillboard(data.part) end
     end
@@ -1003,15 +1021,10 @@ end)
 -- =========================================================
 -- FORCE UNLOCK MOUSE (LEFT ALT)
 -- =========================================================
-local mouseUnlocked = false
-local mouseUnlockConnection = nil
-
+local mouseUnlocked, mouseUnlockConnection = false, nil
 local function setMouseUnlocked(state)
     mouseUnlocked = state
-    if mouseUnlockConnection then
-        mouseUnlockConnection:Disconnect()
-        mouseUnlockConnection = nil
-    end
+    if mouseUnlockConnection then mouseUnlockConnection:Disconnect(); mouseUnlockConnection = nil end
     if state then
         pcall(function()
             UserInputService.MouseBehavior = Enum.MouseBehavior.Default
@@ -1026,12 +1039,9 @@ local function setMouseUnlocked(state)
             end
         end)
     else
-        pcall(function()
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        end)
+        pcall(function() UserInputService.MouseBehavior = Enum.MouseBehavior.Default end)
     end
 end
-
 local altConnection = UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.LeftAlt then
         setMouseUnlocked(not mouseUnlocked)
@@ -1042,22 +1052,17 @@ end)
 -- UI: VISUALS
 -- =========================================================
 Tabs.Visuals:Section({ Title = "Lighting" })
-Tabs.Visuals:Toggle({
-    Title = "Full Bright", Value = false,
-    Callback = function(s) setFullBright(s) end
-})
-Tabs.Visuals:Toggle({
-    Title = "No Fog", Value = false,
-    Callback = function(s) setNoFog(s) end
-})
-Tabs.Visuals:Toggle({
-    Title = "Global Shadows", Value = false,
-    Callback = function(s) toggleGlobalShadows(s) end
-})
-Tabs.Visuals:Slider({
-    Title = "Brightness",
-    Value = { Min = 0, Max = 10, Default = 1, Step = 0.1 },
-    Callback = function(v) setBrightness(v) end
+Tabs.Visuals:Toggle({ Title = "Full Bright", Value = false, Callback = function(s) setFullBright(s) end })
+Tabs.Visuals:Toggle({ Title = "No Fog",      Value = false, Callback = function(s) setNoFog(s) end })
+Tabs.Visuals:Toggle({ Title = "Global Shadows", Value = false, Callback = function(s) toggleGlobalShadows(s) end })
+Tabs.Visuals:Input({
+    Title = "Brightness", Flag = "BrightnessInput",
+    Value = "1", Placeholder = "0 - 10",
+    NumbersOnly = true,
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 0 and n <= 10 then setBrightness(n) end
+    end
 })
 
 -- =========================================================
@@ -1065,15 +1070,29 @@ Tabs.Visuals:Slider({
 -- =========================================================
 Tabs.Player:Section({ Title = "Player" })
 Tabs.Player:Toggle({
-    Title = "Floating", Desc = "Q = turun, E = naik",
-    Value = false,
+    Title = "Floating", Desc = "Q = turun, E = naik", Value = false,
     Callback = function(s) toggleFloating(s) end
 })
-Tabs.Player:Toggle({
+
+GodModeToggle = Tabs.Player:Toggle({
     Title = "God Mode", Value = false,
     Callback = function(s)
         godModeEnabled = s
-        if s then applyGodMode(); startGodMode() else stopGodMode(); restoreGodModeHealth() end
+        if s then applyGodMode(); startGodMode()
+        else stopGodMode(); restoreGodMode() end
+    end
+})
+Tabs.Player:Dropdown({
+    Title = "God Mode Method", Flag = "GodModeMethodDropdown",
+    Values = { "Health Math.huge", "Humanoid Replacement (Very buggy)" },
+    Value = "Health Math.huge",
+    Callback = function(v)
+        godModeMethod = v
+        if godModeEnabled then
+            stopGodMode()
+            applyGodMode()
+            startGodMode()
+        end
     end
 })
 
@@ -1081,41 +1100,31 @@ Tabs.Player:Toggle({
 -- UI: MISC
 -- =========================================================
 Tabs.Misc:Section({ Title = "Misc" })
-Tabs.Misc:Toggle({
-    Title = "Anti AFK", Value = false,
-    Callback = function(s) if s then startAntiAFK() else stopAntiAFK() end end
-})
-Tabs.Misc:Toggle({
-    Title = "Anti Kill Parts", Value = false,
-    Callback = function(s) toggleAntiKillParts(s) end
-})
-Tabs.Misc:Toggle({
-    Title = "Visual Server Desync", Desc = "Desync visual/server sementara",
-    Value = false,
-    Callback = function(s) toggleVisualServerDesync(s) end
-})
+Tabs.Misc:Toggle({ Title = "Anti AFK", Value = false, Callback = function(s) if s then startAntiAFK() else stopAntiAFK() end end })
+Tabs.Misc:Toggle({ Title = "Anti Kill Parts", Value = false, Callback = function(s) toggleAntiKillParts(s) end })
+Tabs.Misc:Toggle({ Title = "Visual Server Desync", Value = false, Callback = function(s) toggleVisualServerDesync(s) end })
 
 Tabs.Misc:Section({ Title = "Hitbox" })
 Tabs.Misc:Toggle({
     Title = "Hitbox Expanding", Value = false,
     Callback = function(s)
         HitboxSettings.Enabled = s
-        if s then
-            ExpandHitboxes()
-            if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
-        else
-            ResetHitboxes(); ClearVisualAdornments()
-        end
+        if s then ExpandHitboxes(); if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
+        else ResetHitboxes(); ClearVisualAdornments() end
     end
 })
-Tabs.Misc:Slider({
-    Title = "Hitbox Size",
-    Value = { Min = 3, Max = 30, Default = 10 },
+Tabs.Misc:Input({
+    Title = "Hitbox Size", Flag = "HitboxSizeInput",
+    Value = "10", Placeholder = "3 - 30",
+    NumbersOnly = true,
     Callback = function(v)
-        HitboxSettings.Size = v
-        if HitboxSettings.Enabled then
-            ExpandHitboxes()
-            if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
+        local n = tonumber(v)
+        if n and n >= 3 and n <= 30 then
+            HitboxSettings.Size = n
+            if HitboxSettings.Enabled then
+                ExpandHitboxes()
+                if HitboxSettings.ShowVisual then UpdateVisualHitboxes() end
+            end
         end
     end
 })
@@ -1135,54 +1144,74 @@ Tabs.Misc:Colorpicker({
     end
 })
 
+Tabs.Misc:Section({ Title = "UI Settings" })
+Tabs.Misc:Button({
+    Title = "Hide UI",
+    Desc = "Tekan RightControl untuk show lagi / klik OpenButton",
+    Callback = function()
+        pcall(function() Window:Close() end)
+    end
+})
+Tabs.Misc:Keybind({
+    Title = "Toggle UI",
+    Desc = "Keybind untuk show/hide UI",
+    Value = "RightControl",
+    Callback = function(v)
+        if v and Enum.KeyCode[v] then
+            Window:SetToggleKey(Enum.KeyCode[v])
+        end
+    end
+})
+
 -- =========================================================
 -- UI: ESP
 -- =========================================================
 Tabs.ESP:Section({ Title = "Player ESP" })
-Tabs.ESP:Toggle({ Title = "Player Boxes", Value = false, Callback = function(s) playerBoxes = s end })
-Tabs.ESP:Toggle({ Title = "Player Names", Value = false, Callback = function(s) playerNames = s end })
-Tabs.ESP:Toggle({ Title = "Player Distance", Value = false, Callback = function(s) playerDistance = s end })
-Tabs.ESP:Toggle({ Title = "Player Health", Value = false, Callback = function(s) playerHealth = s end })
+Tabs.ESP:Toggle({ Title = "Player Boxes",      Value = false, Callback = function(s) playerBoxes = s end })
+Tabs.ESP:Dropdown({
+    Title = "Player Box Type", Flag = "PlayerBoxTypeDropdown",
+    Values = { "2D", "3D" }, Value = "2D",
+    Callback = function(v) playerBoxType = v end
+})
+Tabs.ESP:Toggle({ Title = "Player Names",      Value = false, Callback = function(s) playerNames = s end })
+Tabs.ESP:Toggle({ Title = "Player Distance",   Value = false, Callback = function(s) playerDistance = s end })
+Tabs.ESP:Toggle({ Title = "Player Health",     Value = false, Callback = function(s) playerHealth = s end })
 Tabs.ESP:Toggle({ Title = "Player Highlights", Value = false, Callback = function(s) playerHighlights = s end })
 
 Tabs.ESP:Section({ Title = "Tool ESP" })
-Tabs.ESP:Toggle({ Title = "Tool Boxes", Value = false, Callback = function(s) toolBoxes = s end })
-Tabs.ESP:Toggle({ Title = "Tool Names", Value = false, Callback = function(s) toolNames = s end })
-Tabs.ESP:Toggle({ Title = "Tool Distance", Value = false, Callback = function(s) toolDistance = s end })
+Tabs.ESP:Toggle({ Title = "Tool Boxes",      Value = false, Callback = function(s) toolBoxes = s end })
+Tabs.ESP:Dropdown({
+    Title = "Tool Box Type", Flag = "ToolBoxTypeDropdown",
+    Values = { "2D", "3D" }, Value = "2D",
+    Callback = function(v) toolBoxType = v end
+})
+Tabs.ESP:Toggle({ Title = "Tool Names",      Value = false, Callback = function(s) toolNames = s end })
+Tabs.ESP:Toggle({ Title = "Tool Distance",   Value = false, Callback = function(s) toolDistance = s end })
 Tabs.ESP:Toggle({ Title = "Tool Highlights", Value = false, Callback = function(s) toolHighlights = s end })
 
 -- =========================================================
--- GLOBAL CLEANUP FUNCTION (dipanggil saat reload / destroy)
+-- FULL CLEANUP (dipanggil saat reload / OnDestroy)
 -- =========================================================
 local function fullCleanup()
-    -- Aimbot
     AimbotEnabled = false
     pcall(stopAimbot)
     if f8Connection then pcall(function() f8Connection:Disconnect() end); f8Connection = nil end
 
-    -- Hitbox
     HitboxSettings.Enabled = false
     pcall(ResetHitboxes)
     pcall(ClearVisualAdornments)
-    if hitboxLoopConnection then pcall(function() hitboxLoopConnection:Disconnect() end); hitboxLoopConnection = nil end
-    if hitboxPlayerAddedConn then pcall(function() hitboxPlayerAddedConn:Disconnect() end); hitboxPlayerAddedConn = nil end
-    if hitboxPlayerRemovingConn then pcall(function() hitboxPlayerRemovingConn:Disconnect() end); hitboxPlayerRemovingConn = nil end
-    for _, c in ipairs(hitboxCharAddedConns) do
-        pcall(function() c:Disconnect() end)
-    end
+    if hitboxLoopConnection       then pcall(function() hitboxLoopConnection:Disconnect() end); hitboxLoopConnection = nil end
+    if hitboxPlayerAddedConn      then pcall(function() hitboxPlayerAddedConn:Disconnect() end); hitboxPlayerAddedConn = nil end
+    if hitboxPlayerRemovingConn   then pcall(function() hitboxPlayerRemovingConn:Disconnect() end); hitboxPlayerRemovingConn = nil end
+    for _, c in ipairs(hitboxCharAddedConns) do pcall(function() c:Disconnect() end) end
     hitboxCharAddedConns = {}
 
-    -- Visual Server Desync
     vsdEnabled = false
     if vsdConnection then pcall(function() vsdConnection:Disconnect() end); vsdConnection = nil end
 
-    -- Anti AFK
     pcall(stopAntiAFK)
-
-    -- Anti Kill Parts
     if AntiKillPartsEnabled then pcall(function() toggleAntiKillParts(false) end) end
 
-    -- Lighting
     pcall(function()
         Lighting.Brightness        = lightingSnapshot.Brightness
         Lighting.Ambient           = lightingSnapshot.Ambient
@@ -1192,30 +1221,23 @@ local function fullCleanup()
         Lighting.FogEnd            = lightingSnapshot.FogEnd
         Lighting.GlobalShadows     = lightingSnapshot.GlobalShadows
     end)
-    FullBright = false
-    NoFog = false
-    globalShadowsEnabled = false
+    FullBright, NoFog, globalShadowsEnabled = false, false, false
 
-    -- Floating
     if floatingEnabled then pcall(function() toggleFloating(false) end) end
 
-    -- God Mode
     godModeEnabled = false
     pcall(stopGodMode)
-    pcall(restoreGodModeHealth)
+    pcall(restoreGodMode)
 
-    -- ESP
     pcall(cleanupPlayerESP)
     pcall(cleanupToolESP)
     if espRenderConnection then pcall(function() espRenderConnection:Disconnect() end); espRenderConnection = nil end
 
-    -- Mouse unlock
     mouseUnlocked = false
     if mouseUnlockConnection then pcall(function() mouseUnlockConnection:Disconnect() end); mouseUnlockConnection = nil end
     if altConnection then pcall(function() altConnection:Disconnect() end); altConnection = nil end
     pcall(function() UserInputService.MouseBehavior = Enum.MouseBehavior.Default end)
 
-    -- GUI
     pcall(function() Window:Destroy() end)
     pcall(function()
         local g = CoreGui:FindFirstChild("Darahub")
