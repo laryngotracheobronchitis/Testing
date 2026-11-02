@@ -1,6 +1,41 @@
 --[[
-    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub BETA terbaru) - EDISI PERBAIKAN TOTAL v1.6.4
-    Basis: DARAHUBBETA.txt (Evade 2.2, update terbaru) - hanya fitur yang diminta yang dipertahankan + sinkron data Beta.
+    JoblessHub | Evade 2.2 - VERSI RINGKAS (basis DaraHub update terbaru) - EDISI PERBAIKAN TOTAL v1.6.5
+    Basis: DARAHUBDAMN.txt (DaraHub versi terbaru, Evade update terbaru) + DARAHUBBETA.txt - hanya fitur yang diminta yang dipertahankan + sinkron data DaraHub terbaru.
+
+    ============================ UPDATE v1.6.5 (GAME UPDATE BESAR: SEMUA REMOTE & ALUR TOOL GAME BERUBAH - SINKRON DARAHUB TERBARU) ============================
+    DASAR: DaraHub merilis versi terbaru (DARAHUBDAMN) yang menyesuaikan game Evade update
+    terbaru. SEMUA perubahan itu dipindahkan ke sini supaya SEMUA fitur bekerja lagi:
+    - REMOTE GAME DIPINDAHKAN: semua remote pindah dari ReplicatedStorage.Events.* ke
+      ReplicatedStorage.Remotes.<Kategori>.* (Character, UI, Registry, Session, Round, Admin).
+      Resolver baru mencoba layout BARU dulu lalu fallback ke layout LAMA - semua fitur yang
+      memakai remote diperbaiki: ModifyMovement/SpeedChange (CharacterTask), Cola vignette
+      (SharedUISetType), Defib (ToolAction), Auto Farm (Interact + TouchReward), Self Revive /
+      Force Respawn (SetPlayerMode), Auto Vote (Vote), Add/Remove Map (Admin.VIPCommand).
+    - KEYBIND: game MENGHAPUS bindable "SendKeybindEvent" - kini keybind dikirim lewat MODULE
+      KeybindService (KeyInfoUsed -> fallback SendKeybind) persis DaraHub terbaru; tombol layar
+      Zoom/Front View/Leaderboard (Top GUI) & Auto Whistle memakai jalur ini.
+    - DEFIBRILLATOR AURA DITULIS ULANG (alur equip tool game berubah): ToolProfile ->
+      AttemptEquip(keybind defib) -> ToolAction:FireServer(indexBuffer metode "Revive", tag);
+      target dari CharacterService:GetCharacters() (Downed + tidak dibawa + antrian revive);
+      otomatis kembali ke tool semula setelah tidak ada target.
+    - COLA DITULIS ULANG (alur aktifasi tool berubah - engine __namecall lama dibongkar total):
+      patch ToolTasks.Activate + watcher CharacterTask.OnClientEvent + reassert thread,
+      persis DaraHub terbaru; tidak lagi butuh hookfunction/getrawmetatable/newcclosure.
+    - INFINITE RANGE -> SISTEM TOOL MODS BARU: hook ToolClass.Init (tool baru otomatis
+      ter-patch) + patch tool hidup via ToolService.Profiles + fallback patch module;
+      3 tombol baru ikut terpasang: Visual Infinite Ammo, Visual No Tool Delay, Disable
+      Weapon Spread (sama seperti DaraHub terbaru).
+    - CATCH NPC (Auto Farm): deteksi baru CollectionService tag "TouchReward" + fallback
+      atribut TouchRange; root NPC bisa PrimaryPart/HRP/BasePart; offset dijepit ke jangkauan
+      sentuh; scan 4x lebih cepat (0.25 dtk).
+    - BYPASS "TooMany": path HUD baru (Assets.UI.Game.HUD) ditambahkan (path lama tetap).
+    - FITUR BARU (dari DaraHub terbaru): "Speedup Popup Rewards" (percepat animasi popup
+      reward, otomatis ON saat load) + input multipliernya.
+    - HOT-SWAP v1.6.3 tetap berlaku + diperluas: hook ToolTasks.Activate (Cola) & ToolClass.Init
+      (Tool Mods) dari eksekusi lama otomatis dipulihkan ke fungsi asli saat re-execute.
+    - Semua fitur lain (Smart Refresh movement, Bhop, Lag Switch, Demon, Timer, Player Stats,
+      Death Feed, Auto Exchange, Shop, Teleport, VIP, Anti-Stuck, dll) diverifikasi TIDAK
+      berubah di DaraHub terbaru - tidak disentuh, tetap utuh.
 
     ============================ UPDATE v1.6.4 (AUTO REFRESH PINTAR: PERIKSA DULU -> SESUAI = ABAIKAN, KE-RESET = KIRIM ULANG) ============================
     GEJALA (laporan user): "Air Strafe Acceleration itu selalu di loop membuatnya seperti
@@ -473,6 +508,26 @@ end
 end
 end
 end)
+-- UPDATE v1.6.5: hook tool dari eksekusi lama (ToolTasks.Activate milik Cola & ToolClass.Init
+-- milik Tool Mods) dikembalikan ke fungsi asli saat re-execute (anti menumpuk lapis hook).
+pcall(function()
+local _colaHook = getgenv().__JoblessHub_ColaHook
+if type(_colaHook) == "table" and type(_colaHook.tasks) == "table" and type(_colaHook.original) == "function" then
+if _colaHook.tasks.Activate == _colaHook.patched then
+_colaHook.tasks.Activate = _colaHook.original
+end
+end
+end)
+getgenv().__JoblessHub_ColaHook = nil
+pcall(function()
+local _tmHook = getgenv().__JoblessHub_ToolModsHook
+if type(_tmHook) == "table" and type(_tmHook.class) == "table" and type(_tmHook.original) == "function" then
+if _tmHook.class.Init == _tmHook.patched then
+_tmHook.class.Init = _tmHook.original
+end
+end
+end)
+getgenv().__JoblessHub_ToolModsHook = nil
 local function DaraTrackConn(c)
 if c then
 table.insert(getgenv().__JoblessHubConns, c)
@@ -683,7 +738,7 @@ function DaraHubFinalReport()
                 end
         end
         local _total = #getgenv().DaraHubSectionOrder
-        print("[JoblessHub] ============ LAPORAN LOAD v1.6.4 ============")
+        print("[JoblessHub] ============ LAPORAN LOAD v1.6.5 ============")
         print("[JoblessHub] Section OK: " .. _okC .. "/" .. _total)
         for _, _name in ipairs(getgenv().DaraHubSectionOrder) do
                 local _st = getgenv().DaraHubSections[_name]
@@ -700,7 +755,7 @@ function DaraHubFinalReport()
                                 })
                         else
                                 WindUI:Notify({
-                                        Title = "JoblessHub Ringkas v1.6.4 siap dipakai (Evade 2.2)",
+                                        Title = "JoblessHub Ringkas v1.6.5 siap dipakai (Evade 2.2)",
                                         Content = "Semua " .. _okC .. " section dimuat tanpa error." .. (JoblessHubHotSwapped and " Instance lama otomatis dibongkar & diganti (anti menumpuk)." or "") .. (_crashC > 0 and (" (Sesi sebelumnya crash di: " .. table.concat(_crashList, ", ") .. ")") or ""),
                                         Duration = 5
                                 })
@@ -1465,7 +1520,7 @@ print("The injector does not support identifyexecutor()")
 end
 pcall(function()
 Window:Tag({
-Title = "v1.6.4",
+Title = "v1.6.5",
 Color = Color3.fromHex("#30ff6a")
 })
 end)
@@ -1570,6 +1625,13 @@ Window:OnDestroy(function()
 if ButtonLib then ButtonLib:DestroyScreengui() end -- FIX v1.5.1: guard nil
 mouseUnlock(false)
 if stopRampBooster then stopRampBooster() end
+-- UPDATE v1.6.5: hook tool dibongkar bersih saat window dihancurkan (persis DaraHub terbaru)
+if ToolModsUnhook then
+ToolModsUnhook()
+end
+if ColaCheatUnloadHooks then
+ColaCheatUnloadHooks()
+end
 -- FIX v1.5.2: JAMINAN menu Roblox - topbar Roblox asli SELALU dinyalakan lagi saat script
 -- dihancurkan (kalau Top GUI sempat mematikannya), supaya menu/leave game tidak pernah hilang.
 pcall(function() game:GetService("StarterGui"):SetCore("TopbarEnabled", true) end)
@@ -1589,15 +1651,63 @@ local isLagActive = false
 local demonResizeActive = false
 local demonOriginalSize = nil
 
--- ADD: remote event yang dipakai fitur Cola (hook ToolAction.FireServer) & Defibrillator Aura.
--- FIX: dipakai FindFirstChild + warn agar penyebab jelas jika event tidak ditemukan
-local ToolAction = ReplicatedStorage.Events:FindFirstChild("ToolAction")
-local UpdateCharacterDataRegistry = ReplicatedStorage.Events:FindFirstChild("UpdateCharacterDataRegistry")
-if not ToolAction then
-warn("[JoblessHub] ReplicatedStorage.Events.ToolAction tidak ditemukan - fitur Cola & Defibrillator tidak akan berfungsi")
+-- ================= UPDATE v1.6.5 (GAME UPDATE: REMOTES DIPINDAHKAN) =================
+-- Game Evade memindahkan semua remote dari ReplicatedStorage.Events.* ke
+-- ReplicatedStorage.Remotes.<Kategori>.* (Character / UI / Registry / Session / Round / Admin).
+-- Resolver di bawah mencoba layout BARU lebih dulu lalu fallback ke layout LAMA
+-- (Events flat / Events.<Kategori> / Events.Other) sehingga script tetap jalan di kedua
+-- versi game. Hanya hasil SUKSES yang di-cache; remote yang belum ketemu dicari ulang
+-- (folder Remotes bisa direplikasi lebih lambat dari folder Events pada executor tertentu).
+local GameRemoteCache = {}
+local function GetGameRemote(category, name)
+local cacheKey = tostring(category) .. "/" .. tostring(name)
+local cached = GameRemoteCache[cacheKey]
+if cached then
+return cached
 end
-if not UpdateCharacterDataRegistry then
-warn("[JoblessHub] ReplicatedStorage.Events.UpdateCharacterDataRegistry tidak ditemukan - fitur Defibrillator tidak akan berfungsi")
+local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+if remotesFolder then
+local found = nil
+if category then
+local catFolder = remotesFolder:FindFirstChild(category)
+found = catFolder and catFolder:FindFirstChild(name)
+end
+found = found or remotesFolder:FindFirstChild(name)
+if found then
+GameRemoteCache[cacheKey] = found
+return found
+end
+end
+local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
+if eventsFolder then
+local found = eventsFolder:FindFirstChild(name)
+if not found and category then
+local catFolder = eventsFolder:FindFirstChild(category)
+found = catFolder and catFolder:FindFirstChild(name)
+end
+if not found then
+local otherFolder = eventsFolder:FindFirstChild("Other")
+found = otherFolder and otherFolder:FindFirstChild(name)
+end
+if found then
+GameRemoteCache[cacheKey] = found
+return found
+end
+end
+return nil
+end
+local function SafeFireGameRemote(category, name, ...)
+local ev = GetGameRemote(category, name)
+if not ev then
+return false
+end
+return FireClient(ev, ...)
+end
+-- remote yang dipakai fitur Cola & Defibrillator Aura (resolve lazy lewat resolver)
+local ToolAction = GetGameRemote("Character", "ToolAction")
+local UpdateCharacterDataRegistry = GetGameRemote("Registry", "UpdateCharacterDataRegistry")
+if not ToolAction then
+warn("[JoblessHub] Remote ToolAction (Remotes.Character.ToolAction / Events.ToolAction) tidak ditemukan - fitur terkait tidak akan berfungsi")
 end
 
 -- require
@@ -1922,19 +2032,47 @@ setupCharacter(character)
 end))
 
 -- Top bar buttons (Custom Top GUI: Zoom, Front View/Reload, Leaderboard)
+-- ================= UPDATE v1.6.5 (GAME UPDATE: KEYBIND SERVICE) =================
+-- Game MENGHAPUS bindable "SendKeybindEvent" (Services.Client.KeybindService.SendKeybindEvent).
+-- Jalur baru persis DaraHub terbaru: panggil MODULE KeybindService langsung
+-- (KeyInfoUsed -> fallback SendKeybind) dengan field Key + Keybind.
+local KeybindServiceModule = nil
+local keybindWarned = false
+local function SendKeybindInfo(info)
+if not KeybindServiceModule then
+local okRequire, module = pcall(function()
+local servicesF = ReplicatedStorage:FindFirstChild("Services")
+local clientF = servicesF and servicesF:FindFirstChild("Client")
+local kbModule = clientF and clientF:FindFirstChild("KeybindService")
+if not kbModule then
+return nil
+end
+return require(kbModule)
+end)
+if not okRequire or not module then
+return false
+end
+KeybindServiceModule = module
+end
+local okInfo = pcall(function()
+return KeybindServiceModule:KeyInfoUsed(info)
+end)
+if okInfo then
+return true
+end
+return (pcall(function()
+return KeybindServiceModule:SendKeybind(info)
+end))
+end
 function SendKeybindEvent(key, bool)
--- FIX: pencarian bertahap + warn; tanpa ini, menghapus folder game membuat tombol zoom/POV error
-local kb = ReplicatedStorage:FindFirstChild("Services")
-kb = kb and kb:FindFirstChild("Client")
-kb = kb and kb:FindFirstChild("KeybindService")
-kb = kb and kb:FindFirstChild("SendKeybindEvent")
-if kb then
-kb:Fire({
+local sent = SendKeybindInfo({
 Key = key,
+Keybind = key,
 Down = bool
 })
-else
-warn("[JoblessHub] KeybindService.SendKeybindEvent tidak ditemukan - keybind layar tidak terkirim")
+if not sent and not keybindWarned then
+keybindWarned = true
+warn("[JoblessHub] KeybindService (module) tidak bisa dikirim - keybind layar tidak terkirim")
 end
 end
 
@@ -2244,8 +2382,9 @@ if not CharacterTag then
 CharacterTag = GetCharacterTag(LocalPlayer.Character)
 end
 -- Jalur 1 (PERSIS DaraHub asli): fire event CharacterTask milik game lewat getconnections
+-- UPDATE v1.6.5: remote CharacterTask pindah Events -> Remotes.Character (via resolver)
 if CharacterTag then
-local sent = SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", CharacterTag, "ModifyMovement", {MovementType, value})
+local sent = SafeFireGameRemote("Character", "CharacterTask", CharacterTag, "ModifyMovement", {MovementType, value})
 if sent then
 return
 end
@@ -3024,43 +3163,236 @@ end
 DaraSectionStart("TAB COMBAT")
 local ok_TC, err_TC = pcall(function()
 -- ================= TAB COMBAT =================
+-- ================= UPDATE v1.6.5 (GAME UPDATE: SISTEM TOOL MODS - persis DaraHub terbaru) =================
+-- Engine lama (patch module ReplicatedStorage.Tools langsung) tidak lagi cukup: tool yang
+-- sudah ter-instance membaca salinan datanya sendiri. Sistem baru persis DaraHub terbaru:
+-- hook ToolClass.Init (tool BARU otomatis ter-patch saat dibuat) + patch SEMUA tool hidup
+-- via ToolService.Profiles + fallback patch module (jalur lama) bila hook gagal.
+ToolMods = {
+Active = {},
+Hooked = false,
+OriginalInit = nil,
+ToolClass = nil
+}
+local ToolModBig = 9999999999
+function ToolModsEachMethod(info, callback)
+for _, taskInfo in ipairs(info.Tasks or {}) do
+for _, functionInfo in ipairs(taskInfo.Functions or {}) do
+for _, activation in ipairs(functionInfo.Activations or {}) do
+for _, method in ipairs(activation.Methods or {}) do
+callback(method, taskInfo)
+end
+end
+end
+for _, functionInfo in ipairs(taskInfo.AutomaticFunctions or {}) do
+for _, method in ipairs(functionInfo.Methods or {}) do
+callback(method, taskInfo)
+end
+end
+end
+end
+function ToolModsSetKeys(data, keys, valueFn)
+if type(data) ~= "table" then
+return
+end
+for key, value in pairs(data) do
+if keys[key] and type(value) == "number" then
+data[key] = valueFn(key, value)
+elseif type(value) == "table" then
+ToolModsSetKeys(value, keys, valueFn)
+end
+end
+end
+ToolMods.InfoPatchers = {
+Ammo = function(info)
+for _, taskInfo in ipairs(info.Tasks or {}) do
+local resourceInfo = taskInfo.ResourceInfo
+if resourceInfo and resourceInfo.Type == "Clip" then
+resourceInfo.Reserve = ToolModBig
+resourceInfo.Cap = ToolModBig
+if resourceInfo.MaxReserve ~= nil then
+resourceInfo.MaxReserve = ToolModBig
+end
+end
+end
+end,
+NoDelay = function(info)
+ToolModsEachMethod(info, function(method)
+if type(method.Info) == "table" then
+ToolModsSetKeys(method.Info, {Cooldown = true}, function()
+return 1 / 65536
+end)
+end
+end)
+end,
+Spread = function(info)
+for _, taskInfo in ipairs(info.Tasks or {}) do
+for _, reference in pairs(taskInfo.MethodReferences or {}) do
+local spreadInfo = type(reference) == "table" and type(reference.Info) == "table" and reference.Info.SpreadInfo
+if type(spreadInfo) == "table" then
+spreadInfo.MaxSpread = 0
+spreadInfo.MinSpread = 0
+end
+end
+end
+end,
+Range = function(info)
+ToolModsEachMethod(info, function(method)
+if type(method.Info) ~= "table" then
+return
+end
+ToolModsSetKeys(method.Info, {Range = true, LungeRange = true, HearingRange = true}, function()
+return math.huge
+end)
+local interval = method.Info.DamageDistanceInterval
+if type(interval) == "table" and #interval >= 2 then
+interval[2] = math.huge
+end
+end)
+end
+}
+ToolMods.LivePatchers = {
+Ammo = function(tool)
+for _, taskObject in ipairs(tool.Tasks and tool.Tasks.Tasks or {}) do
+local clip = taskObject.Resource and taskObject.Resource.Resource
+if type(clip) == "table" and clip.Cap ~= nil and clip.Ammo ~= nil then
+clip.Cap = ToolModBig
+clip.Reserve = ToolModBig
+clip.MaxReserve = ToolModBig
+clip.Ammo = ToolModBig
+end
+end
+end,
+Spread = function(tool)
+for _, taskObject in ipairs(tool.Tasks and tool.Tasks.Tasks or {}) do
+for _, reference in ipairs(taskObject.Methods or {}) do
+local spread = reference.Spread
+if type(spread) == "table" then
+spread.Min = 0
+spread.Max = 0
+spread.Value = 0
+end
+end
+end
+end
+}
+function ToolModsPatchTool(tool)
+if type(tool) ~= "table" or type(tool.Info) ~= "table" then
+return
+end
+for kind in pairs(ToolMods.Active) do
+local infoPatcher = ToolMods.InfoPatchers[kind]
+if infoPatcher then
+pcall(infoPatcher, tool.Info)
+end
+local livePatcher = ToolMods.LivePatchers[kind]
+if livePatcher then
+pcall(livePatcher, tool)
+end
+end
+end
+function ToolModsGetLiveTools()
+local list = {}
+local ToolService = safeRequire({"Services", "Asset", "ToolService"}, "ToolService")
+if type(ToolService) == "table" and type(ToolService.Profiles) == "table" then
+for _, profile in ipairs(ToolService.Profiles) do
+local isMine = profile.Player == LocalPlayer or (profile.Character ~= nil and profile.Character == LocalPlayer.Character)
+if isMine then
+for _, tool in ipairs(profile.Tools or {}) do
+table.insert(list, tool)
+end
+end
+end
+end
+return list
+end
+function ToolModsInstallHook()
+if ToolMods.Hooked then
+return true
+end
+local ToolClass = safeRequire({"Objects", "Game", "Tool"}, "ToolClass")
+if type(ToolClass) ~= "table" or type(ToolClass.Init) ~= "function" then
+return false
+end
+local originalInit = ToolClass.Init
+ToolMods.OriginalInit = originalInit
+ToolMods.ToolClass = ToolClass
+ToolClass.Init = function(self, ...)
+local results = table.pack(originalInit(self, ...))
+pcall(ToolModsPatchTool, self)
+return table.unpack(results, 1, results.n)
+end
+ToolMods.Hooked = true
+-- HOT-SWAP: catat hook di registry global agar eksekusi berikutnya bisa memulihkannya
+getgenv().__JoblessHub_ToolModsHook = {
+class = ToolClass,
+patched = ToolClass.Init,
+original = originalInit
+}
+return true
+end
+function ToolModsUnhook()
+if ToolMods.Hooked and ToolMods.ToolClass and ToolMods.ToolClass.Init ~= ToolMods.OriginalInit then
+ToolMods.ToolClass.Init = ToolMods.OriginalInit
+end
+ToolMods.Hooked = false
+ToolMods.Active = {}
+getgenv().__JoblessHub_ToolModsHook = nil
+end
+function ToolModsEnable(kind)
+ToolMods.Active[kind] = true
+local hooked = ToolModsInstallHook()
+local patched = 0
+for _, tool in ipairs(ToolModsGetLiveTools()) do
+ToolModsPatchTool(tool)
+patched = patched + 1
+end
+if not hooked then
+local infoPatcher = ToolMods.InfoPatchers[kind]
+for _, tool in ipairs(ReplicatedStorage.Tools:GetChildren()) do
+if tool:IsA("ModuleScript") then
+local okModule, data = pcall(require, tool)
+if okModule and type(data) == "table" and infoPatcher then
+pcall(infoPatcher, data)
+end
+end
+end
+end
+WindUI:Notify({
+Title = "Tool Modifier",
+Content = kind .. " applied to " .. patched .. " tool(s)" .. (hooked and ", new tools get it too" or " (hook failed, only works next spawn)"),
+Duration = 3
+})
+end
+
+-- Combat
+-- UPDATE v1.6.5: 3 tombol tool modifier baru dari DaraHub terbaru + Infinite Range kini
+-- memakai sistem Tool Mods (patch tool hidup + tool baru, bukan hanya module).
+Tabs.Combat:Button({
+Title = "Visual Infinite Ammo",
+Callback = function()
+ToolModsEnable("Ammo")
+end
+})
+Tabs.Combat:Space()
+Tabs.Combat:Button({
+Title = "Visual No Tool Delay",
+Callback = function()
+ToolModsEnable("NoDelay")
+end
+})
+Tabs.Combat:Space()
+Tabs.Combat:Button({
+Title = "Disable Weapon Spread",
+Callback = function()
+ToolModsEnable("Spread")
+end
+})
+Tabs.Combat:Space()
 Tabs.Combat:Button({
 Title = "Infinite Range",
 Callback = function()
-function setInfiniteRange(data)
-if type(data) ~= "table" then return end
-for key, value in pairs(data) do
-if (key == "Range" or key == "LungeRange" or key == "HearingRange") and type(value) == "number" then
-data[key] = math.huge
-elseif key == "DamageDistanceInterval" and type(value) == "table" and #value >= 2 then
-value[2] = math.huge
-elseif type(value) == "table" then
-setInfiniteRange(value)
-end
-end
-end
-
-for _, tool in pairs(ReplicatedStorage.Tools:GetChildren()) do
-if tool:IsA("ModuleScript") then
-local success, toolData = pcall(require, tool)
-if success and type(toolData) == "table" and toolData.Tasks then
-for _, task in ipairs(toolData.Tasks) do
-for _, func in ipairs(task.Functions or {}) do
-for _, activation in ipairs(func.Activations or {}) do
-for _, method in ipairs(activation.Methods or {}) do
-if method.Info then setInfiniteRange(method.Info) end
-end
-end
-end
-for _, autoFunc in ipairs(task.AutomaticFunctions or {}) do
-for _, method in ipairs(autoFunc.Methods or {}) do
-if method.Info then setInfiniteRange(method.Info) end
-end
-end
-end
-end
-end
-end
+ToolModsEnable("Range")
 end
 })
 Tabs.Combat:Space()
@@ -3109,129 +3441,224 @@ if b then b = b:FindFirstChild("TooMany") end
 if b then b:Destroy() end
 end
 end
+
+-- UPDATE v1.6.5 (GAME UPDATE): HUD pindah Misc.UI.Shared -> Assets.UI.Game.HUD -
+-- path BARU ditambahkan (path lama di atas tetap dicoba sebagai fallback)
+for i = 1, 4 do
+local a = ReplicatedStorage:FindFirstChild("Assets")
+if a then a = a:FindFirstChild("UI") end
+if a then a = a:FindFirstChild("Game") end
+if a then a = a:FindFirstChild("HUD") end
+if a then a = a:FindFirstChild("Interactors") end
+if a then a = a:FindFirstChild("Popups") end
+if a then a = a:FindFirstChild("Usables") end
+if a then a = a:FindFirstChild("Wheel") end
+if a then
+local b = a:FindFirstChild("Item" .. i)
+if b then b = b:FindFirstChild("Icon") end
+if b then b = b:FindFirstChild("TooMany") end
+if b then b:Destroy() end
+end
+end
 end
 })
 
 Tabs.Combat:Space()
 
--- ADD: Defibrillator Aura - otomatis memasang defibrillator lalu menghidupkan (revive) pemain terdekat
--- yang sedang DOWNED (fitur revive PEMAIN LAIN, bukan diri sendiri). Port dari file asli (tab Combat);
--- helper GetStatus / isPlayerDowned dibuat lokal agar tidak bentrok dengan helper teleport.
+-- ================= UPDATE v1.6.5 (GAME UPDATE: DEFIBRILLATOR AURA DITULIS ULANG - persis DaraHub terbaru) =================
+-- Game mengubah alur equip tool: jalur buffer UpdateCharacterDataRegistry lama tidak lagi
+-- dipakai. Alur baru persis DaraHub terbaru: ToolProfile (CharacterService:GetLocalCharacter)
+-- -> AttemptEquip(keybind defib) -> ToolAction:FireServer(indexBuffer metode "Revive", tag).
+-- Target dipilih dari CharacterService:GetCharacters() (DOWNED + tidak sedang dibawa +
+-- antrian revive kosong) dan otomatis kembali ke tool semula saat tidak ada target.
 do
 local defibrillator = {
-Equipped = false,
 AuraEnabled = false,
 AuraRange = 20,
-Connection = nil,
+Thread = nil,
 EquipDelay = 0,
-ReviveDelay = 0
+ReviveDelay = 0,
+Cooldown = 1.25,
+LastFire = 0,
+LastEquipTry = 0,
+NoTargetSince = nil,
+PreviousKeybind = nil,
+UsedEquip = false,
+WarnedMissing = false,
+WarnedError = false
 }
 
-local function GetStatus(player)
-local character = player.Character
-if not character then
-return "DEAD"
+local function DefibGetProfile()
+if not CharacterService then
+return nil, nil
+end
+local ok, character = pcall(function()
+return CharacterService:GetLocalCharacter()
+end)
+if ok and character and character.ToolProfile and character.Model then
+return character.ToolProfile, character
+end
+return nil, nil
 end
 
-local charData = CharacterService:GetCharacterFromPlayer(player)
-if charData and charData.DataRegistry:Get("Downed") then
-return "DOWNED"
+local function DefibFindTool(profile)
+for index, tool in pairs(profile.Tools or {}) do
+if tool.Module and tool.Module.Name == "Defibrillator" then
+return index, tool
+end
+end
+return nil, nil
 end
 
-local humanoid = character:FindFirstChildOfClass("Humanoid")
-if humanoid and humanoid.Health > 0 then
-return "ALIVE"
+local function DefibFindReviveMethod(tool)
+local info = tool.Info
+for _, taskInfo in ipairs(info and info.Tasks or {}) do
+for _, func in ipairs(taskInfo.Functions or {}) do
+for _, activation in ipairs(func.Activations or {}) do
+for _, method in ipairs(activation.Methods or {}) do
+if method.VisualName == "Revive" and not method.Ignore then
+return method
+end
+end
+end
+end
+end
+return nil
 end
 
-return "DEAD"
+local function DefibFindTarget(localCharacter, localRoot)
+local myTag = localCharacter.Model:GetAttribute("Tag")
+local range = defibrillator.AuraRange
+local bestModel, bestDistance
+for _, other in pairs(CharacterService:GetCharacters()) do
+local model = other.Model
+local root = model and model.PrimaryPart
+local registry = other.DataRegistry
+if other ~= localCharacter and root and registry and registry:Get("Downed") and (registry:Get("Carried") or 0) == 0 then
+local humanoid = model:FindFirstChild("Humanoid")
+local queue = registry:Get("ReviveQueue") or {}
+if humanoid and humanoid.Health <= 0 and not (queue[1] and queue[1] ~= myTag) and model:GetAttribute("Tag") then
+local distance = (root.Position - localRoot.Position).Magnitude
+if range == "inf" or (type(range) == "number" and distance <= range) then
+if not bestDistance or distance < bestDistance then
+bestModel = model
+bestDistance = distance
+end
+end
+end
+end
+end
+return bestModel
 end
 
-local function isPlayerDowned(player)
-return GetStatus(player) == "DOWNED"
+local function DefibRestore(profile)
+if defibrillator.UsedEquip and profile then
+local _, tool = DefibFindTool(profile)
+local current = profile:GetCurrentTool()
+if tool and current == tool and defibrillator.PreviousKeybind then
+pcall(profile.AttemptEquip, profile, defibrillator.PreviousKeybind)
+end
+end
+defibrillator.UsedEquip = false
+defibrillator.PreviousKeybind = nil
+defibrillator.NoTargetSince = nil
+end
+
+local function DefibStep()
+local profile, character = DefibGetProfile()
+if not profile then
+return
+end
+local localRoot = character.Model.PrimaryPart
+if not localRoot or character.DataRegistry:Get("Downed") then
+return
+end
+local target = DefibFindTarget(character, localRoot)
+if not target then
+defibrillator.NoTargetSince = defibrillator.NoTargetSince or tick()
+if tick() - defibrillator.NoTargetSince > 0.6 then
+DefibRestore(profile)
+end
+return
+end
+defibrillator.NoTargetSince = nil
+local index, tool = DefibFindTool(profile)
+if not tool then
+if not defibrillator.WarnedMissing then
+defibrillator.WarnedMissing = true
+WindUI:Notify({
+Title = "Defibrillator Aura",
+Content = "No Defibrillator in your loadout, put it in a slot first (needs to be owned too)",
+Duration = 4
+})
+end
+return
+end
+if profile.DataRegistry:Get("Equipped") ~= index then
+if tick() - defibrillator.LastEquipTry < 0.8 then
+return
+end
+local current = profile:GetCurrentTool()
+if current and current ~= tool then
+defibrillator.PreviousKeybind = current.Keybind
+end
+if defibrillator.EquipDelay > 0 then
+task.wait(defibrillator.EquipDelay)
+end
+defibrillator.LastEquipTry = tick()
+defibrillator.UsedEquip = true
+pcall(profile.AttemptEquip, profile, tool.Keybind)
+return
+end
+if tick() - defibrillator.LastFire < defibrillator.Cooldown or tool.Tasks and tool.Tasks.Unequipping then
+return
+end
+if defibrillator.ReviveDelay > 0 then
+task.wait(defibrillator.ReviveDelay)
+if not target.Parent or profile.DataRegistry:Get("Equipped") ~= index then
+return
+end
+end
+local indexBuffer
+local method = DefibFindReviveMethod(tool)
+if method and tool.Tasks then
+local okBuffer, result = pcall(tool.Tasks.GetIndexBufferFromMethod, tool.Tasks, method)
+if okBuffer then
+indexBuffer = result
+end
+end
+indexBuffer = indexBuffer or buffer.fromstring("\1\1\1\1")
+defibrillator.LastFire = tick()
+local toolActionRemote = GetGameRemote("Character", "ToolAction")
+if toolActionRemote then
+toolActionRemote:FireServer(indexBuffer, target:GetAttribute("Tag"))
+end
 end
 
 local function StopReviveAura()
 defibrillator.AuraEnabled = false
-if defibrillator.Connection then
-defibrillator.Connection:Disconnect()
-defibrillator.Connection = nil
+if defibrillator.Thread then
+pcall(task.cancel, defibrillator.Thread)
+defibrillator.Thread = nil
 end
-if defibrillator.Equipped then
-pcall(function()
-UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\8\0"), buffer.fromstring("\1")})
-end)
-defibrillator.Equipped = false
-end
+DefibRestore(DefibGetProfile())
 end
 
 local function StartReviveAura()
-if not UpdateCharacterDataRegistry or not ToolAction then
-warn("[JoblessHub] Defibrillator Aura butuh Events.UpdateCharacterDataRegistry & Events.ToolAction (tidak ditemukan)")
-return
-end
-if defibrillator.Connection then
+if defibrillator.Thread then
 StopReviveAura()
 end
-
 defibrillator.AuraEnabled = true
-
--- FIX (Task 18): scan sebelumnya berjalan tiap frame (RenderStepped ~60x/detik) dan
--- memanggil GetStatus (service call) untuk SETIAP pemain -> makan FPS saat pemain banyak.
--- Kini scan dibatasi 10x/detik (akumulator 0.1s) - revive tetap responsif, beban turun ~6x.
-local auraScanAcc = 0
-defibrillator.Connection = DaraTrackConn(RunService.RenderStepped:Connect(function(dt)
-if not defibrillator.AuraEnabled then return end
-
-auraScanAcc = auraScanAcc + dt
-if auraScanAcc < 0.1 then return end
-auraScanAcc = 0
-
-local found = false
-local localChar = LocalPlayer.Character
-local localPos = localChar and localChar:FindFirstChild("HumanoidRootPart")
-
-if not localPos then return end
-
-for _, player in pairs(Players:GetPlayers()) do
-if isPlayerDowned(player) then
-local character = player.Character
--- FIX: guard "character and" agar aman jika karakter target terputus di tengah loop
-local targetHRP = character and character:FindFirstChild("HumanoidRootPart")
-if targetHRP then
-local distance = (localPos.Position - targetHRP.Position).Magnitude
-local range = defibrillator.AuraRange
-
-if range == "inf" or (type(range) == "number" and distance <= range) then
-found = true
-local tag = character:GetAttribute("Tag")
-
-if tag then
-if not defibrillator.Equipped then
-if defibrillator.EquipDelay > 0 then
-task.wait(defibrillator.EquipDelay)
+defibrillator.WarnedMissing = false
+defibrillator.LastFire = 0
+defibrillator.Thread = DaraTrackThread(task.spawn(function()
+while defibrillator.AuraEnabled do
+local ok, err = pcall(DefibStep)
+if not ok and not defibrillator.WarnedError then
+defibrillator.WarnedError = true
+warn("[JoblessHub] Defibrillator aura error: " .. tostring(err))
 end
-pcall(function()
-UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\008\000"), buffer.fromstring("\003")})
-end)
-defibrillator.Equipped = true
-end
-
-if defibrillator.ReviveDelay > 0 then
-task.wait(defibrillator.ReviveDelay)
-end
-pcall(function()
-ToolAction:FireServer(buffer.fromstring("\001\001\001\001"), tag)
-end)
-end
-end
-end
-end
-end
-if not found and defibrillator.Equipped then
-pcall(function()
-UpdateCharacterDataRegistry:FireServer({buffer.fromstring("\8\0"), buffer.fromstring("\1")})
-end)
-defibrillator.Equipped = false
+task.wait(0.1)
 end
 end))
 end
@@ -3393,9 +3820,8 @@ local ok_SR, err_SR = pcall(function()
 Tabs.Auto:Space()
 Tabs.Auto:Section({ Title = "Auto" })
 
--- FIX: lookup aman (Events/SetPlayerMode hilang = tidak crash saat load)
-local _eventsRS = ReplicatedStorage:FindFirstChild("Events")
-local changePlayerMode = _eventsRS and _eventsRS:FindFirstChild("SetPlayerMode")
+-- UPDATE v1.6.5: SetPlayerMode pindah Events -> Remotes.Session (via resolver, fallback lama)
+local changePlayerMode = GetGameRemote("Session", "SetPlayerMode")
 
 SelfRevive = {
 Method = "Spawnpoint",
@@ -3603,7 +4029,7 @@ Callback = function()
 if changePlayerMode then
 pcall(function() changePlayerMode:FireServer(true) end)
 else
-warn("[JoblessHub] Force Respawn: Events.SetPlayerMode tidak ditemukan di game ini")
+warn("[JoblessHub] Force Respawn: SetPlayerMode (Remotes.Session / Events) tidak ditemukan di game ini")
 end
 end
 })
@@ -3812,12 +4238,10 @@ if okVU then VirtualUser = resVU end
 return VirtualUser
 end
 
--- FIX: akses Events.Interact memakai FindFirstChild bertingkat + warn agar tidak error saat load
--- jika game mengubah struktur Events (pola sama dengan fix UserData di bagian Shop)
-local Interact = ReplicatedStorage:FindFirstChild("Events")
-Interact = Interact and Interact:FindFirstChild("Interact")
+-- UPDATE v1.6.5: Interact pindah Events -> Remotes.Character (via resolver, fallback lama)
+local Interact = GetGameRemote("Character", "Interact")
 if not Interact then
-warn("[JoblessHub] ReplicatedStorage.Events.Interact tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
+warn("[JoblessHub] Remote Interact (Remotes.Character.Interact / Events.Interact) tidak ditemukan - Auto Farm (Revive/Token/Objective) tidak akan berfungsi")
 end
 
 Tabs.Auto:Section({ Title = "Auto Farm" })
@@ -3996,56 +4420,70 @@ end
 end
 
 -- ============================================================
--- ADD (UPDATE BETA): helper Catch NPC - port dari DaraHub BETA (decompile/source scan
--- NPC yang memberi reward event, lalu dipakai mode "Catch NPC" Auto Farm).
+-- UPDATE v1.6.5: helper Catch NPC LAMA (getModuleSource + npcHasEventReward - scan source
+-- module NPC folder) DIHAPUS - diganti deteksi CollectionService di bawah (persis DaraHub
+-- terbaru); game tidak lagi cocok dengan scan source lama.
 -- ============================================================
-function getModuleSource(module)
-local src = nil
-if decompile then
-local ok, result = pcall(decompile, module)
-if ok and type(result) == "string" then
-src = result
-end
-end
-if not src then
-local ok, result = pcall(function()
-return module.Source
-end)
-if ok and type(result) == "string" then
-src = result
-end
-end
-return src
-end
 
-function npcHasEventReward(module)
-local cached = module:GetAttribute("CatchRewarded")
-if cached ~= nil then
-return cached
+-- ================= UPDATE v1.6.5 (GAME UPDATE: CATCH NPC - deteksi baru DaraHub terbaru) =================
+-- Game tidak lagi cocok dengan deteksi lama (scan module folder ReplicatedStorage.NPCs).
+-- Deteksi baru persis DaraHub terbaru: CollectionService tag "TouchReward" + fallback scan
+-- Model ber-atribut TouchRange tiap 5 detik; root NPC bisa PrimaryPart / HRP / BasePart mana
+-- pun; target diurutkan dari yang terdekat dari pemain.
+local CollectionService = game:GetService("CollectionService")
+local CatchTagName = "TouchReward"
+local lastCatchFallbackScan = 0
+function getCatchRoot(model)
+if typeof(model) ~= "Instance" or not model.Parent then
+return nil
 end
-local src = getModuleSource(module)
--- UPDATE v1.4.4 (SINKRON BETA): pola sumber di-update - game 2.2 memakai layout UserData baru
--- (Client.Services.UserData.Event); pola lama hanya cocok "Services.UserData.EventService". Pola
--- baru "UserData%.Event" cocok untuk KEDUANYA (EventService & Event) - Catch NPC tetap menemukan
--- NPC pemberi reward baik di layout lama maupun baru.
-local rewarded = src ~= nil and src:find("UserData%.Event") ~= nil
-pcall(module.SetAttribute, module, "CatchRewarded", rewarded)
-return rewarded
+return model.PrimaryPart or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart", true)
 end
-
+function isCatchTarget(inst)
+if typeof(inst) ~= "Instance" or not inst:IsDescendantOf(workspace) then
+return false
+end
+if inst:GetAttribute("Tag") == nil then
+return false
+end
+return getCatchRoot(inst) ~= nil
+end
+function getCatchRange(inst)
+return tonumber(inst:GetAttribute("TouchRange")) or 10
+end
 function getCatchTargets()
 local targets = {}
-local npcFolder = ReplicatedStorage:FindFirstChild("NPCs")
-if not npcFolder then
-return targets
-end
-for _, obj in ipairs(workspace:GetDescendants()) do
-if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
-local module = npcFolder:FindFirstChild(obj.Name)
-if module and module:IsA("ModuleScript") and npcHasEventReward(module) then
-table.insert(targets, obj)
+local seen = {}
+local function add(inst)
+if not seen[inst] and isCatchTarget(inst) then
+seen[inst] = true
+table.insert(targets, inst)
 end
 end
+for _, inst in ipairs(CollectionService:GetTagged(CatchTagName)) do
+add(inst)
+end
+if #targets == 0 then
+local now = tick()
+if now - lastCatchFallbackScan >= 5 then
+lastCatchFallbackScan = now
+for _, inst in ipairs(workspace:GetDescendants()) do
+if inst:IsA("Model") and inst:GetAttribute("TouchRange") ~= nil then
+add(inst)
+end
+end
+end
+end
+local char = LocalPlayer.Character
+local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+if myRoot then
+table.sort(targets, function(x, y)
+local rx, ry = getCatchRoot(x), getCatchRoot(y)
+if not rx or not ry then
+return rx ~= nil
+end
+return (rx.Position - myRoot.Position).Magnitude < (ry.Position - myRoot.Position).Magnitude
+end)
 end
 return targets
 end
@@ -4079,15 +4517,16 @@ local now = tick()
 
 local catchTarget = nil
 if hasCatchNPC then
-if now - AutoFarm.LastCatchScan >= 1 then
+-- UPDATE v1.6.5: scan 0.25 dtk (persis DaraHub terbaru) + validasi via isCatchTarget
+if now - AutoFarm.LastCatchScan >= 0.25 then
 AutoFarm.LastCatchScan = now
 AutoFarm.CatchTargets = getCatchTargets()
 end
 local target = AutoFarm.CatchTarget
-if not target or not target.Parent or not target:FindFirstChild("HumanoidRootPart") then
+if not target or not isCatchTarget(target) then
 target = nil
 for _, candidate in ipairs(AutoFarm.CatchTargets) do
-if candidate.Parent and candidate:FindFirstChild("HumanoidRootPart") then
+if isCatchTarget(candidate) then
 target = candidate
 break
 end
@@ -4116,19 +4555,23 @@ end
 tokenTarget = AutoFarm.ReviveTarget
 end
 
-local catchHrp = catchTarget and catchTarget:FindFirstChild("HumanoidRootPart")
+local catchHrp = catchTarget and getCatchRoot(catchTarget)
 local tokenHrp = tokenTarget and tokenTarget:FindFirstChild("HumanoidRootPart")
 
 if catchHrp then
-hrp.CFrame = catchHrp.CFrame + AutoFarm.CatchOffset
+-- UPDATE v1.6.5: offset dijepit ke (TouchRange - 1) supaya selalu masuk jangkauan sentuh NPC
+local catchRange = getCatchRange(catchTarget)
+local catchOffset = AutoFarm.CatchOffset
+if catchOffset.Magnitude > catchRange - 1 then
+catchOffset = catchOffset.Magnitude > 0 and catchOffset.Unit * math.max(catchRange - 1, 0) or catchOffset
+end
+hrp.CFrame = catchHrp.CFrame + catchOffset
 local catchTag = catchTarget:GetAttribute("Tag")
 if catchTag and now - AutoFarm.LastCatchFire >= AutoFarm.CatchDelay then
 AutoFarm.LastCatchFire = now
 pcall(function()
--- FIX: Events.Other.TouchReward dicari bertahap (tidak error bila path berubah)
-local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
-local otherFolder = eventsFolder and eventsFolder:FindFirstChild("Other")
-local touchReward = otherFolder and otherFolder:FindFirstChild("TouchReward")
+-- UPDATE v1.6.5: TouchReward pindah Events.Other -> Remotes.Character (via resolver)
+local touchReward = GetGameRemote("Character", "TouchReward")
 if touchReward then
 touchReward:FireServer(catchTag)
 end
@@ -4789,18 +5232,16 @@ end
 return nil
 end
 
--- FIX: pencarian event + FireServer dibungkus pcall (anti spam error di Heartbeat)
+-- UPDATE v1.6.5: Vote pindah Events -> Remotes.Round (via resolver, fallback lama)
+-- pencarian event + FireServer tetap dibungkus pcall (anti spam error di Heartbeat)
 local function fireVoteServer(mapNumber)
 local votePopup = getVotePopup()
 if not votePopup then
 return
 end
-local voteEvent = ReplicatedStorage:FindFirstChild("Events")
-if voteEvent then
-voteEvent = voteEvent:FindFirstChild("Vote")
+local voteEvent = GetGameRemote("Round", "Vote")
 if voteEvent and voteEvent:IsA("RemoteEvent") then
 pcall(voteEvent.FireServer, voteEvent, mapNumber)
-end
 end
 end
 
@@ -4809,13 +5250,10 @@ local votePopup = getVotePopup()
 if not votePopup then
 return
 end
-local voteEvent = ReplicatedStorage:FindFirstChild("Events")
-if voteEvent then
-voteEvent = voteEvent:FindFirstChild("Vote")
+local voteEvent = GetGameRemote("Round", "Vote")
 if voteEvent and voteEvent:IsA("RemoteEvent") then
 -- argumen kedua true = vote game mode (bukan map)
 pcall(voteEvent.FireServer, voteEvent, modeNumber, true)
-end
 end
 end
 
@@ -6049,135 +6487,316 @@ end
 Tabs.Visuals:Space()
 Tabs.Visuals:Section({ Title = "Cola", TextSize = 20 })
 
--- ADD: semua fitur Cola - port dari file asli (tab Visuals).
--- Cara kerja: hook metatable __namecall sehingga setiap kali pemain memakai Cola (ToolAction:FireServer),
--- efeknya digantikan versi kustom (unlimited / durasi & speed boost) sepenuhnya client-side.
--- Butuh executor dengan hookfunction + getrawmetatable + newcclosure + buffer.
+-- ================= UPDATE v1.6.5 (GAME UPDATE: COLA DITULIS ULANG - persis DaraHub terbaru) =================
+-- Engine lama (hook __namecall + intersepsi buffer ToolAction "\1\2\1") dibongkar TOTAL:
+-- game mengubah alur aktifasi tool sehingga pola lama tidak lagi match. Engine baru persis
+-- DaraHub versi terbaru: patch ToolTasks.Activate (intersepsi aktifasi tool client-side),
+-- watcher CharacterTask.OnClientEvent (deteksi speed boost yang dikirim server), dan
+-- reassert thread (perpanjang durasi boost kustom setelah durasi asli habis).
+-- Tidak lagi butuh hookfunction/getrawmetatable/newcclosure (cukup getconnections).
 do
-local ColaModule = safeRequire(ReplicatedStorage.Tools.Cola, "Cola")
+local ToolTasks = safeRequire({"Objects", "Game", "Tool", "Tasks"}, "ToolTasks")
+local DrinkTaskType = nil
+do
+local okDrink, drinkType = pcall(function()
+return require(ReplicatedStorage.Objects.Game.Tool.Tasks.Types.Drink)
+end)
+if okDrink then
+DrinkTaskType = drinkType
+end
+end
+local colaCharacterTask = GetGameRemote("Character", "CharacterTask")
+local colaSharedUI = GetGameRemote("UI", "SharedUISetType")
 
-if hookfunction and getrawmetatable and newcclosure and ToolAction and buffer
-and type(ColaModule) == "table" and ColaModule.Tasks
+if getconnections and ToolTasks and type(ToolTasks.Activate) == "function"
+and colaCharacterTask and colaSharedUI then
+
+-- Info default (durasi & speed boost asli Cola) - dicari aman; struktur berubah = tabel kosong
+local info = {}
+local ColaModule = safeRequire(ReplicatedStorage.Tools.Cola, "Cola")
+if type(ColaModule) == "table" and ColaModule.Tasks
 and ColaModule.Tasks[1] and ColaModule.Tasks[1].AutomaticFunctions
 and ColaModule.Tasks[1].AutomaticFunctions[2] and ColaModule.Tasks[1].AutomaticFunctions[2].Methods
 and ColaModule.Tasks[1].AutomaticFunctions[2].Methods[1] then
-
-local okInfo, info = pcall(function()
+local okInfo, colaInfo = pcall(function()
 return ColaModule.Tasks[1].AutomaticFunctions[2].Methods[1].Info
 end)
-
-if okInfo and type(info) == "table" then
-local endlessColaEnabled = false
-local modifyColaEnabled = false
-
-local customDuration = tonumber(info.Duration) or 10
-local customSpeedBoost = tonumber(info.SpeedBoost) or 15
-
-local function ColaVignette()
-local duration = modifyColaEnabled and customDuration or info.Duration
-
-SafeFireEvent(ReplicatedStorage.Events, "SharedUISetType", "Vignette", info.Color, duration, true)
-end
-
-local function ColaSpeedBoost(Type)
-local character = LocalPlayer.Character
-if character then
-local tag = character:GetAttribute("Tag")
-if tag then
-local speed = modifyColaEnabled and customSpeedBoost or info.SpeedBoost
-local duration = modifyColaEnabled and customDuration or info.Duration
-
-SafeFireEvent(ReplicatedStorage.Events, "CharacterTask", tag, "Movement", {SpeedChange = {Value = speed, Type = Type or "Cola", Length = duration}})
-end
+if okInfo and type(colaInfo) == "table" then
+info = colaInfo
 end
 end
 
-local gmt = getrawmetatable(game)
-local oldNamecall = gmt.__namecall
-local isColaHooked = false
+local ColaCheat = {
+["Visual Infinite"] = false,
+["Cola Modifier"] = false,
+["Loaded"] = false,
+["Custom Duration"] = tonumber(info.Duration),
+["Custom Speed"] = tonumber(info.SpeedBoost),
+["Original Activate"] = nil,
+["Patched"] = nil,
+["Watcher"] = nil,
+["Pending Drink"] = nil,
+["Reassert Thread"] = nil,
+["Drink Tools"] = setmetatable({}, { __mode = "k" }),
+}
 
-local function applyColaHook()
-if isColaHooked then return end
+local function ColaCheatFindColor3InTable(value, seen)
+if typeof(value) == "Color3" then
+return value
+end
+if type(value) ~= "table" or seen[value] then
+return nil
+end
+seen[value] = true
+for _, child in pairs(value) do
+local found = ColaCheatFindColor3InTable(child, seen)
+if found then
+return found
+end
+end
+return nil
+end
 
-setreadonly(gmt, false)
-local okHook, hookErr = pcall(function()
-gmt.__namecall = newcclosure(function(self, ...)
-local method = getnamecallmethod()
-local args = {...}
+local function ColaCheatCollectToolActivationMethods(toolInfo)
+local list = {}
+for _, taskInfo in pairs(toolInfo.Tasks or {}) do
+for _, functionInfo in pairs(taskInfo.Functions or {}) do
+for _, activation in pairs(functionInfo.Activations or {}) do
+for _, method in pairs(activation.Methods or {}) do
+list[#list + 1] = method
+end
+end
+end
+for _, functionInfo in pairs(taskInfo.AutomaticFunctions or {}) do
+for _, method in pairs(functionInfo.Methods or {}) do
+list[#list + 1] = method
+end
+end
+end
+return list
+end
 
--- FIX (UI hang): hook __namecall berjalan DI THREAD pemanggil. Semua interaksi UI game asli
--- (leaderboard, zoom, ganti POV depan/belakang, boombox, drop/lepaskan item) mengirim remote
--- lewat FireServer yang sama sehingga ikut melewati hook ini. Kode asli menjalankan efek Cola
--- SINKRON di dalam hook (termasuk task.wait() dan FireClient/getconnections yang bisa yield),
--- sehingga thread pemanggil ikut tertahan -> tombol UI game terasa delay/macet dan boombox
--- tidak jalan. Perbaikan: (1) logika intersepsi dibungkus pcall agar error apapun TIDAK
--- merambat ke thread game (remote diteruskan apa adanya), (2) seluruh efek Cola dipindah ke
--- task.spawn sehingga hook langsung return dan tidak pernah yield di thread pemanggil.
-local eatRemote = false
-if method == "FireServer" or method == "fireServer" then
-local okInt = pcall(function()
-if self == ToolAction then
-for i, v in ipairs(args) do
-if typeof(v) == "buffer" then
-local content = buffer.tostring(v)
-if content == "\1\1\1" and endlessColaEnabled then
-eatRemote = true
+local function ColaCheatIsSpeedBoostMethod(method)
+return type(method) == "table" and type(method.Info) == "table" and method.Info.SpeedBoost ~= nil
 end
-if content == "\1\2\1" and (endlessColaEnabled or modifyColaEnabled) then
-eatRemote = true
-task.spawn(function()
-if endlessColaEnabled then
-ColaSpeedBoost()
-task.wait()
-ColaVignette()
-else
-ColaSpeedBoost("FakeCola")
-ColaVignette()
-end
-end)
-end
+
+local function ColaCheatIsDrinkBoostTool(tasks)
+local cached = ColaCheat["Drink Tools"][tasks]
+if cached == nil then
+cached = false
+if type(tasks.Info) == "table" then
+for _, method in ipairs(ColaCheatCollectToolActivationMethods(tasks.Info)) do
+if ColaCheatIsSpeedBoostMethod(method) then
+cached = true
 break
 end
 end
 end
-end)
+ColaCheat["Drink Tools"][tasks] = cached
+end
+return cached
+end
 
-if okInt and eatRemote then
+local function ColaCheatIsLocalPlayerToolOwner(tasks)
+local owner = tasks.Parent and tasks.Parent.Parent and tasks.Parent.Parent.Parent
+return owner ~= nil and owner.Local == true
+end
+
+local function ColaCheatIsDrinkMethod(tasks, method)
+local okRef, reference = pcall(function()
+return tasks:GetMethodReferenceFromMethodTable(method)
+end)
+if okRef and reference and DrinkTaskType and getmetatable(reference) == DrinkTaskType then
+return true
+end
+return method.MethodReferencing == "Drink" and (method.ActivationType == "Start" or method.ActivationType == "End")
+end
+
+local function ColaCheatShouldInterceptActivate(tasks, method)
+if not ColaCheat["Visual Infinite"] or type(method) ~= "table" or not ColaCheatIsDrinkBoostTool(tasks) then
+return false
+end
+if not (ColaCheatIsDrinkMethod(tasks, method) or ColaCheatIsSpeedBoostMethod(method) or method.ItemUseIncrement ~= nil) then
+return false
+end
+return ColaCheatIsLocalPlayerToolOwner(tasks)
+end
+
+local function ColaCheatFireSpeedChange(character, tasks, value, length)
+FireClient(colaCharacterTask, character:GetAttribute("Tag"), "Movement", {
+SpeedChange = {
+Value = value,
+Type = tasks.Module.Name,
+Length = length,
+},
+})
+end
+
+local function ColaCheatApplyBoostEffects(tasks, method, withVignette)
+local character = LocalPlayer.Character
+local boostInfo = method.Info
+local defaultLength = boostInfo.Duration or boostInfo.Length
+local value = boostInfo.SpeedBoost
+local length = defaultLength
+local vignetteLength = boostInfo.SuccessImmortalLength or defaultLength
+if ColaCheat["Cola Modifier"] then
+value = ColaCheat["Custom Speed"] or value
+length = ColaCheat["Custom Duration"] or length
+if ColaCheat["Custom Duration"] then
+vignetteLength = ColaCheat["Custom Duration"]
+end
+end
+if withVignette then
+local color = ColaCheatFindColor3InTable(boostInfo, {}) or ColaCheatFindColor3InTable(tasks.Info, {})
+if color then
+FireClient(colaSharedUI, "Vignette", color, vignetteLength, true)
+end
+end
+ColaCheatFireSpeedChange(character, tasks, value, length)
+return value, length, defaultLength
+end
+
+local function ColaCheatReassertBoostAfterServer(tasks, value, length, defaultLength, character)
+if type(defaultLength) ~= "number" or type(length) ~= "number" or length <= defaultLength then
 return
 end
+if ColaCheat["Reassert Thread"] then
+pcall(task.cancel, ColaCheat["Reassert Thread"])
+end
+ColaCheat["Reassert Thread"] = DaraTrackThread(task.delay(defaultLength, function()
+ColaCheat["Reassert Thread"] = nil
+if ColaCheat["Loaded"] then
+ColaCheatFireSpeedChange(character, tasks, value, length - defaultLength)
+end
+end))
 end
 
-return oldNamecall(self, ...)
-end)
-end)
-pcall(function()
-setreadonly(gmt, true)
-end)
+local function ColaCheatActivateMethodLocally(tasks, method)
+local reference = tasks:GetMethodReferenceFromMethodTable(method)
+local resource = tasks:GetResourceFromMethodTable(method)
+if reference then
+reference.LastActivated = tick()
+end
+if method.ResourceIncrement and resource then
+resource:Increment(method.ResourceIncrement)
+end
+local activationType, requirement = tasks:ActivationTypeFromMethodTable(method)
+local cooldown
+if requirement ~= "Update" then
+local cooldownInfo = tasks:GetCooldownInfoFromMethod(method)
+tasks.Parent:AddCooldown(cooldownInfo)
+cooldown = cooldownInfo.Cooldown
+end
+local viewmodelData
+local characterData
+if reference then
+local _, viewmodel, characterVisual = reference:ActivateClient(activationType, method)
+viewmodelData = viewmodel
+characterData = characterVisual
+end
+if method.VisualName then
+tasks.Parent.Parent.ViewmodelVisuals:Task(method.VisualName, viewmodelData)
+tasks.Parent.Parent.CharacterVisuals:Task(method.VisualName, characterData)
+end
+return cooldown
+end
 
-if okHook then
-isColaHooked = true
+local function ColaCheatOnServerSpeedBoost(tag, kind, data)
+local pending = ColaCheat["Pending Drink"]
+if not pending or kind ~= "Movement" or type(data) ~= "table" or data.SpeedChange == nil then
+return
+end
+if pending.character:GetAttribute("Tag") ~= tag then
+return
+end
+ColaCheat["Pending Drink"] = nil
+if os.clock() > pending.expires then
+return
+end
+task.defer(function()
+if not ColaCheat["Loaded"] then
+return
+end
+local value, length, defaultLength = ColaCheatApplyBoostEffects(pending.tasks, pending.method, false)
+if value then
+ColaCheatReassertBoostAfterServer(pending.tasks, value, length, defaultLength, pending.character)
+end
+end)
+end
+
+ColaCheat["Patched"] = function(self, method, data)
+if not ColaCheat["Loaded"] then
+return ColaCheat["Original Activate"](self, method, data)
+end
+if ColaCheatShouldInterceptActivate(self, method) then
+local cooldown = ColaCheatActivateMethodLocally(self, method)
+if ColaCheatIsSpeedBoostMethod(method) then
+ColaCheatApplyBoostEffects(self, method, true)
+end
+return cooldown
+end
+local result = ColaCheat["Original Activate"](self, method, data)
+if ColaCheat["Cola Modifier"] and ColaCheatIsSpeedBoostMethod(method) and ColaCheatIsDrinkBoostTool(self) and ColaCheatIsLocalPlayerToolOwner(self) and LocalPlayer.Character then
+local cooldown = result
+if type(cooldown) ~= "number" then
+local cooldownInfo = self:GetCooldownInfoFromMethod(method)
+cooldown = cooldownInfo and cooldownInfo.Cooldown
+end
+ColaCheat["Pending Drink"] = {
+tasks = self,
+method = method,
+character = LocalPlayer.Character,
+expires = os.clock() + (cooldown or method.Info.Duration or method.Info.Length or 0),
+}
+end
+return result
+end
+
+function ColaCheatLoadHooks()
+if ColaCheat["Loaded"] then
+return
+end
+ColaCheat["Loaded"] = true
+if not ColaCheat["Original Activate"] then
+ColaCheat["Original Activate"] = ToolTasks.Activate
+end
+if ToolTasks.Activate == ColaCheat["Original Activate"] then
+ToolTasks.Activate = ColaCheat["Patched"]
+-- HOT-SWAP: catat hook di registry global agar eksekusi berikutnya bisa memulihkannya
+getgenv().__JoblessHub_ColaHook = {
+tasks = ToolTasks,
+patched = ColaCheat["Patched"],
+original = ColaCheat["Original Activate"]
+}
+end
+ColaCheat["Watcher"] = DaraTrackConn(colaCharacterTask.OnClientEvent:Connect(ColaCheatOnServerSpeedBoost))
+end
+
+function ColaCheatUnloadHooks()
+if not ColaCheat["Loaded"] then
+return
+end
+ColaCheat["Loaded"] = false
+if ToolTasks.Activate == ColaCheat["Patched"] then
+ToolTasks.Activate = ColaCheat["Original Activate"]
+end
+getgenv().__JoblessHub_ColaHook = nil
+if ColaCheat["Watcher"] then
+ColaCheat["Watcher"]:Disconnect()
+ColaCheat["Watcher"] = nil
+end
+if ColaCheat["Reassert Thread"] then
+pcall(task.cancel, ColaCheat["Reassert Thread"])
+ColaCheat["Reassert Thread"] = nil
+end
+ColaCheat["Pending Drink"] = nil
+end
+
+local function ColaCheatRefreshHooks()
+if ColaCheat["Visual Infinite"] or ColaCheat["Cola Modifier"] then
+ColaCheatLoadHooks()
 else
-warn("[JoblessHub] Gagal memasang hook Cola: " .. tostring(hookErr))
-end
-end
-
-local function removeColaHook()
-if not isColaHooked then return end
-
-pcall(function()
-setreadonly(gmt, false)
-gmt.__namecall = oldNamecall
-setreadonly(gmt, true)
-end)
-
-isColaHooked = false
-end
-
-local function checkColaHookStatus()
-if endlessColaEnabled or modifyColaEnabled then
-applyColaHook()
-else
-removeColaHook()
+ColaCheatUnloadHooks()
 end
 end
 
@@ -6185,8 +6804,8 @@ Tabs.Visuals:Toggle({
 Title = "Visuals Endless Cola",
 Desc = "Gives you unlimited cola client-side while blocking server animation",
 Callback = function(state)
-endlessColaEnabled = state
-checkColaHookStatus()
+ColaCheat["Visual Infinite"] = state
+ColaCheatRefreshHooks()
 end
 })
 
@@ -6194,39 +6813,136 @@ Tabs.Visuals:Toggle({
 Title = "Cola Booster",
 Desc = "Ganti efek cola versi kustom (FakeCola) memakai nilai Duration & Speed Boost di bawah",
 Callback = function(state)
-modifyColaEnabled = state
-checkColaHookStatus()
+ColaCheat["Cola Modifier"] = state
+ColaCheatRefreshHooks()
 end
 })
 
 Tabs.Visuals:Input({
 Title = "Cola Duration Boost",
-Value = tostring(customDuration),
+Value = ColaCheat["Custom Duration"] and tostring(ColaCheat["Custom Duration"]) or "",
 Callback = function(v)
 local num = tonumber(v)
-if num then
-customDuration = num
+if num and num > 0 then
+ColaCheat["Custom Duration"] = num
 end
 end
 })
 
 Tabs.Visuals:Input({
 Title = "Cola Speed Boost",
-Value = tostring(customSpeedBoost),
+Value = ColaCheat["Custom Speed"] and tostring(ColaCheat["Custom Speed"]) or "",
 Callback = function(v)
 local num = tonumber(v)
-if num then
-customSpeedBoost = num
+if num and num > 0 then
+ColaCheat["Custom Speed"] = num
 end
 end
 })
 else
-warn("[JoblessHub] Struktur module Cola berubah (Info tidak ditemukan) - fitur Cola dinonaktifkan")
+warn("[JoblessHub] Fitur Cola butuh getconnections + ToolTasks + remote CharacterTask/SharedUISetType - fitur Cola dinonaktifkan")
 Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
 end
+end
+
+Tabs.Visuals:Space()
+
+-- ================= ADD v1.6.5 (FITUR BARU DARAHUB TERBARU): SPEEDUP POPUP REWARDS =================
+-- Mempercepat animasi popup reward (claim harian dll) dengan mempercepat task.wait & tween
+-- di dalam PopupService Rewards.ShowAnimation. Toggle otomatis dinyalakan saat load
+-- (perilaku yang sama seperti DaraHub asli). Multiplier bisa diatur dari input di bawah.
+do
+local PopupService_Rewards = nil
+do
+local okRew, rewModule = pcall(function()
+local servicesF = ReplicatedStorage:FindFirstChild("Services")
+local uiF = servicesF and servicesF:FindFirstChild("UI")
+local popupF = uiF and uiF:FindFirstChild("PopupService")
+local typesF = popupF and popupF:FindFirstChild("Types")
+local rewardsModule = typesF and typesF:FindFirstChild("Rewards")
+if not rewardsModule then
+return nil
+end
+return require(rewardsModule)
+end)
+if okRew then
+PopupService_Rewards = rewModule
+end
+end
+
+if PopupService_Rewards and type(PopupService_Rewards.ShowAnimation) == "function" then
+local popupRewardsSpeed = 67.6767 -- multiplier default (sama seperti DaraHub)
+
+local rewardsToggle = Tabs.Visuals:Toggle({
+Title = "Speedup Popup Rewards",
+Flag = "popupservice_rewards_speed_toggle",
+Value = false,
+Callback = function(s)
+if s then
+local okPatch, errPatch = pcall(function()
+if not (getfenv and setfenv) then
+warn("[JoblessHub] Executor tidak punya getfenv/setfenv - speed patch tidak tersedia")
+return
+end
+if PopupService_Rewards._speedPatched then
+return
+end
+local original = PopupService_Rewards.ShowAnimation
+local baseEnv = getfenv(original)
+local baseTween = baseEnv.tween
+PopupService_Rewards._originalEnv = baseEnv
+PopupService_Rewards._speedPatched = true
+local proxyTask = setmetatable({}, { __index = task })
+proxyTask.wait = function(t)
+local mult = tonumber(popupRewardsSpeed) or 1
+if type(t) == "number" and t > 0 then
+return task.wait(t / mult)
+end
+return task.wait(t)
+end
+local proxyTween = function(inst, goal, time, style, dir, rev)
+local mult = tonumber(popupRewardsSpeed) or 1
+return baseTween(inst, goal, time / mult, style, dir, rev)
+end
+setfenv(original, setmetatable({
+task = proxyTask,
+tween = proxyTween
+}, { __index = baseEnv }))
+end)
+if not okPatch then
+warn("[JoblessHub] Speedup Popup Rewards gagal dipasang: " .. tostring(errPatch))
+end
 else
-warn("[JoblessHub] Fitur Cola butuh hookfunction/getrawmetatable/newcclosure/buffer + Events.ToolAction + Tools.Cola")
-Tabs.Visuals:Paragraph({ Title = "Cola Not Available" })
+pcall(function()
+if PopupService_Rewards._originalEnv then
+setfenv(PopupService_Rewards.ShowAnimation, PopupService_Rewards._originalEnv)
+end
+PopupService_Rewards._originalEnv = nil
+PopupService_Rewards._speedPatched = nil
+end)
+end
+end
+})
+
+local rewardsSpeedInput = Tabs.Visuals:Input({
+Title = "Popup Rewards Speed",
+Flag = "PopupService_Rewards_speed",
+Value = tostring(popupRewardsSpeed),
+Placeholder = "Enter Your Speed"
+})
+rewardsSpeedInput.Callback = function(val)
+local n = tonumber(val)
+if n and n > 0 then
+popupRewardsSpeed = n
+end
+end
+
+-- AUTO-ON saat load (perilaku sama seperti DaraHub terbaru)
+task.defer(function()
+pcall(function() rewardsToggle:Set(true) end)
+end)
+else
+warn("[JoblessHub] PopupService Rewards module tidak ditemukan - Speedup Popup Rewards dilewati")
 end
 end
 
@@ -7248,9 +7964,8 @@ local mapName = SelectedMapSetting or "BrickMaze"
 if mapName and mapName ~= "" then
 if isValidMap(mapName) then
 pcall(function()
-local adminEvents = ReplicatedStorage:FindFirstChild("Events")
-local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
-local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+-- UPDATE v1.6.5: VIPCommand pindah Events.Admin -> Remotes.Admin (via resolver, fallback lama)
+local vipCommand = GetGameRemote("Admin", "VIPCommand")
 if vipCommand then
 vipCommand:FireServer("AddMap", mapName)
 WindUI:Notify({
@@ -7279,9 +7994,8 @@ local mapName = SelectedMapSetting or "BrickMaze"
 if mapName and mapName ~= "" then
 if isValidMap(mapName) then
 pcall(function()
-local adminEvents = ReplicatedStorage:FindFirstChild("Events")
-local adminFolder = adminEvents and adminEvents:FindFirstChild("Admin")
-local vipCommand = adminFolder and adminFolder:FindFirstChild("VIPCommand")
+-- UPDATE v1.6.5: VIPCommand pindah Events.Admin -> Remotes.Admin (via resolver, fallback lama)
+local vipCommand = GetGameRemote("Admin", "VIPCommand")
 if vipCommand then
 vipCommand:FireServer("RemoveMap", mapName)
 WindUI:Notify({
